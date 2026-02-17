@@ -8,7 +8,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/
 task.wait(0.2)
 
 -- 3. Load Player List Logic
-loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/main/Script/Player%20manager/PlayerList.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/Player%20manager/PlayerList.lua?token=GHSAT0AAAAAADTPB3T3V64KI7LTCDXGRJZY2MUKSUA"))()
 
 print("Script Player Manager Loaded Successfully!")
 
