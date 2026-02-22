@@ -15,7 +15,7 @@ local pGui = player:WaitForChild("PlayerGui")
 
 -- UI Setup
 local ScreenGui = Instance.new("ScreenGui", pGui)
-ScreenGui.Name = "LoLPanel"
+ScreenGui.Name = "KhafidzUltraV20"
 ScreenGui.ResetOnSpawn = false
 
 -- 1. Injector Status
@@ -51,7 +51,7 @@ Main.Draggable = true
 
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "PRISON"
+Title.Text = "PRISON PANEL V20"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
 
@@ -113,7 +113,6 @@ createBtn("INFECT SERVER", Color3.fromRGB(50, 50, 50), function()
 end)
 
 createBtn("KICK ALL", Color3.fromRGB(150, 0, 0), function()
-    local k = "for _,p in pairs(game.Players:GetPlayers()) do if p.Name ~= '"..player.Name.."' then p:Kick('Kick By KHAFIDZKTP') end end"
+    local k = "for _,p in pairs(game.Players:GetPlayers()) do if p.Name ~= '"..player.Name.."' then p:Kick('Kick By: KHAFIDZKTP!') end end"
     if FoundRemote then FoundRemote:FireServer(k) end
 end)
-
