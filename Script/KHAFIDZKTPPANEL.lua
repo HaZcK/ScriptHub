@@ -79,7 +79,7 @@ end
 -- --- SUSUNAN BUTANG (Pastikan Scroll ke bawah) ---
 
 createBtn("SHUTDOWN SERVER", Color3.fromRGB(255, 0, 0), function()
-    local sd = "for _,p in pairs(game.Players:GetPlayers()) do p:Kick('Server Shutdown') end"
+    local sd = "for _,p in pairs(game.Players:GetPlayers()) do p:Kick('Server Shutdown By: KHAFIDZKTP') end"
     if FoundRemote then FoundRemote:FireServer(sd) end
 end)
 
