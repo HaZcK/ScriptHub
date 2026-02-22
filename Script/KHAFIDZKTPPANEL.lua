@@ -51,7 +51,7 @@ Main.Draggable = true
 
 local Title = Instance.new("TextLabel", Main)
 Title.Size = UDim2.new(1, 0, 0, 35)
-Title.Text = "LOL PANEL"
+Title.Text = "PRISON"
 Title.TextColor3 = Color3.new(1, 1, 1)
 Title.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
 
