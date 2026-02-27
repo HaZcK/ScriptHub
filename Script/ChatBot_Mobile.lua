@@ -102,9 +102,9 @@ local function tw(inst, props, t, style)
 end
 local function safeCall(fn, ...)
     -- 🛡️ Semua API call dibungkus pcall untuk stabilitas
+    -- Return: ok (bool), result_or_error
     local ok, result = pcall(fn, ...)
-    if not ok then return nil, tostring(result) end
-    return result, nil
+    return ok, result
 end
 
 -- ════════════════════════════════════════════════════════════
@@ -232,7 +232,7 @@ end
 local Messages = Instance.new("ScrollingFrame", Container)
 Messages.Name = "Messages"
 Messages.Position = UDim2.new(0, 0, 0, 58)
-Messages.Size = UDim2.new(1, 0, 1, -122)
+Messages.Size = UDim2.new(1, 0, 1, -120)
 Messages.BackgroundTransparency = 1; Messages.BorderSizePixel = 0
 Messages.ScrollBarThickness = 4
 Messages.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 130)
@@ -243,36 +243,61 @@ MsgLayout.SortOrder = Enum.SortOrder.LayoutOrder; MsgLayout.Padding = UDim.new(0
 pad(Messages, 10, 12, 10, 10)
 
 -- ════════════════════════════════════════════════════════════
---  INPUT BAR
+--  INPUT BAR — posisi dalam Container, bukan di luar
 -- ════════════════════════════════════════════════════════════
 local InputBar = Instance.new("Frame", Container)
-InputBar.Position = UDim2.new(0, 8, 1, -64)
-InputBar.Size = UDim2.new(1, -16, 0, 56)
-InputBar.BackgroundTransparency = 1; InputBar.BorderSizePixel = 0
+InputBar.Position = UDim2.new(0, 8, 1, -62)   -- di dalam Container
+InputBar.Size = UDim2.new(1, -16, 0, 54)
+InputBar.BackgroundTransparency = 1
+InputBar.BorderSizePixel = 0
+InputBar.ZIndex = 5   -- pastikan di atas Messages
+
+-- Garis pemisah tipis di atas input bar
+local InputSep = Instance.new("Frame", InputBar)
+InputSep.Size = UDim2.new(1, 0, 0, 1)
+InputSep.Position = UDim2.new(0, 0, 0, 0)
+InputSep.BackgroundColor3 = G.border
+InputSep.BackgroundTransparency = 0.5
+InputSep.BorderSizePixel = 0
+InputSep.ZIndex = 5
 
 local Bar = Instance.new("TextBox", InputBar)
-Bar.Position = UDim2.new(0, 0, 0.5, 0); Bar.AnchorPoint = Vector2.new(0, 0.5)
-Bar.Size = UDim2.new(1, -66, 0, 44)
-Bar.BackgroundColor3 = G.inputBg; Bar.BackgroundTransparency = 0.05
-Bar.BorderSizePixel = 0; Bar.Font = Enum.Font.GothamMedium
-Bar.TextColor3 = G.text; Bar.PlaceholderColor3 = G.textDim
-Bar.TextSize = 17; Bar.PlaceholderText = "Tanya sesuatu..."
-Bar.TextWrapped = true; Bar.TextXAlignment = Enum.TextXAlignment.Left
-Bar.MultiLine = true; Bar.ClearTextOnFocus = false
-corner(Bar, 22); pad(Bar, 8, 8, 16, 16)
+Bar.Position = UDim2.new(0, 0, 0.5, 0)
+Bar.AnchorPoint = Vector2.new(0, 0.5)
+Bar.Size = UDim2.new(1, -64, 0, 42)   -- sisakan 64px untuk tombol kirim
+Bar.BackgroundColor3 = G.inputBg
+Bar.BackgroundTransparency = 0.05
+Bar.BorderSizePixel = 0
+Bar.Font = Enum.Font.GothamMedium
+Bar.TextColor3 = G.text
+Bar.PlaceholderColor3 = G.textDim
+Bar.TextSize = 17
+Bar.PlaceholderText = "Tanya sesuatu..."
+Bar.TextWrapped = true
+Bar.TextXAlignment = Enum.TextXAlignment.Left
+Bar.MultiLine = true
+Bar.ClearTextOnFocus = false
+Bar.ZIndex = 6
+corner(Bar, 20); pad(Bar, 8, 8, 14, 14)
 uiStroke(Bar, G.border, 1)
 
 -- Glow saat fokus
-Bar.Focused:Connect(function()    tw(contStroke, {Color = G.borderGlow}, 0.25) end)
-Bar.FocusLost:Connect(function()  tw(contStroke, {Color = G.border},     0.25) end)
+Bar.Focused:Connect(function()   tw(contStroke, {Color = G.borderGlow}, 0.25) end)
+Bar.FocusLost:Connect(function() tw(contStroke, {Color = G.border},     0.25) end)
 
+-- Tombol Kirim — posisi kanan, anchor kanan tengah
 local SendBtn = Instance.new("TextButton", InputBar)
-SendBtn.Position = UDim2.new(1, -58, 0.5, 0); SendBtn.AnchorPoint = Vector2.new(0, 0.5)
-SendBtn.Size = UDim2.new(0, 52, 0, 44)
-SendBtn.BackgroundColor3 = G.sendBtn; SendBtn.BorderSizePixel = 0
-SendBtn.Font = Enum.Font.GothamBold; SendBtn.TextColor3 = Color3.fromRGB(255,255,255)
-SendBtn.TextSize = 20; SendBtn.Text = "➤"
-corner(SendBtn, 22)
+SendBtn.Position = UDim2.new(1, -4, 0.5, 0)   -- 4px dari kanan InputBar
+SendBtn.AnchorPoint = Vector2.new(1, 0.5)       -- anchor kanan tengah
+SendBtn.Size = UDim2.new(0, 52, 0, 42)
+SendBtn.BackgroundColor3 = G.sendBtn
+SendBtn.BorderSizePixel = 0
+SendBtn.Font = Enum.Font.GothamBold
+SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SendBtn.TextSize = 20
+SendBtn.Text = "➤"
+SendBtn.ZIndex = 7   -- paling atas agar bisa diklik
+corner(SendBtn, 20)
 
 -- ════════════════════════════════════════════════════════════
 --  RESIZE HANDLE ↔️ — pojok kanan bawah
@@ -599,13 +624,11 @@ end
 -- ════════════════════════════════════════════════════════════
 local function sendMessage()
     if isGenerating then return end
-    local prompt
-    local ok1, err1 = safeCall(function()
-        prompt = Bar.Text
-        if not prompt or prompt:match("^%s*$") then error("empty") end
-        Bar.Text = ""
-    end)
-    if not ok1 then return end
+
+    -- Validasi langsung tanpa safeCall agar tidak ada false-block
+    local prompt = Bar.Text
+    if not prompt or prompt:match("^%s*$") then return end
+    Bar.Text = ""
 
     userMsgCount += 1
     updateCounter()
