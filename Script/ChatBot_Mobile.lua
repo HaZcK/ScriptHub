@@ -1,454 +1,731 @@
-local ui = game:GetService("CoreGui"):FindFirstChild("AI")
-if ui then ui:Destroy() end
+-- ════════════════════════════════════════════════════════════
+--   AI ChatBot - Mobile Edition
+--   Powered by pollinations.ai
+--   Fitur: Drag • Minimize • Hapus Chat • Ganti Model • Counter
+-- ════════════════════════════════════════════════════════════
 
--- This chatbot is powered by https://pollinations.ai
--- Mobile-optimized version + CodeBox support
+local existing = game:GetService("CoreGui"):FindFirstChild("AI")
+if existing then existing:Destroy() end
 
-local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local CoreGui       = game:GetService("CoreGui")
+local HttpService   = game:GetService("HttpService")
+local RunService    = game:GetService("RunService")
+local UIS           = game:GetService("UserInputService")
+local TweenService  = game:GetService("TweenService")
 
-local isStudio = RunService:IsStudio()
-local http_func = request or http and http.request or http_request or syn and syn.request
-local REQUIRED_PROMPT = "\n"
+local isStudio  = RunService:IsStudio()
+local http_func = request or (http and http.request) or http_request or (syn and syn.request)
 
--- ============================================================
--- UI SETUP
--- ============================================================
+-- ── Konfigurasi ──────────────────────────────────────────────
+local CONFIG = {
+    models = {
+        { id = "openai",        label = "GPT-4o"       },
+        { id = "openai-large",  label = "GPT-4o Large" },
+        { id = "mistral",       label = "Mistral"      },
+        { id = "claude-hybridspace", label = "Claude" },
+    },
+    currentModel = 1,
+    systemPrompt = "You are a helpful AI assistant. Be concise and clear.",
+    maxHistory   = 40,   -- batas pesan agar tidak terlalu panjang
+}
 
+-- ── Warna ────────────────────────────────────────────────────
+local C = {
+    bg          = Color3.fromRGB(14, 14, 18),
+    header      = Color3.fromRGB(22, 22, 30),
+    headerBtn   = Color3.fromRGB(35, 35, 50),
+    userBubble  = Color3.fromRGB(40, 90, 210),
+    aiBubble    = Color3.fromRGB(28, 28, 38),
+    inputBg     = Color3.fromRGB(28, 28, 38),
+    sendBtn     = Color3.fromRGB(40, 90, 210),
+    codeBg      = Color3.fromRGB(18, 18, 26),
+    codeHeader  = Color3.fromRGB(26, 26, 40),
+    codeCopyBtn = Color3.fromRGB(44, 44, 66),
+    border      = Color3.fromRGB(50, 50, 70),
+    textPrim    = Color3.fromRGB(230, 230, 240),
+    textSec     = Color3.fromRGB(140, 140, 160),
+    accent      = Color3.fromRGB(100, 140, 255),
+    danger      = Color3.fromRGB(200, 60, 60),
+    success     = Color3.fromRGB(60, 180, 100),
+    miniBtn     = Color3.fromRGB(255, 190, 40),
+    closeBtn    = Color3.fromRGB(220, 60, 60),
+}
+
+-- ════════════════════════════════════════════════════════════
+--  HELPERS
+-- ════════════════════════════════════════════════════════════
+local function corner(inst, r)
+    local uc = Instance.new("UICorner", inst)
+    uc.CornerRadius = UDim.new(0, r or 12)
+    return uc
+end
+local function stroke(inst, color, thick)
+    local us = Instance.new("UIStroke", inst)
+    us.Color = color or C.border
+    us.Thickness = thick or 1
+    us.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    return us
+end
+local function pad(inst, t, b, l, r)
+    local p = Instance.new("UIPadding", inst)
+    p.PaddingTop    = UDim.new(0, t or 0)
+    p.PaddingBottom = UDim.new(0, b or 0)
+    p.PaddingLeft   = UDim.new(0, l or 0)
+    p.PaddingRight  = UDim.new(0, r or 0)
+end
+local function tween(inst, props, t)
+    TweenService:Create(inst, TweenInfo.new(t or 0.2, Enum.EasingStyle.Quad), props):Play()
+end
+
+-- ════════════════════════════════════════════════════════════
+--  ROOT GUI
+-- ════════════════════════════════════════════════════════════
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AI"
-ScreenGui.Parent = CoreGui
 ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = CoreGui
 
--- Container utama
+-- ── Container ────────────────────────────────────────────────
 local Container = Instance.new("Frame", ScreenGui)
 Container.Name = "Container"
-Container.Position = UDim2.new(0.5, 0, 0.5, 0)
-Container.Size = UDim2.new(0.95, 0, 0.88, 0)
-Container.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-Container.AnchorPoint = Vector2.new(0.5, 0.5)
+Container.Size = UDim2.new(0.94, 0, 0.86, 0)
+Container.Position = UDim2.new(0.03, 0, 0.07, 0)
+Container.BackgroundColor3 = C.bg
 Container.BorderSizePixel = 0
-Instance.new("UICorner", Container).CornerRadius = UDim.new(0, 18)
-local cs = Instance.new("UIStroke", Container)
-cs.Color = Color3.fromRGB(40, 40, 40)
+corner(Container, 20)
+stroke(Container, C.border, 1)
 
--- Header
+-- ════════════════════════════════════════════════════════════
+--  HEADER
+-- ════════════════════════════════════════════════════════════
 local Header = Instance.new("Frame", Container)
 Header.Name = "Header"
-Header.Size = UDim2.new(1, 0, 0, 56)
-Header.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Header.Size = UDim2.new(1, 0, 0, 54)
+Header.BackgroundColor3 = C.header
 Header.BorderSizePixel = 0
-Instance.new("UICorner", Header).CornerRadius = UDim.new(0, 18)
+corner(Header, 20)
 
-local IconLeft = Instance.new("ImageLabel", Header)
-IconLeft.Position = UDim2.new(0, 12, 0.5, 0)
-IconLeft.Size = UDim2.new(0, 36, 0, 36)
-IconLeft.AnchorPoint = Vector2.new(0, 0.5)
-IconLeft.BackgroundTransparency = 1
-IconLeft.Image = "rbxassetid://125966901198850"
+-- Teks judul di header
+local TitleLabel = Instance.new("TextLabel", Header)
+TitleLabel.Position = UDim2.new(0, 56, 0, 0)
+TitleLabel.Size = UDim2.new(0.45, 0, 1, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.TextSize = 16
+TitleLabel.TextColor3 = C.textPrim
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Text = "✦ AI Chat"
 
-local IconRight = Instance.new("ImageLabel", Header)
-IconRight.Position = UDim2.new(1, -12, 0.5, 0)
-IconRight.Size = UDim2.new(0, 36, 0, 36)
-IconRight.AnchorPoint = Vector2.new(1, 0.5)
-IconRight.BackgroundTransparency = 1
-IconRight.Image = "rbxassetid://73985599900390"
+-- Counter pesan
+local CounterLabel = Instance.new("TextLabel", Header)
+CounterLabel.Position = UDim2.new(0, 56, 0, 0)
+CounterLabel.Size = UDim2.new(0.45, 0, 1, 0)
+CounterLabel.BackgroundTransparency = 1
+CounterLabel.Font = Enum.Font.Gotham
+CounterLabel.TextSize = 13
+CounterLabel.TextColor3 = C.textSec
+CounterLabel.TextXAlignment = Enum.TextXAlignment.Left
+CounterLabel.Position = UDim2.new(0, 56, 0.52, 0)
+CounterLabel.Text = "0 pesan"
 
--- Area chat (ScrollingFrame)
+-- ── Tombol Header (kanan) ────────────────────────────────────
+local function makeHeaderBtn(icon, xOffset, bgColor)
+    local btn = Instance.new("TextButton", Header)
+    btn.Size = UDim2.new(0, 36, 0, 36)
+    btn.Position = UDim2.new(1, xOffset, 0.5, 0)
+    btn.AnchorPoint = Vector2.new(1, 0.5)
+    btn.BackgroundColor3 = bgColor or C.headerBtn
+    btn.BorderSizePixel = 0
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 16
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.Text = icon
+    corner(btn, 10)
+    return btn
+end
+
+local BtnClose    = makeHeaderBtn("✕", -8,  C.closeBtn)
+local BtnMinimize = makeHeaderBtn("─", -50, C.miniBtn)
+local BtnClear    = makeHeaderBtn("🗑", -94, C.headerBtn)
+local BtnModel    = makeHeaderBtn("⚙", -136, C.headerBtn)
+
+-- Icon kiri header
+local HeaderIcon = Instance.new("ImageLabel", Header)
+HeaderIcon.Position = UDim2.new(0, 10, 0.5, 0)
+HeaderIcon.Size = UDim2.new(0, 34, 0, 34)
+HeaderIcon.AnchorPoint = Vector2.new(0, 0.5)
+HeaderIcon.BackgroundTransparency = 1
+HeaderIcon.Image = "rbxassetid://125966901198850"
+
+-- ════════════════════════════════════════════════════════════
+--  MODEL PICKER (dropdown sederhana, muncul di bawah header)
+-- ════════════════════════════════════════════════════════════
+local ModelPicker = Instance.new("Frame", Container)
+ModelPicker.Name = "ModelPicker"
+ModelPicker.Position = UDim2.new(1, -196, 0, 58)
+ModelPicker.Size = UDim2.new(0, 188, 0, 0)
+ModelPicker.BackgroundColor3 = C.codeHeader
+ModelPicker.BorderSizePixel = 0
+ModelPicker.Visible = false
+ModelPicker.ZIndex = 20
+corner(ModelPicker, 12)
+stroke(ModelPicker, C.border)
+
+local MPLayout = Instance.new("UIListLayout", ModelPicker)
+MPLayout.SortOrder = Enum.SortOrder.LayoutOrder
+MPLayout.Padding = UDim.new(0, 2)
+pad(ModelPicker, 6, 6, 6, 6)
+
+local modelBtns = {}
+for i, m in ipairs(CONFIG.models) do
+    local mb = Instance.new("TextButton", ModelPicker)
+    mb.Size = UDim2.new(1, 0, 0, 38)
+    mb.BackgroundColor3 = i == CONFIG.currentModel and C.accent or C.headerBtn
+    mb.BorderSizePixel = 0
+    mb.Font = Enum.Font.GothamMedium
+    mb.TextSize = 14
+    mb.TextColor3 = Color3.fromRGB(230, 230, 255)
+    mb.Text = (i == CONFIG.currentModel and "● " or "  ") .. m.label
+    mb.ZIndex = 21
+    mb.LayoutOrder = i
+    corner(mb, 8)
+    modelBtns[i] = mb
+end
+ModelPicker.Size = UDim2.new(0, 188, 0, (#CONFIG.models * 40) + 12)
+
+-- ════════════════════════════════════════════════════════════
+--  AREA PESAN
+-- ════════════════════════════════════════════════════════════
 local Messages = Instance.new("ScrollingFrame", Container)
 Messages.Name = "Messages"
-Messages.Position = UDim2.new(0, 0, 0, 60)
-Messages.Size = UDim2.new(1, 0, 1, -130)
+Messages.Position = UDim2.new(0, 0, 0, 58)
+Messages.Size = UDim2.new(1, 0, 1, -126)
 Messages.BackgroundTransparency = 1
 Messages.BorderSizePixel = 0
-Messages.ScrollBarThickness = 6
-Messages.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 80)
+Messages.ScrollBarThickness = 5
+Messages.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 100)
 Messages.AutomaticCanvasSize = Enum.AutomaticSize.Y
-Messages.CanvasSize = UDim2.new(0, 0, 0, 0)
+Messages.CanvasSize = UDim2.new(0,0,0,0)
 
 local MsgLayout = Instance.new("UIListLayout", Messages)
 MsgLayout.SortOrder = Enum.SortOrder.LayoutOrder
 MsgLayout.Padding = UDim.new(0, 10)
+pad(Messages, 10, 10, 10, 10)
 
-local MsgPad = Instance.new("UIPadding", Messages)
-MsgPad.PaddingTop = UDim.new(0, 10)
-MsgPad.PaddingBottom = UDim.new(0, 10)
-MsgPad.PaddingLeft = UDim.new(0, 10)
-MsgPad.PaddingRight = UDim.new(0, 10)
-
--- Input bar (bawah)
+-- ════════════════════════════════════════════════════════════
+--  INPUT BAR
+-- ════════════════════════════════════════════════════════════
 local InputBar = Instance.new("Frame", Container)
-InputBar.Name = "InputBar"
-InputBar.Position = UDim2.new(0, 8, 1, -68)
-InputBar.Size = UDim2.new(1, -16, 0, 60)
+InputBar.Position = UDim2.new(0, 8, 1, -66)
+InputBar.Size = UDim2.new(1, -16, 0, 58)
 InputBar.BackgroundTransparency = 1
 InputBar.BorderSizePixel = 0
 
 local Bar = Instance.new("TextBox", InputBar)
-Bar.Name = "Bar"
 Bar.Position = UDim2.new(0, 0, 0.5, 0)
-Bar.Size = UDim2.new(1, -72, 0, 48)
+Bar.Size = UDim2.new(1, -70, 0, 46)
 Bar.AnchorPoint = Vector2.new(0, 0.5)
-Bar.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Bar.BackgroundColor3 = C.inputBg
 Bar.BorderSizePixel = 0
 Bar.Font = Enum.Font.GothamMedium
-Bar.TextColor3 = Color3.fromRGB(220, 220, 220)
-Bar.PlaceholderColor3 = Color3.fromRGB(100, 100, 100)
-Bar.TextSize = 19
-Bar.Text = ""
+Bar.TextColor3 = C.textPrim
+Bar.PlaceholderColor3 = C.textSec
+Bar.TextSize = 18
 Bar.PlaceholderText = "Tanya sesuatu..."
 Bar.TextWrapped = true
 Bar.TextXAlignment = Enum.TextXAlignment.Left
 Bar.MultiLine = true
 Bar.ClearTextOnFocus = false
-Instance.new("UICorner", Bar).CornerRadius = UDim.new(0, 22)
-local barPad = Instance.new("UIPadding", Bar)
-barPad.PaddingLeft = UDim.new(0, 14)
-barPad.PaddingRight = UDim.new(0, 14)
-barPad.PaddingTop = UDim.new(0, 8)
-barPad.PaddingBottom = UDim.new(0, 8)
-local barStroke = Instance.new("UIStroke", Bar)
-barStroke.Color = Color3.fromRGB(60, 60, 60)
-barStroke.Thickness = 1
-barStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+corner(Bar, 22)
+pad(Bar, 8, 8, 16, 16)
+stroke(Bar, C.border, 1)
 
 local SendBtn = Instance.new("TextButton", InputBar)
-SendBtn.Name = "SendButton"
 SendBtn.Position = UDim2.new(1, -62, 0.5, 0)
-SendBtn.Size = UDim2.new(0, 58, 0, 48)
+SendBtn.Size = UDim2.new(0, 56, 0, 46)
 SendBtn.AnchorPoint = Vector2.new(0, 0.5)
-SendBtn.BackgroundColor3 = Color3.fromRGB(40, 90, 200)
+SendBtn.BackgroundColor3 = C.sendBtn
 SendBtn.BorderSizePixel = 0
 SendBtn.Font = Enum.Font.GothamBold
-SendBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-SendBtn.TextSize = 15
-SendBtn.Text = "Kirim"
-Instance.new("UICorner", SendBtn).CornerRadius = UDim.new(0, 22)
+SendBtn.TextColor3 = Color3.fromRGB(255,255,255)
+SendBtn.TextSize = 20
+SendBtn.Text = "➤"
+corner(SendBtn, 22)
 
--- ============================================================
--- FUNGSI BANTU
--- ============================================================
+-- ════════════════════════════════════════════════════════════
+--  MINIMIZE BAR (bar kecil muncul saat minimize)
+-- ════════════════════════════════════════════════════════════
+local MiniBar = Instance.new("Frame", ScreenGui)
+MiniBar.Name = "MiniBar"
+MiniBar.Size = UDim2.new(0, 140, 0, 44)
+MiniBar.Position = UDim2.new(0.03, 0, 0.07, 0)
+MiniBar.BackgroundColor3 = C.header
+MiniBar.BorderSizePixel = 0
+MiniBar.Visible = false
+corner(MiniBar, 22)
+stroke(MiniBar, C.border)
 
-local msgCount = 0
+local MiniIcon = Instance.new("ImageLabel", MiniBar)
+MiniIcon.Position = UDim2.new(0, 10, 0.5, 0)
+MiniIcon.Size = UDim2.new(0, 28, 0, 28)
+MiniIcon.AnchorPoint = Vector2.new(0, 0.5)
+MiniIcon.BackgroundTransparency = 1
+MiniIcon.Image = "rbxassetid://125966901198850"
 
+local MiniLabel = Instance.new("TextLabel", MiniBar)
+MiniLabel.Position = UDim2.new(0, 46, 0, 0)
+MiniLabel.Size = UDim2.new(1, -46, 1, 0)
+MiniLabel.BackgroundTransparency = 1
+MiniLabel.Font = Enum.Font.GothamBold
+MiniLabel.TextSize = 14
+MiniLabel.TextColor3 = C.textPrim
+MiniLabel.TextXAlignment = Enum.TextXAlignment.Left
+MiniLabel.Text = "✦ AI Chat"
+
+-- ════════════════════════════════════════════════════════════
+--  STATE
+-- ════════════════════════════════════════════════════════════
+local msgCount    = 0
+local userMsgCount = 0
+local isGenerating = false
+local isMinimized  = false
+local modelPickerOpen = false
+
+local messages = {
+    { role = "system", content = CONFIG.systemPrompt }
+}
+
+-- ════════════════════════════════════════════════════════════
+--  DRAG (geser) — bekerja di HP & PC
+-- ════════════════════════════════════════════════════════════
+local function makeDraggable(frame, handle)
+    local dragging, dragStart, startPos = false, nil, nil
+
+    local function onStart(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging  = true
+            dragStart = input.Position
+            startPos  = frame.Position
+        end
+    end
+    local function onMove(input)
+        if not dragging then return end
+        if input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end
+    local function onEnd(input)
+        if input.UserInputType == Enum.UserInputType.Touch
+            or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end
+
+    handle.InputBegan:Connect(onStart)
+    UIS.InputChanged:Connect(onMove)
+    UIS.InputEnded:Connect(onEnd)
+end
+
+makeDraggable(Container, Header)
+makeDraggable(MiniBar,   MiniBar)
+
+-- ════════════════════════════════════════════════════════════
+--  FUNGSI UI
+-- ════════════════════════════════════════════════════════════
 local function scrollToBottom()
-	task.wait()
-	Messages.CanvasPosition = Vector2.new(0, math.huge)
+    task.wait(0.05)
+    Messages.CanvasPosition = Vector2.new(0, math.huge)
 end
 
--- Buat bubble teks biasa
+local function updateCounter()
+    CounterLabel.Text = userMsgCount .. " pesan"
+end
+
+-- Buat bubble teks
 local function createTextBubble(isUser, text)
-	msgCount += 1
-	local bubble = Instance.new("Frame", Messages)
-	bubble.Name = isUser and "UserMsg" or "SysMsg"
-	bubble.LayoutOrder = msgCount
-	bubble.BackgroundTransparency = 1
-	bubble.Size = UDim2.new(1, 0, 0, 0)
-	bubble.AutomaticSize = Enum.AutomaticSize.Y
-	bubble.BorderSizePixel = 0
+    msgCount += 1
+    local row = Instance.new("Frame", Messages)
+    row.Name = isUser and "UserRow" or "AIRow"
+    row.LayoutOrder = msgCount
+    row.BackgroundTransparency = 1
+    row.Size = UDim2.new(1, 0, 0, 0)
+    row.AutomaticSize = Enum.AutomaticSize.Y
+    row.BorderSizePixel = 0
 
-	local inner = Instance.new("Frame", bubble)
-	inner.AutomaticSize = Enum.AutomaticSize.XY
-	inner.BackgroundColor3 = isUser and Color3.fromRGB(40, 90, 200) or Color3.fromRGB(30, 30, 30)
-	inner.BorderSizePixel = 0
-	if isUser then
-		inner.AnchorPoint = Vector2.new(1, 0)
-		inner.Position = UDim2.new(1, 0, 0, 0)
-	else
-		inner.AnchorPoint = Vector2.new(0, 0)
-		inner.Position = UDim2.new(0, 0, 0, 0)
-	end
-	Instance.new("UICorner", inner).CornerRadius = UDim.new(0, 16)
+    local bubble = Instance.new("Frame", row)
+    bubble.AutomaticSize = Enum.AutomaticSize.XY
+    bubble.BackgroundColor3 = isUser and C.userBubble or C.aiBubble
+    bubble.BorderSizePixel = 0
+    bubble.AnchorPoint = Vector2.new(isUser and 1 or 0, 0)
+    bubble.Position = UDim2.new(isUser and 1 or 0, 0, 0, 0)
+    corner(bubble, 16)
 
-	local label = Instance.new("TextLabel", inner)
-	label.Name = "Message"
-	label.AutomaticSize = Enum.AutomaticSize.XY
-	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 20
-	label.TextColor3 = isUser and Color3.fromRGB(255,255,255) or Color3.fromRGB(210,210,210)
-	label.TextWrapped = true
-	label.RichText = true
-	label.TextXAlignment = isUser and Enum.TextXAlignment.Right or Enum.TextXAlignment.Left
-	label.Text = text
-	local lp = Instance.new("UIPadding", label)
-	lp.PaddingTop = UDim.new(0, 8)
-	lp.PaddingBottom = UDim.new(0, 8)
-	lp.PaddingLeft = UDim.new(0, 14)
-	lp.PaddingRight = UDim.new(0, 14)
+    local label = Instance.new("TextLabel", bubble)
+    label.Name = "Message"
+    label.AutomaticSize = Enum.AutomaticSize.XY
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = 18
+    label.TextColor3 = isUser and Color3.fromRGB(255,255,255) or C.textPrim
+    label.TextWrapped = true
+    label.RichText = true
+    label.TextXAlignment = isUser and Enum.TextXAlignment.Right or Enum.TextXAlignment.Left
+    label.Text = text
+    pad(label, 10, 10, 14, 14)
 
-	scrollToBottom()
-	return label
+    -- Animasi muncul
+    bubble.BackgroundTransparency = 1
+    tween(bubble, { BackgroundTransparency = 0 }, 0.15)
+
+    scrollToBottom()
+    return label
 end
 
--- ============================================================
--- CODEBOX: Kotak khusus untuk blok kode
--- ============================================================
-
+-- ════════════════════════════════════════════════════════════
+--  CODEBOX
+-- ════════════════════════════════════════════════════════════
 local function createCodeBox(lang, code)
-	msgCount += 1
-	local wrapper = Instance.new("Frame", Messages)
-	wrapper.Name = "CodeBox"
-	wrapper.LayoutOrder = msgCount
-	wrapper.Size = UDim2.new(1, 0, 0, 0)
-	wrapper.AutomaticSize = Enum.AutomaticSize.Y
-	wrapper.BackgroundColor3 = Color3.fromRGB(20, 20, 28)
-	wrapper.BorderSizePixel = 0
-	Instance.new("UICorner", wrapper).CornerRadius = UDim.new(0, 12)
-	local ws = Instance.new("UIStroke", wrapper)
-	ws.Color = Color3.fromRGB(60, 60, 90)
-	ws.Thickness = 1
+    msgCount += 1
+    local wrapper = Instance.new("Frame", Messages)
+    wrapper.Name = "CodeBox"
+    wrapper.LayoutOrder = msgCount
+    wrapper.Size = UDim2.new(1, 0, 0, 0)
+    wrapper.AutomaticSize = Enum.AutomaticSize.Y
+    wrapper.BackgroundColor3 = C.codeBg
+    wrapper.BorderSizePixel = 0
+    corner(wrapper, 14)
+    stroke(wrapper, C.border, 1)
 
-	-- Header codebox (nama bahasa + tombol salin)
-	local codeHeader = Instance.new("Frame", wrapper)
-	codeHeader.Name = "CodeHeader"
-	codeHeader.Size = UDim2.new(1, 0, 0, 38)
-	codeHeader.BackgroundColor3 = Color3.fromRGB(28, 28, 40)
-	codeHeader.BorderSizePixel = 0
-	-- Buat sudut atas melengkung, bawah datar
-	Instance.new("UICorner", codeHeader).CornerRadius = UDim.new(0, 12)
+    -- Header codebox
+    local ch = Instance.new("Frame", wrapper)
+    ch.Size = UDim2.new(1, 0, 0, 40)
+    ch.BackgroundColor3 = C.codeHeader
+    ch.BorderSizePixel = 0
+    corner(ch, 14)
 
-	local langLabel = Instance.new("TextLabel", codeHeader)
-	langLabel.Position = UDim2.new(0, 14, 0, 0)
-	langLabel.Size = UDim2.new(0.6, 0, 1, 0)
-	langLabel.BackgroundTransparency = 1
-	langLabel.Font = Enum.Font.GothamBold
-	langLabel.TextSize = 14
-	langLabel.TextColor3 = Color3.fromRGB(130, 160, 255)
-	langLabel.TextXAlignment = Enum.TextXAlignment.Left
-	langLabel.Text = (lang ~= "" and lang or "code"):upper()
+    local ll = Instance.new("TextLabel", ch)
+    ll.Position = UDim2.new(0, 14, 0, 0)
+    ll.Size = UDim2.new(0.6, 0, 1, 0)
+    ll.BackgroundTransparency = 1
+    ll.Font = Enum.Font.GothamBold
+    ll.TextSize = 13
+    ll.TextColor3 = C.accent
+    ll.TextXAlignment = Enum.TextXAlignment.Left
+    ll.Text = (lang ~= "" and lang or "code"):upper()
 
-	local copyBtn = Instance.new("TextButton", codeHeader)
-	copyBtn.Name = "CopyCode"
-	copyBtn.Position = UDim2.new(1, -8, 0.5, 0)
-	copyBtn.Size = UDim2.new(0, 90, 0, 28)
-	copyBtn.AnchorPoint = Vector2.new(1, 0.5)
-	copyBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 68)
-	copyBtn.BorderSizePixel = 0
-	copyBtn.Font = Enum.Font.GothamMedium
-	copyBtn.TextColor3 = Color3.fromRGB(190, 200, 255)
-	copyBtn.TextSize = 14
-	copyBtn.Text = "📋  Salin"
-	Instance.new("UICorner", copyBtn).CornerRadius = UDim.new(0, 8)
+    local cpBtn = Instance.new("TextButton", ch)
+    cpBtn.Position = UDim2.new(1, -8, 0.5, 0)
+    cpBtn.Size = UDim2.new(0, 90, 0, 28)
+    cpBtn.AnchorPoint = Vector2.new(1, 0.5)
+    cpBtn.BackgroundColor3 = C.codeCopyBtn
+    cpBtn.BorderSizePixel = 0
+    cpBtn.Font = Enum.Font.GothamMedium
+    cpBtn.TextColor3 = Color3.fromRGB(190, 205, 255)
+    cpBtn.TextSize = 13
+    cpBtn.Text = "📋 Salin"
+    corner(cpBtn, 8)
 
-	-- Area kode: ScrollingFrame horizontal + vertikal
-	local codeScroll = Instance.new("ScrollingFrame", wrapper)
-	codeScroll.Name = "CodeScroll"
-	codeScroll.Position = UDim2.new(0, 0, 0, 38)
-	codeScroll.Size = UDim2.new(1, 0, 0, 0)
-	codeScroll.AutomaticSize = Enum.AutomaticSize.Y
-	codeScroll.BackgroundTransparency = 1
-	codeScroll.BorderSizePixel = 0
-	codeScroll.ScrollBarThickness = 5
-	codeScroll.ScrollBarImageColor3 = Color3.fromRGB(80, 80, 130)
-	codeScroll.ElasticBehavior = Enum.ElasticBehavior.Never
-	codeScroll.AutomaticCanvasSize = Enum.AutomaticSize.XY
-	codeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	codeScroll.HorizontalScrollBarInset = Enum.ScrollBarInset.ScrollBar
-	codeScroll.VerticalScrollBarInset = Enum.ScrollBarInset.ScrollBar
+    -- Scroll area kode
+    local cs2 = Instance.new("ScrollingFrame", wrapper)
+    cs2.Position = UDim2.new(0, 0, 0, 40)
+    cs2.Size = UDim2.new(1, 0, 0, 0)
+    cs2.AutomaticSize = Enum.AutomaticSize.Y
+    cs2.BackgroundTransparency = 1
+    cs2.BorderSizePixel = 0
+    cs2.ScrollBarThickness = 4
+    cs2.ScrollBarImageColor3 = Color3.fromRGB(70, 70, 120)
+    cs2.AutomaticCanvasSize = Enum.AutomaticSize.XY
+    cs2.CanvasSize = UDim2.new(0,0,0,0)
+    cs2.ElasticBehavior = Enum.ElasticBehavior.Never
 
-	local codeLabel = Instance.new("TextLabel", codeScroll)
-	codeLabel.Name = "CodeText"
-	codeLabel.AutomaticSize = Enum.AutomaticSize.XY
-	codeLabel.BackgroundTransparency = 1
-	codeLabel.Font = Enum.Font.Code           -- Font monospace
-	codeLabel.TextSize = 16
-	codeLabel.TextColor3 = Color3.fromRGB(190, 230, 160)
-	codeLabel.TextWrapped = false             -- Biarkan scroll horizontal
-	codeLabel.RichText = false
-	codeLabel.TextXAlignment = Enum.TextXAlignment.Left
-	codeLabel.TextYAlignment = Enum.TextYAlignment.Top
-	codeLabel.Text = code
-	local cp = Instance.new("UIPadding", codeLabel)
-	cp.PaddingTop = UDim.new(0, 10)
-	cp.PaddingBottom = UDim.new(0, 14)
-	cp.PaddingLeft = UDim.new(0, 14)
-	cp.PaddingRight = UDim.new(0, 14)
+    local cl = Instance.new("TextLabel", cs2)
+    cl.AutomaticSize = Enum.AutomaticSize.XY
+    cl.BackgroundTransparency = 1
+    cl.Font = Enum.Font.Code
+    cl.TextSize = 15
+    cl.TextColor3 = Color3.fromRGB(180, 230, 150)
+    cl.TextWrapped = false
+    cl.RichText = false
+    cl.TextXAlignment = Enum.TextXAlignment.Left
+    cl.TextYAlignment = Enum.TextYAlignment.Top
+    cl.Text = code
+    pad(cl, 10, 14, 14, 14)
 
-	-- Logika tombol Salin kode
-	local function doCopy()
-		if isStudio then
-			print("[CodeBox Copy]\n" .. code)
-		else
-			pcall(setclipboard, code)
-		end
-		copyBtn.Text = "✅  Disalin!"
-		copyBtn.BackgroundColor3 = Color3.fromRGB(30, 80, 50)
-		task.delay(2, function()
-			if copyBtn and copyBtn.Parent then
-				copyBtn.Text = "📋  Salin"
-				copyBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 68)
-			end
-		end)
-	end
-	copyBtn.MouseButton1Click:Connect(doCopy)
-	copyBtn.TouchTap:Connect(doCopy)
+    -- Tombol salin
+    local function doCopy()
+        pcall(function()
+            if isStudio then print("[COPY]\n"..code) else setclipboard(code) end
+        end)
+        cpBtn.Text = "✅ Disalin!"
+        cpBtn.BackgroundColor3 = Color3.fromRGB(30, 90, 55)
+        task.delay(2, function()
+            if cpBtn.Parent then
+                cpBtn.Text = "📋 Salin"
+                cpBtn.BackgroundColor3 = C.codeCopyBtn
+            end
+        end)
+    end
+    cpBtn.MouseButton1Click:Connect(doCopy)
+    cpBtn.TouchTap:Connect(doCopy)
 
-	scrollToBottom()
-	return wrapper
+    scrollToBottom()
+    return wrapper
 end
 
--- ============================================================
--- PARSER: Pisahkan teks biasa & blok kode ```...```
--- ============================================================
-
+-- ════════════════════════════════════════════════════════════
+--  RICH TEXT & PARSER
+-- ════════════════════════════════════════════════════════════
 local function richText(txt)
-	txt = txt:gsub("%*%*([^\n%*]+)%*%*", "<b>%1</b>")
-	txt = txt:gsub("~~([^\n~]+)~~", "<strike>%1</strike>")
-	return txt
+    txt = txt:gsub("%*%*(.-)%*%*", "<b>%1</b>")
+    txt = txt:gsub("_(.-)_",       "<i>%1</i>")
+    txt = txt:gsub("~~(.-)~~",     "<strike>%1</strike>")
+    txt = txt:gsub("`([^`]+)`",    '<font color="rgb(160,210,120)" face="Code">%1</font>')
+    return txt
 end
 
 local function renderAIMessage(fullText)
-	local segments = {}
-	local pos = 1
-
-	while pos <= #fullText do
-		-- Cari pembuka ```
-		local openS, openE, lang = fullText:find("```([^\n]*)\n", pos)
-		if openS then
-			-- Teks sebelum blok kode
-			if openS > pos then
-				local before = fullText:sub(pos, openS - 1):gsub("^%s+", ""):gsub("%s+$", "")
-				if before ~= "" then
-					table.insert(segments, { type = "text", content = before })
-				end
-			end
-			-- Cari penutup ```
-			local closeS, closeE = fullText:find("\n```", openE + 1)
-			if closeS then
-				local code = fullText:sub(openE + 1, closeS)
-				table.insert(segments, { type = "code", lang = lang or "", content = code })
-				pos = closeE + 1
-			else
-				-- Tidak ada penutup → perlakukan sebagai teks
-				table.insert(segments, { type = "text", content = fullText:sub(openS) })
-				pos = #fullText + 1
-			end
-		else
-			-- Sisa semua teks biasa
-			local rest = fullText:sub(pos):gsub("^%s+", ""):gsub("%s+$", "")
-			if rest ~= "" then
-				table.insert(segments, { type = "text", content = rest })
-			end
-			break
-		end
-	end
-
-	if #segments == 0 then
-		createTextBubble(false, richText(fullText))
-		return
-	end
-
-	for _, seg in ipairs(segments) do
-		if seg.type == "text" then
-			createTextBubble(false, richText(seg.content))
-		elseif seg.type == "code" then
-			createCodeBox(seg.lang, seg.content)
-		end
-	end
+    local pos = 1
+    local rendered = false
+    while pos <= #fullText do
+        local openS, openE, lang = fullText:find("```([^\n]*)\n", pos)
+        if openS then
+            if openS > pos then
+                local before = fullText:sub(pos, openS-1):gsub("^%s+",""):gsub("%s+$","")
+                if before ~= "" then createTextBubble(false, richText(before)) end
+            end
+            local closeS, closeE = fullText:find("\n```", openE+1)
+            if closeS then
+                createCodeBox(lang or "", fullText:sub(openE+1, closeS))
+                pos = closeE + 1
+            else
+                createTextBubble(false, richText(fullText:sub(openS)))
+                pos = #fullText + 1
+            end
+            rendered = true
+        else
+            local rest = fullText:sub(pos):gsub("^%s+",""):gsub("%s+$","")
+            if rest ~= "" then createTextBubble(false, richText(rest)) rendered = true end
+            break
+        end
+    end
+    if not rendered then createTextBubble(false, richText(fullText)) end
 end
 
--- ============================================================
--- KIRIM PESAN & TERIMA BALASAN
--- ============================================================
-
-local messages = {
-	{
-		role = "system",
-		content = "You are a helpful AI assistant." .. REQUIRED_PROMPT
-	}
-}
-
-local isGenerating = false
-
+-- ════════════════════════════════════════════════════════════
+--  KIRIM PESAN
+-- ════════════════════════════════════════════════════════════
 local function sendMessage()
-	if isGenerating or Bar.Text:match("^%s*$") then return end
+    if isGenerating or Bar.Text:match("^%s*$") then return end
 
-	local Prompt = Bar.Text
-	Bar.Text = ""
+    local prompt = Bar.Text
+    Bar.Text = ""
+    userMsgCount += 1
+    updateCounter()
 
-	createTextBubble(true, Prompt)
-	table.insert(messages, { role = "user", content = Prompt })
+    createTextBubble(true, prompt)
+    table.insert(messages, { role = "user", content = prompt })
 
-	isGenerating = true
+    -- Potong history jika terlalu panjang
+    while #messages > CONFIG.maxHistory do
+        table.remove(messages, 2)
+    end
 
-	-- Animasi "sedang berpikir..."
-	local thinkLabel = createTextBubble(false, "Sedang berpikir...")
-	task.spawn(function()
-		local dots = 0
-		while isGenerating do
-			dots = (dots % 3) + 1
-			if thinkLabel and thinkLabel.Parent then
-				thinkLabel.Text = "Sedang berpikir" .. string.rep(".", dots)
-			end
-			task.wait(0.35)
-		end
-	end)
+    isGenerating = true
+    tween(SendBtn, { BackgroundColor3 = Color3.fromRGB(30, 60, 140) })
 
-	local Data = {
-		Url = "https://text.pollinations.ai/openai",
-		Method = "POST",
-		Headers = { ["Content-Type"] = "application/json" },
-		Body = { messages = messages }
-	}
+    local thinkLabel = createTextBubble(false, "⏳ Sedang berpikir...")
+    task.spawn(function()
+        local d = 0
+        while isGenerating do
+            d = (d % 3) + 1
+            if thinkLabel and thinkLabel.Parent then
+                thinkLabel.Text = "⏳ Sedang berpikir" .. string.rep(".", d)
+            end
+            task.wait(0.35)
+        end
+    end)
 
-	local Result
-	local ok, err = pcall(function()
-		if isStudio then
-			Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
-		else
-			if not http_func then error("Tidak ada fungsi HTTP!") end
-			Data.Body = HttpService:JSONEncode(Data.Body)
-			Result = HttpService:JSONDecode(http_func(Data).Body)
-		end
-	end)
+    local model = CONFIG.models[CONFIG.currentModel].id
+    local Data = {
+        Url = "https://text.pollinations.ai/openai",
+        Method = "POST",
+        Headers = { ["Content-Type"] = "application/json" },
+        Body = { model = model, messages = messages }
+    }
 
-	isGenerating = false
+    local Result
+    local ok, err = pcall(function()
+        if isStudio then
+            Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
+        else
+            if not http_func then error("Tidak ada fungsi HTTP!") end
+            Data.Body = HttpService:JSONEncode(Data.Body)
+            Result = HttpService:JSONDecode(http_func(Data).Body)
+        end
+    end)
 
-	-- Hapus bubble "sedang berpikir..."
-	if thinkLabel and thinkLabel.Parent and thinkLabel.Parent.Parent then
-		thinkLabel.Parent.Parent:Destroy()
-	end
+    isGenerating = false
+    tween(SendBtn, { BackgroundColor3 = C.sendBtn })
 
-	if not ok or not Result then
-		createTextBubble(false, "❌ Gagal terhubung: " .. tostring(err))
-		return
-	end
+    if thinkLabel and thinkLabel.Parent and thinkLabel.Parent.Parent then
+        thinkLabel.Parent.Parent:Destroy()
+    end
 
-	local Msg = (
-		Result.choices
-		and Result.choices[1]
-		or { message = { content = "Gagal mendapat balasan." } }
-	).message.content or "?"
+    if not ok or not Result then
+        createTextBubble(false, "❌ Error: " .. tostring(err))
+        return
+    end
 
-	table.insert(messages, { role = "system", content = Msg })
-	renderAIMessage(Msg)
-	scrollToBottom()
+    local Msg = (Result.choices and Result.choices[1] or {message={content="Gagal mendapat balasan."}}).message.content or "?"
+    table.insert(messages, { role = "assistant", content = Msg })
+    renderAIMessage(Msg)
+    scrollToBottom()
 end
 
--- ============================================================
--- EVENT: Tombol Kirim & Enter keyboard
--- ============================================================
+-- ════════════════════════════════════════════════════════════
+--  HAPUS CHAT
+-- ════════════════════════════════════════════════════════════
+local function clearChat()
+    for _, child in ipairs(Messages:GetChildren()) do
+        if child:IsA("Frame") then child:Destroy() end
+    end
+    messages = { { role = "system", content = CONFIG.systemPrompt } }
+    msgCount = 0
+    userMsgCount = 0
+    updateCounter()
+    createTextBubble(false, "💬 Chat dihapus. Mulai percakapan baru!")
+end
 
+-- ════════════════════════════════════════════════════════════
+--  MINIMIZE / MAXIMIZE
+-- ════════════════════════════════════════════════════════════
+local function minimize()
+    isMinimized = true
+    -- Simpan posisi container ke minibar
+    MiniBar.Position = UDim2.new(
+        Container.Position.X.Scale,
+        Container.Position.X.Offset,
+        Container.Position.Y.Scale,
+        Container.Position.Y.Offset
+    )
+    tween(Container, { Size = UDim2.new(Container.Size.X.Scale, Container.Size.X.Offset, 0, 0) }, 0.2)
+    task.delay(0.2, function()
+        Container.Visible = false
+        MiniBar.Visible = true
+    end)
+end
+
+local function maximize()
+    isMinimized = false
+    Container.Position = MiniBar.Position
+    Container.Visible = true
+    Container.Size = UDim2.new(0.94, 0, 0, 0)
+    MiniBar.Visible = false
+    tween(Container, { Size = UDim2.new(0.94, 0, 0.86, 0) }, 0.2)
+end
+
+-- ════════════════════════════════════════════════════════════
+--  MODEL PICKER TOGGLE
+-- ════════════════════════════════════════════════════════════
+local function toggleModelPicker()
+    modelPickerOpen = not modelPickerOpen
+    ModelPicker.Visible = modelPickerOpen
+end
+
+local function selectModel(i)
+    CONFIG.currentModel = i
+    for j, mb in ipairs(modelBtns) do
+        mb.Text = (j == i and "● " or "  ") .. CONFIG.models[j].label
+        mb.BackgroundColor3 = j == i and C.accent or C.headerBtn
+    end
+    ModelPicker.Visible = false
+    modelPickerOpen = false
+    TitleLabel.Text = "✦ " .. CONFIG.models[i].label
+end
+
+for i, mb in ipairs(modelBtns) do
+    mb.MouseButton1Click:Connect(function() selectModel(i) end)
+    mb.TouchTap:Connect(function() selectModel(i) end)
+end
+
+-- ════════════════════════════════════════════════════════════
+--  EVENT CONNECTIONS
+-- ════════════════════════════════════════════════════════════
+
+-- Tombol header
+BtnClose.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
+BtnClose.TouchTap:Connect(function() ScreenGui:Destroy() end)
+
+BtnMinimize.MouseButton1Click:Connect(minimize)
+BtnMinimize.TouchTap:Connect(minimize)
+
+BtnClear.MouseButton1Click:Connect(clearChat)
+BtnClear.TouchTap:Connect(clearChat)
+
+BtnModel.MouseButton1Click:Connect(toggleModelPicker)
+BtnModel.TouchTap:Connect(toggleModelPicker)
+
+-- MiniBar: tap untuk maximize
+MiniBar.InputBegan:Connect(function(inp)
+    if inp.UserInputType == Enum.UserInputType.Touch
+        or inp.UserInputType == Enum.UserInputType.MouseButton1 then
+        maximize()
+    end
+end)
+
+-- Kirim pesan
 SendBtn.MouseButton1Click:Connect(sendMessage)
 SendBtn.TouchTap:Connect(sendMessage)
 
 local lastBox, lastFocusReleased
-UserInputService.TextBoxFocusReleased:Connect(function(box)
-	lastBox, lastFocusReleased = box, tick()
+UIS.TextBoxFocusReleased:Connect(function(box)
+    lastBox, lastFocusReleased = box, tick()
+end)
+UIS.InputBegan:Connect(function(Input, GPE)
+    if Input.KeyCode == Enum.KeyCode.Return then
+        local shift = UIS:IsKeyDown(Enum.KeyCode.LeftShift) or UIS:IsKeyDown(Enum.KeyCode.RightShift)
+        if lastBox == Bar and shift then
+            Bar.Text ..= "\n"; Bar:CaptureFocus()
+        elseif lastBox == Bar then
+            sendMessage()
+        end
+    end
 end)
 
-UserInputService.InputBegan:Connect(function(Input, GPE)
-	if Input.KeyCode == Enum.KeyCode.Return then
-		local shifting = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
-			or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
-		if lastBox == Bar and shifting then
-			Bar.Text ..= "\n"
-			Bar:CaptureFocus()
-		elseif lastBox == Bar then
-			sendMessage()
-		end
-	end
+-- Tutup model picker saat tap di luar
+UIS.InputBegan:Connect(function(inp)
+    if modelPickerOpen then
+        if inp.UserInputType == Enum.UserInputType.Touch
+            or inp.UserInputType == Enum.UserInputType.MouseButton1 then
+            task.wait(0.05)
+            if modelPickerOpen then
+                ModelPicker.Visible = false
+                modelPickerOpen = false
+            end
+        end
+    end
+end)
+
+-- ════════════════════════════════════════════════════════════
+--  PESAN SELAMAT DATANG
+-- ════════════════════════════════════════════════════════════
+task.delay(0.3, function()
+    createTextBubble(false,
+        "👋 <b>Halo! Aku AI Asisten.</b>\n\n"
+        .. "Kamu bisa:\n"
+        .. "• <b>Geser</b> jendela ini ke mana saja\n"
+        .. "• Tekan <b>─</b> untuk minimize\n"
+        .. "• Tekan <b>⚙</b> untuk ganti model AI\n"
+        .. "• Tekan <b>🗑</b> untuk hapus chat\n"
+        .. "• Kode akan tampil di <b>codebox</b> khusus ✦"
+    )
 end)
