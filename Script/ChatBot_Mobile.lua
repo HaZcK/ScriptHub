@@ -23,8 +23,24 @@ local RunService   = game:GetService("RunService")
 local UIS          = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
-local isStudio  = RunService:IsStudio()
-local http_func = request or (http and http.request) or http_request or (syn and syn.request)
+local isStudio = RunService:IsStudio()
+
+-- Deteksi fungsi HTTP dari berbagai executor Android & PC
+-- Pakai pcall agar tidak crash kalau variabel tidak ada
+local http_func
+local function tryGet(fn)
+    local ok, val = pcall(fn)
+    if ok and typeof(val) == "function" then return val end
+    if ok and typeof(val) == "table" and typeof(val.request) == "function" then return val.request end
+    return nil
+end
+http_func = tryGet(function() return request end)
+    or tryGet(function() return http_request end)
+    or tryGet(function() return fluxus.request end)
+    or tryGet(function() return http.request end)
+    or tryGet(function() return syn.request end)
+    or tryGet(function() return (getgenv or getrenv)().request end)
+    or nil
 
 -- ════════════════════════════════════════════════════════════
 --  KONFIGURASI
@@ -737,11 +753,18 @@ local function sendMessage()
         if isStudio then
             Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
         else
-            if not http_func then error("Tidak ada fungsi HTTP executor!") end
+            if not http_func then
+                error("❌ Executor kamu tidak support HTTP request!\nCoba executor lain seperti Fluxus, Delta, atau Codex.")
+            end
             Data.Body = HttpService:JSONEncode(Data.Body)
-            local raw = http_func(Data)
-            if not raw or not raw.Body then error("Respons kosong dari server") end
-            Result = HttpService:JSONDecode(raw.Body)
+            local ok_req, raw = pcall(http_func, Data)
+            if not ok_req then error("HTTP gagal: " .. tostring(raw)) end
+            if not raw or not raw.Body or raw.Body == "" then
+                error("Respons kosong dari server. Cek koneksi internet.")
+            end
+            local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
+            if not ok_json then error("Gagal parse JSON: " .. tostring(decoded)) end
+            Result = decoded
         end
     end)
 
