@@ -25,22 +25,34 @@ local TweenService = game:GetService("TweenService")
 
 local isStudio = RunService:IsStudio()
 
--- Deteksi fungsi HTTP dari berbagai executor Android & PC
--- Pakai pcall agar tidak crash kalau variabel tidak ada
-local http_func
-local function tryGet(fn)
+-- ─────────────────────────────────────────────────────────────
+-- Deteksi metode HTTP yang tersedia
+-- Ronix Android pakai `request` (UNC standar)
+-- Fallback ke game:HttpGet sebagai proxy Roblox
+-- ─────────────────────────────────────────────────────────────
+local http_func = nil
+local use_roblox_proxy = false  -- mode HttpGet proxy
+
+-- Coba semua nama fungsi HTTP yang mungkin ada
+local function tryHTTP(fn)
     local ok, val = pcall(fn)
-    if ok and typeof(val) == "function" then return val end
-    if ok and typeof(val) == "table" and typeof(val.request) == "function" then return val.request end
+    if ok and type(val) == "function" then return val end
+    if ok and type(val) == "table" and type(val.request) == "function" then return val.request end
     return nil
 end
-http_func = tryGet(function() return request end)
-    or tryGet(function() return http_request end)
-    or tryGet(function() return fluxus.request end)
-    or tryGet(function() return http.request end)
-    or tryGet(function() return syn.request end)
-    or tryGet(function() return (getgenv or getrenv)().request end)
-    or nil
+
+http_func = tryHTTP(function() return request       end)
+         or tryHTTP(function() return http_request   end)
+         or tryHTTP(function() return syn.request    end)
+         or tryHTTP(function() return http.request   end)
+         or tryHTTP(function() return fluxus.request end)
+         or tryHTTP(function() return (getgenv or getrenv)().request end)
+
+-- Kalau tidak ada http executor function → pakai Roblox HttpService
+-- (Roblox HttpService bekerja di semua executor termasuk Ronix Android)
+if not http_func then
+    use_roblox_proxy = true
+end
 
 -- ════════════════════════════════════════════════════════════
 --  KONFIGURASI
@@ -753,18 +765,58 @@ local function sendMessage()
         if isStudio then
             Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
         else
-            if not http_func then
-                error("❌ Executor kamu tidak support HTTP request!\nCoba executor lain seperti Fluxus, Delta, atau Codex.")
-            end
             Data.Body = HttpService:JSONEncode(Data.Body)
-            local ok_req, raw = pcall(http_func, Data)
-            if not ok_req then error("HTTP gagal: " .. tostring(raw)) end
-            if not raw or not raw.Body or raw.Body == "" then
-                error("Respons kosong dari server. Cek koneksi internet.")
+
+            local rawBody = nil
+
+            if use_roblox_proxy then
+                -- ── Mode Roblox HttpService (Ronix Android) ──
+                -- Encode body ke URL karena HttpGet hanya GET
+                -- Pakai endpoint GET pollinations dengan query param
+                local prompt_encoded = Data.Body:gsub("([^%w%-%.%_%~ ])", function(c)
+                    return string.format("%%%02X", string.byte(c))
+                end):gsub(" ", "+")
+
+                -- Pollinations punya endpoint GET sederhana: /model?prompt=...&system=...
+                -- Ambil hanya pesan terakhir user untuk mode proxy
+                local lastUserMsg = ""
+                local lastSysMsg = CFG.modes[CFG.currentMode].prompt
+                for _, m in ipairs(messages) do
+                    if m.role == "user" then lastUserMsg = m.content end
+                end
+                local encPrompt = lastUserMsg:gsub("([^%w%-%.%_%~ ])", function(c)
+                    return string.format("%%%02X", string.byte(c))
+                end):gsub(" ", "+")
+                local encSys = lastSysMsg:gsub("([^%w%-%.%_%~ ])", function(c)
+                    return string.format("%%%02X", string.byte(c))
+                end):gsub(" ", "+")
+
+                local getUrl = "https://text.pollinations.ai/" .. encPrompt
+                    .. "?model=" .. CFG.models[CFG.currentModel].id
+                    .. "&system=" .. encSys
+                    .. "&token=pk_6LhIKnJe2QGne85m"
+
+                local ok_get, body = pcall(function()
+                    return game:HttpGetAsync(getUrl, true)
+                end)
+                if not ok_get or not body or body == "" then
+                    error("HttpGet gagal: " .. tostring(body))
+                end
+                -- Endpoint GET pollinations langsung return teks, bukan JSON
+                Result = { choices = {{ message = { content = body } } } }
+                rawBody = body
+
+            else
+                -- ── Mode executor http_func (PC / executor lain) ──
+                local ok_req, raw = pcall(http_func, Data)
+                if not ok_req then error("HTTP gagal: " .. tostring(raw)) end
+                if not raw or not raw.Body or raw.Body == "" then
+                    error("Respons kosong. Cek koneksi internet.")
+                end
+                local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
+                if not ok_json then error("Gagal parse JSON: " .. tostring(decoded)) end
+                Result = decoded
             end
-            local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
-            if not ok_json then error("Gagal parse JSON: " .. tostring(decoded)) end
-            Result = decoded
         end
     end)
 
