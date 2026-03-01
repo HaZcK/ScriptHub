@@ -1,13 +1,15 @@
 -- ════════════════════════════════════════════════════════════
---   AI ChatBot v3.1 — Mobile Edition
+--   AI ChatBot v3.2 — Mobile Edition
 --   Powered by pollinations.ai
+--   Dioptimalkan untuk Delta Executor (Android)
 --
---   ✦ Update berdasarkan hasil voting:
---   🛡️  Stabilitas    — pcall menyeluruh, error handling ketat
---   🌌  Dark Glass    — tema kaca gelap dengan blur & transparansi
---   ↔️  Resize        — sudut kanan bawah untuk ubah ukuran bebas
---   💾  Export Chat   — simpan percakapan ke clipboard / file
---   ⚙️  Fitur lama    — Drag, Minimize, Clear, Model Picker tetap ada
+--   ✦ Fitur:
+--   🌌  Dark Glass    — tema kaca gelap
+--   ↔️  Resize        — ubah ukuran bebas
+--   💾  Export Chat   — salin ke clipboard
+--   🟢  Mode AI       — Normal/Dev/Creative/Unrestricted
+--   ⚙️  9 Model AI    — Mistral, GPT-4o, DeepSeek, dll
+--   🛡️  Stabilitas    — error handling ketat
 -- ════════════════════════════════════════════════════════════
 
 -- ── Bersihkan instance lama ──────────────────────────────────
@@ -27,32 +29,10 @@ local isStudio = RunService:IsStudio()
 
 -- ─────────────────────────────────────────────────────────────
 -- Deteksi metode HTTP yang tersedia
--- Ronix Android pakai `request` (UNC standar)
--- Fallback ke game:HttpGet sebagai proxy Roblox
 -- ─────────────────────────────────────────────────────────────
-local http_func = nil
-local use_roblox_proxy = false  -- mode HttpGet proxy
-
--- Coba semua nama fungsi HTTP yang mungkin ada
-local function tryHTTP(fn)
-    local ok, val = pcall(fn)
-    if ok and type(val) == "function" then return val end
-    if ok and type(val) == "table" and type(val.request) == "function" then return val.request end
-    return nil
-end
-
-http_func = tryHTTP(function() return request       end)
-         or tryHTTP(function() return http_request   end)
-         or tryHTTP(function() return syn.request    end)
-         or tryHTTP(function() return http.request   end)
-         or tryHTTP(function() return fluxus.request end)
-         or tryHTTP(function() return (getgenv or getrenv)().request end)
-
--- Kalau tidak ada http executor function → pakai Roblox HttpService
--- (Roblox HttpService bekerja di semua executor termasuk Ronix Android)
-if not http_func then
-    use_roblox_proxy = true
-end
+-- Delta Executor: 100% UNC, engine Gloop, pakai request() standar
+local http_func = request
+local use_roblox_proxy = false
 
 -- ════════════════════════════════════════════════════════════
 --  KONFIGURASI
@@ -765,58 +745,21 @@ local function sendMessage()
         if isStudio then
             Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
         else
+            -- Delta Executor: request() langsung ke Pollinations API
             Data.Body = HttpService:JSONEncode(Data.Body)
 
-            local rawBody = nil
-
-            if use_roblox_proxy then
-                -- ── Mode Roblox HttpService (Ronix Android) ──
-                -- Encode body ke URL karena HttpGet hanya GET
-                -- Pakai endpoint GET pollinations dengan query param
-                local prompt_encoded = Data.Body:gsub("([^%w%-%.%_%~ ])", function(c)
-                    return string.format("%%%02X", string.byte(c))
-                end):gsub(" ", "+")
-
-                -- Pollinations punya endpoint GET sederhana: /model?prompt=...&system=...
-                -- Ambil hanya pesan terakhir user untuk mode proxy
-                local lastUserMsg = ""
-                local lastSysMsg = CFG.modes[CFG.currentMode].prompt
-                for _, m in ipairs(messages) do
-                    if m.role == "user" then lastUserMsg = m.content end
-                end
-                local encPrompt = lastUserMsg:gsub("([^%w%-%.%_%~ ])", function(c)
-                    return string.format("%%%02X", string.byte(c))
-                end):gsub(" ", "+")
-                local encSys = lastSysMsg:gsub("([^%w%-%.%_%~ ])", function(c)
-                    return string.format("%%%02X", string.byte(c))
-                end):gsub(" ", "+")
-
-                local getUrl = "https://text.pollinations.ai/" .. encPrompt
-                    .. "?model=" .. CFG.models[CFG.currentModel].id
-                    .. "&system=" .. encSys
-                    .. "&token=pk_6LhIKnJe2QGne85m"
-
-                local ok_get, body = pcall(function()
-                    return game:HttpGetAsync(getUrl, true)
-                end)
-                if not ok_get or not body or body == "" then
-                    error("HttpGet gagal: " .. tostring(body))
-                end
-                -- Endpoint GET pollinations langsung return teks, bukan JSON
-                Result = { choices = {{ message = { content = body } } } }
-                rawBody = body
-
-            else
-                -- ── Mode executor http_func (PC / executor lain) ──
-                local ok_req, raw = pcall(http_func, Data)
-                if not ok_req then error("HTTP gagal: " .. tostring(raw)) end
-                if not raw or not raw.Body or raw.Body == "" then
-                    error("Respons kosong. Cek koneksi internet.")
-                end
-                local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
-                if not ok_json then error("Gagal parse JSON: " .. tostring(decoded)) end
-                Result = decoded
+            local ok_req, raw = pcall(request, Data)
+            if not ok_req then
+                error("HTTP gagal: " .. tostring(raw))
             end
+            if not raw or not raw.Body or raw.Body == "" then
+                error("Respons kosong dari server. Cek koneksi internet.")
+            end
+            local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
+            if not ok_json then
+                error("Gagal parse JSON. Respons: " .. tostring(raw.Body):sub(1, 100))
+            end
+            Result = decoded
         end
     end)
 
@@ -1007,14 +950,12 @@ end)
 -- ════════════════════════════════════════════════════════════
 task.delay(0.3, function()
     createTextBubble(false,
-        "🌌 <b>AI Chat v3.1</b>\n\n"
-        .."Tekan <b>🟢</b> untuk ganti <b>Mode AI</b>:\n"
-        .."• 🟢 Normal — umum & sopan\n"
-        .."• 🔵 Developer — bebas, fokus kode\n"
-        .."• 🟣 Creative — kreatif & roleplay\n"
-        .."• 🔴 Unrestricted — tanpa filter\n\n"
-        .."Tekan <b>⚙</b> untuk ganti <b>Model AI</b> (9 pilihan)\n"
-        .."Tekan <b>💾</b> untuk export chat ke clipboard\n"
-        .."Seret sudut <b>◢</b> untuk resize jendela ✦"
+        "🌌 <b>AI Chat v3.2 — Delta Edition</b>\n\n"
+        .."• Tekan <b>🟢</b> → ganti <b>Mode</b> (Normal/Dev/Creative/🔴)\n"
+        .."• Tekan <b>⚙</b> → ganti <b>Model AI</b> (9 pilihan)\n"
+        .."• Tekan <b>💾</b> → export seluruh chat\n"
+        .."• Seret <b>header</b> → pindahkan jendela\n"
+        .."• Seret sudut <b>◢</b> → ubah ukuran\n\n"
+        .."Dioptimalkan untuk <b>Delta Executor</b> ✦"
     )
 end)
