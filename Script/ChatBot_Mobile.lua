@@ -27,12 +27,16 @@ local TweenService = game:GetService("TweenService")
 
 local isStudio = RunService:IsStudio()
 
--- ─────────────────────────────────────────────────────────────
--- Deteksi metode HTTP yang tersedia
--- ─────────────────────────────────────────────────────────────
--- Delta Executor: 100% UNC, engine Gloop, pakai request() standar
+-- Deteksi HTTP function (pattern dari Infinite Yield, kompatibel semua executor)
 local http_func = request
-local use_roblox_proxy = false
+    or http_request
+    or (syn and syn.request)
+    or (http and http.request)
+    or (fluxus and fluxus.request)
+
+if not http_func then
+    warn("[AI Chat] WARNING: Tidak ada fungsi HTTP! Pastikan executor kamu support HTTP.")
+end
 
 -- ════════════════════════════════════════════════════════════
 --  KONFIGURASI
@@ -745,19 +749,23 @@ local function sendMessage()
         if isStudio then
             Result = game.ReplicatedStorage.HTTP:InvokeServer(Data)
         else
-            -- Delta Executor: request() langsung ke Pollinations API
             Data.Body = HttpService:JSONEncode(Data.Body)
 
-            local ok_req, raw = pcall(request, Data)
+            -- Cek http_func tersedia
+            if not http_func then
+                error("❌ Executor tidak support HTTP!\nPastikan Delta sudah inject dengan benar.")
+            end
+
+            local ok_req, raw = pcall(http_func, Data)
             if not ok_req then
                 error("HTTP gagal: " .. tostring(raw))
             end
             if not raw or not raw.Body or raw.Body == "" then
-                error("Respons kosong dari server. Cek koneksi internet.")
+                error("Respons kosong. Cek koneksi internet.")
             end
             local ok_json, decoded = pcall(HttpService.JSONDecode, HttpService, raw.Body)
             if not ok_json then
-                error("Gagal parse JSON. Respons: " .. tostring(raw.Body):sub(1, 100))
+                error("Gagal parse JSON: " .. tostring(raw.Body):sub(1,80))
             end
             Result = decoded
         end
