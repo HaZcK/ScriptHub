@@ -6,17 +6,17 @@
 -- ══════════════════════════════
 --  ⚙️  GANTI INI SESUAI REPO KAMU
 -- ══════════════════════════════
-local GITHUB_USER = "HaZck"       -- ← ganti username GitHub kamu
-local GITHUB_REPO = "ScriptHub"           -- ← ganti nama repo kamu
-local GITHUB_BRANCH = "main"         -- ← ganti kalau branch kamu "master"
+local GITHUB_USER   = "HaZcK"
+local GITHUB_REPO   = "ScriptHub"
+local GITHUB_BRANCH = "main"
 
 -- ══════════════════════════════
 --  URL BUILDER
 -- ══════════════════════════════
 local RAW = "https://raw.githubusercontent.com/"
-	.. GITHUB_USER .. "/"
-	.. GITHUB_REPO .. "/"
-	.. GITHUB_BRANCH .. "/Script/Dice/"
+    .. GITHUB_USER .. "/"
+    .. GITHUB_REPO .. "/"
+    .. GITHUB_BRANCH .. "/Script/Dice/"         -- ← ganti kalau branch kamu "master"
 
 local URL_SKILL_LIST = RAW .. "Skill_List.lua"
 local URL_DICE_CORE  = RAW .. "DiceCore.lua"
