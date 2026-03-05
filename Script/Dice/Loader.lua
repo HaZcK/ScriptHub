@@ -1,7 +1,7 @@
 -- ╔══════════════════════════════════════════════════╗
--- ║           DICE OF FATE — LOADER                  ║
--- ║        Paste ke Delta Executor → Execute         ║
+-- ║         DICE OF FATE — LOADER v5                 ║
+-- ║      Paste ke Delta Executor lalu Execute        ║
 -- ╚══════════════════════════════════════════════════╝
 
--- Ganti dengan raw URL kamu
-loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/Dice/DiceCore.lua?token=GHSAT0AAAAAADTPB3T3FNCZXRVLEOUOMZEG2NJPWBA"))()
+-- Ganti URL ini dengan raw GitHub URL DiceCore.lua kamu
+loadstring(game:HttpGet("RAW_URL_DICECORE_KAMU"))()
