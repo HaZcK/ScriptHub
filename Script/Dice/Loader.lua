@@ -4,4 +4,4 @@
 -- ╚══════════════════════════════════════════════════╝
 
 -- Ganti URL ini dengan raw GitHub URL DiceCore.lua kamu
-loadstring(game:HttpGet("RAW_URL_DICECORE_KAMU"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/Dice/DiceCore.lua?token=GHSAT0AAAAAADTPB3T2YIHBAG7ZBHJDITVA2NJQUHQ"))()
