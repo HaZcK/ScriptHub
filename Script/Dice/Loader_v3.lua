@@ -4,7 +4,7 @@
 -- ╚══════════════════════════════════════════════════╝
 
 -- ⚙️ GANTI URL DI BAWAH INI DENGAN RAW URL KAMU
-local URL_SKILL_LIST = ""  -- ← raw URL Skill_List.lua kamu
+local URL_SKILL_LIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/Dice/Skill_List.lua?token=GHSAT0AAAAAADTPB3T2JXYJ2UHADBVX6XQY2NJOIDQ"  -- ← raw URL Skill_List.lua kamu
 local URL_DICE_CORE  = ""  -- ← raw URL DiceCore.lua kamu
 
 -- ══════════════════════════════
