@@ -1,22 +1,20 @@
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║                 DICE OF FATE — DiceCore v5                   ║
--- ║          Full overhaul: Trade, GiveAll, History,             ║
--- ║          Smooth animations, Sound effects, Server sync       ║
+-- ║                 DICE OF FATE — DiceCore v5.1                 ║
+-- ║         Fixed: Font, Sound IDs, Layout, Buttons              ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 local Players           = game:GetService("Players")
 local TweenService      = game:GetService("TweenService")
 local RunService        = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local SoundService      = game:GetService("SoundService")
 
 local player    = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid  = character:WaitForChild("Humanoid")
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  CONNECTION MANAGER
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 local Connections = {}
 local function storeConn(key, conn)
 	if Connections[key] then pcall(function() Connections[key]:Disconnect() end) end
@@ -26,17 +24,13 @@ local function removeConn(key)
 	if Connections[key] then pcall(function() Connections[key]:Disconnect() end) Connections[key] = nil end
 end
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  ORIGINAL SIZES
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 local OriginalSizes = {}
-local function saveOriginalSizes()
-	OriginalSizes = {}
-	for _,p in ipairs(character:GetDescendants()) do
-		if p:IsA("BasePart") then OriginalSizes[p.Name] = p.Size end
-	end
+for _,p in ipairs(character:GetDescendants()) do
+	if p:IsA("BasePart") then OriginalSizes[p.Name] = p.Size end
 end
-saveOriginalSizes()
 
 local function getChar()
 	character = player.Character or character
@@ -44,22 +38,19 @@ local function getChar()
 	return character, humanoid
 end
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  SERVER DETECTION
--- ══════════════════════════════════════════════════════
-local serverMode  = false
-local REMOTE      = nil  -- DICE_ACTION
-local TRADE_REMOTE= nil  -- DICE_TRADE
-local GIVE_REMOTE = nil  -- DICE_GIVEGUI
-local PING_REMOTE = nil  -- DICE_PING
+-- ══════════════════════════════════════════════
+local serverMode   = false
+local REMOTE       = nil
+local TRADE_REMOTE = nil
+local GIVE_REMOTE  = nil
 
 local function checkServer()
-	PING_REMOTE = ReplicatedStorage:FindFirstChild("DICE_PING")
-	if PING_REMOTE and PING_REMOTE:IsA("RemoteFunction") then
-		local ok, result = pcall(function()
-			return PING_REMOTE:InvokeServer()
-		end)
-		if ok and result == true then
+	local ping = ReplicatedStorage:FindFirstChild("DICE_PING")
+	if ping and ping:IsA("RemoteFunction") then
+		local ok, res = pcall(function() return ping:InvokeServer() end)
+		if ok and res == true then
 			serverMode   = true
 			REMOTE       = ReplicatedStorage:FindFirstChild("DICE_ACTION")
 			TRADE_REMOTE = ReplicatedStorage:FindFirstChild("DICE_TRADE")
@@ -72,96 +63,94 @@ local function checkServer()
 end
 
 local function fireServer(action, data)
-	if serverMode and REMOTE then
-		pcall(function() REMOTE:FireServer(action, data) end)
-	end
+	if serverMode and REMOTE then pcall(function() REMOTE:FireServer(action, data) end) end
 end
 
--- ══════════════════════════════════════════════════════
---  SOUND SYSTEM
--- ══════════════════════════════════════════════════════
-local Sounds = {}
-local function createSound(id, volume, pitch)
+-- ══════════════════════════════════════════════
+--  SOUND SYSTEM (valid Roblox free audio IDs)
+-- ══════════════════════════════════════════════
+local soundEnabled = true
+local SFX = {}
+local validSounds = {
+	roll   = "131961136",   -- dice roll click
+	use    = "131070398",   -- confirm
+	skip   = "131070300",   -- whoosh
+	common = "131070371",   -- soft pop
+	rare   = "131070376",   -- chime
+	epic   = "131070380",   -- power up
+	legend = "131070383",   -- fanfare
+	trade  = "131070393",   -- ping
+}
+for key, id in pairs(validSounds) do
 	local s = Instance.new("Sound")
-	s.SoundId = "rbxassetid://"..id
-	s.Volume = volume or 0.5
-	s.PlaybackSpeed = pitch or 1
-	s.Parent = SoundService
-	return s
+	s.SoundId = "rbxassetid://" .. id
+	s.Volume = 0.5
+	s.Parent = game:GetService("SoundService")
+	SFX[key] = s
 end
-
--- Roblox free sound IDs
-Sounds.roll    = createSound("9120232869", 0.4)   -- dice roll
-Sounds.common  = createSound("9113564284", 0.5)   -- common pop
-Sounds.rare    = createSound("9119777278", 0.6)   -- rare chime
-Sounds.epic    = createSound("9119817677", 0.7)   -- epic whoosh
-Sounds.legend  = createSound("9120237401", 0.8)   -- legendary fanfare
-Sounds.use     = createSound("9113460963", 0.5)   -- confirm
-Sounds.skip    = createSound("9120239737", 0.3)   -- cancel
-Sounds.trade   = createSound("9119817200", 0.6)   -- trade ping
 
 local function playSound(key)
-	local s = Sounds[key]
+	if not soundEnabled then return end
+	local s = SFX[key]
 	if s then pcall(function() s:Play() end) end
 end
 
--- ══════════════════════════════════════════════════════
---  SKILL DATABASE
---  ┌──────────────────────────────────────────────────┐
---  │  CARA TAMBAH CUSTOM SKILL:                        │
---  │  1. Copy salah satu blok skill di bawah           │
---  │  2. Ganti id, name, icon, rarity, desc            │
---  │  3. Isi fungsi apply() dan remove()               │
---  │  4. Tambahkan juga di DiceServer.lua              │
---  │     SkillRegistry["id_kamu"] = { apply, remove }  │
---  │  5. Rarity pilihan: Common Rare Epic Legendary    │
---  └──────────────────────────────────────────────────┘
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
+--  TWEEN HELPERS
+-- ══════════════════════════════════════════════
+local TW_FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
+local TW_MED  = TweenInfo.new(0.28, Enum.EasingStyle.Quart)
+local TW_BACK = TweenInfo.new(0.38, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
-local SkillDB = {}
+local function tw(obj, props, info)
+	TweenService:Create(obj, info or TW_MED, props):Play()
+end
 
-SkillDB.Rarity = {
-	Common    = { color=Color3.fromRGB(180,180,180), glow=Color3.fromRGB(220,220,220), weight=50, soundKey="common"  },
-	Rare      = { color=Color3.fromRGB(80,140,255),  glow=Color3.fromRGB(120,180,255), weight=30, soundKey="rare"    },
-	Epic      = { color=Color3.fromRGB(180,80,255),  glow=Color3.fromRGB(220,120,255), weight=15, soundKey="epic"    },
-	Legendary = { color=Color3.fromRGB(255,180,0),   glow=Color3.fromRGB(255,220,80),  weight=5,  soundKey="legend"  },
+-- ══════════════════════════════════════════════
+--  RARITY DATA
+-- ══════════════════════════════════════════════
+local Rarity = {
+	Common    = { color=Color3.fromRGB(180,180,180), glow=Color3.fromRGB(220,220,220), weight=50, sfx="common"  },
+	Rare      = { color=Color3.fromRGB(80,140,255),  glow=Color3.fromRGB(120,180,255), weight=30, sfx="rare"    },
+	Epic      = { color=Color3.fromRGB(180,80,255),  glow=Color3.fromRGB(220,120,255), weight=15, sfx="epic"    },
+	Legendary = { color=Color3.fromRGB(255,180,0),   glow=Color3.fromRGB(255,220,80),  weight=5,  sfx="legend"  },
 }
+local RE = { Common="⚪", Rare="🔵", Epic="🟣", Legendary="🟡" }
+local function rC(r) return Rarity[r] and Rarity[r].color or Color3.fromRGB(200,200,200) end
+local function rG(r) return Rarity[r] and Rarity[r].glow  or Color3.fromRGB(200,200,200) end
 
--- ── FORMAT TIAP SKILL ──
--- id       : string unik (harus sama dengan DiceServer SkillRegistry key)
--- name     : nama tampilan
--- icon     : emoji
--- rarity   : "Common" | "Rare" | "Epic" | "Legendary"
--- desc     : deskripsi singkat
--- flavor   : kalimat flavor text (opsional, muncul di card)
--- apply()  : efek lokal saat dipakai
--- remove() : balik ke normal
-
-SkillDB.Skills = {
+-- ══════════════════════════════════════════════
+--  SKILL DATABASE
+--
+--  CARA TAMBAH CUSTOM SKILL:
+--  1. Copy salah satu blok skill di bawah
+--  2. Ganti: id, name, icon, rarity, desc, flavor
+--  3. Isi fungsi apply() dan remove()
+--  4. Tambahkan juga di DiceServer.lua
+--     SkillRegistry["id_kamu"] = { apply=..., remove=... }
+--  5. Rarity: "Common" | "Rare" | "Epic" | "Legendary"
+-- ══════════════════════════════════════════════
+local Skills = {
 
 	-- ══ COMMON ══
 	{
 		id="speed_demon", name="Speed Demon", icon="💨", rarity="Common",
-		desc="WalkSpeed jadi 100.",
-		flavor="Angin aja kalah!",
-		apply=function() local c,h=getChar(); h.WalkSpeed=100; fireServer("Apply","speed_demon") end,
-		remove=function() local c,h=getChar(); h.WalkSpeed=16; fireServer("Remove","speed_demon") end,
+		desc="WalkSpeed jadi 100.", flavor="Angin aja kalah!",
+		apply=function()  local c,h=getChar(); h.WalkSpeed=100;  fireServer("Apply","speed_demon")  end,
+		remove=function() local c,h=getChar(); h.WalkSpeed=16;   fireServer("Remove","speed_demon") end,
 	},
 	{
 		id="super_jump", name="Super Jump", icon="🚀", rarity="Common",
-		desc="JumpPower jadi 200.",
-		flavor="Gravity? Belum kenal.",
-		apply=function() local c,h=getChar(); h.JumpPower=200; fireServer("Apply","super_jump") end,
-		remove=function() local c,h=getChar(); h.JumpPower=50; fireServer("Remove","super_jump") end,
+		desc="JumpPower jadi 200.", flavor="Gravity? Belum kenal.",
+		apply=function()  local c,h=getChar(); h.JumpPower=200; fireServer("Apply","super_jump")  end,
+		remove=function() local c,h=getChar(); h.JumpPower=50;  fireServer("Remove","super_jump") end,
 	},
 	{
 		id="giant_head", name="Giant Head", icon="🗿", rarity="Common",
-		desc="Kepala jadi 5x lebih gede.",
-		flavor="Braincell makin besar.",
+		desc="Kepala jadi 5x gede.", flavor="Braincell makin besar.",
 		apply=function()
 			local c,h=getChar()
-			local head=c:FindFirstChild("Head")
-			if head then head.Size=Vector3.new(5,5,5) end
+			local head=c:FindFirstChild("Head"); if head then head.Size=Vector3.new(5,5,5) end
 			fireServer("Apply","giant_head")
 		end,
 		remove=function()
@@ -173,8 +162,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="tiny_legs", name="Tiny Legs", icon="🦵", rarity="Common",
-		desc="Kaki mengecil. Jalannya jadi lucu.",
-		flavor="Kaki kamu mana??",
+		desc="Kaki mengecil. Jalannya lucu.", flavor="Kaki kamu mana??",
 		apply=function()
 			local c,h=getChar()
 			for _,n in ipairs({"LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot"}) do
@@ -192,8 +180,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="buff_arms", name="Buff Arms", icon="💪", rarity="Common",
-		desc="Lengan jadi super gede.",
-		flavor="Siap angkat planet.",
+		desc="Lengan jadi super gede.", flavor="Siap angkat planet.",
 		apply=function()
 			local c,h=getChar()
 			for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
@@ -211,8 +198,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="noodle_arms", name="Noodle Arms", icon="🍜", rarity="Common",
-		desc="Lengan super panjang menjuntai.",
-		flavor="Nyampe lantai dari berdiri.",
+		desc="Lengan super panjang menjuntai.", flavor="Nyampe lantai dari berdiri.",
 		apply=function()
 			local c,h=getChar()
 			for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
@@ -230,8 +216,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="phantom", name="Phantom Mode", icon="👻", rarity="Common",
-		desc="Badan transparan 80%.",
-		flavor="Boo!",
+		desc="Badan transparan 80%.", flavor="Boo!",
 		apply=function()
 			local c,h=getChar()
 			for _,p in ipairs(c:GetDescendants()) do
@@ -249,8 +234,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="golden_skin", name="Golden Touch", icon="✨", rarity="Common",
-		desc="Seluruh badan jadi emas.",
-		flavor="Midas wishes.",
+		desc="Seluruh badan jadi emas.", flavor="Midas wishes.",
 		apply=function()
 			local c,h=getChar()
 			for _,p in ipairs(c:GetDescendants()) do
@@ -270,14 +254,12 @@ SkillDB.Skills = {
 	-- ══ RARE ══
 	{
 		id="rainbow_body", name="Rainbow Body", icon="🌈", rarity="Rare",
-		desc="Warna badan berubah pelangi nonstop.",
-		flavor="Serotonin overload.",
+		desc="Warna badan berubah pelangi nonstop.", flavor="Serotonin overload.",
 		apply=function()
 			fireServer("Apply","rainbow_body")
 			if not serverMode then
 				local conn=RunService.Heartbeat:Connect(function()
-					local t=tick()
-					local c2=player.Character; if not c2 then return end
+					local t=tick(); local c2=player.Character; if not c2 then return end
 					for _,p in ipairs(c2:GetDescendants()) do
 						if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then
 							p.Color=Color3.fromHSV((t*0.5+p.Name:len()*0.05)%1,1,1)
@@ -288,8 +270,7 @@ SkillDB.Skills = {
 			end
 		end,
 		remove=function()
-			removeConn("rainbow")
-			fireServer("Remove","rainbow_body")
+			removeConn("rainbow"); fireServer("Remove","rainbow_body")
 			local c,h=getChar()
 			for _,p in ipairs(c:GetDescendants()) do
 				if p:IsA("BasePart") then p.Color=Color3.fromRGB(163,162,165) end
@@ -298,15 +279,14 @@ SkillDB.Skills = {
 	},
 	{
 		id="anti_gravity", name="Anti Gravity", icon="🪐", rarity="Rare",
-		desc="Gravitasi berkurang, lompat melayang.",
-		flavor="Space walk vibes.",
+		desc="Gravitasi berkurang, lompat melayang.", flavor="Space walk vibes.",
 		apply=function()
 			local c,h=getChar(); h.JumpPower=150
 			local hrp=c:FindFirstChild("HumanoidRootPart")
 			if hrp then
 				local old=hrp:FindFirstChild("_AntiGrav"); if old then old:Destroy() end
-				local bf=Instance.new("BodyForce")
-				bf.Name="_AntiGrav"; bf.Force=Vector3.new(0,workspace.Gravity*hrp:GetMass()*0.75,0); bf.Parent=hrp
+				local bf=Instance.new("BodyForce"); bf.Name="_AntiGrav"
+				bf.Force=Vector3.new(0,workspace.Gravity*hrp:GetMass()*0.75,0); bf.Parent=hrp
 			end
 			fireServer("Apply","anti_gravity")
 		end,
@@ -319,8 +299,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="ice_body", name="Frozen Soul", icon="🧊", rarity="Rare",
-		desc="Badan jadi es transparan biru.",
-		flavor="Dingin sampe jiwa membeku.",
+		desc="Badan jadi es transparan biru.", flavor="Dingin sampe jiwa membeku.",
 		apply=function()
 			local c,h=getChar()
 			for _,p in ipairs(c:GetDescendants()) do
@@ -340,8 +319,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="lava_trail", name="Lava Trail", icon="🔥", rarity="Rare",
-		desc="Ninggalin jejak api saat berjalan.",
-		flavor="Floor is literally lava.",
+		desc="Ninggalin jejak api saat berjalan.", flavor="Floor is literally lava.",
 		apply=function()
 			fireServer("Apply","lava_trail")
 			if not serverMode then
@@ -361,14 +339,11 @@ SkillDB.Skills = {
 				storeConn("lava",conn)
 			end
 		end,
-		remove=function()
-			removeConn("lava"); fireServer("Remove","lava_trail")
-		end,
+		remove=function() removeConn("lava"); fireServer("Remove","lava_trail") end,
 	},
 	{
 		id="spinning_head", name="Spinning Head", icon="🌀", rarity="Rare",
-		desc="Kepala muter nonstop.",
-		flavor="Pusing lihatnya.",
+		desc="Kepala muter nonstop.", flavor="Pusing lihatnya.",
 		apply=function()
 			fireServer("Apply","spinning_head")
 			if not serverMode then
@@ -380,16 +355,13 @@ SkillDB.Skills = {
 				storeConn("spin",conn)
 			end
 		end,
-		remove=function()
-			removeConn("spin"); fireServer("Remove","spinning_head")
-		end,
+		remove=function() removeConn("spin"); fireServer("Remove","spinning_head") end,
 	},
 
 	-- ══ EPIC ══
 	{
 		id="ant_size", name="Ant Size", icon="🐜", rarity="Epic",
-		desc="Tubuh mengecil jadi 0.3x.",
-		flavor="Siapa kamu? Mana kamu?",
+		desc="Tubuh mengecil jadi 0.3x.", flavor="Siapa kamu? Mana kamu?",
 		apply=function()
 			local c,h=getChar(); h.WalkSpeed=10
 			for _,p in ipairs(c:GetDescendants()) do
@@ -407,8 +379,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="giant_mode", name="Giant Mode", icon="🏔️", rarity="Epic",
-		desc="Tumbuh jadi raksasa 3x ukuran.",
-		flavor="Fee-fi-fo-fum.",
+		desc="Tumbuh jadi raksasa 3x ukuran.", flavor="Fee-fi-fo-fum.",
 		apply=function()
 			local c,h=getChar(); h.WalkSpeed=24; h.JumpPower=80
 			for _,p in ipairs(c:GetDescendants()) do
@@ -426,8 +397,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="backwards_brain", name="Backwards Brain", icon="🔄", rarity="Epic",
-		desc="Kamera terbalik 180°.",
-		flavor="Maju itu mundur.",
+		desc="Kamera terbalik 180°.", flavor="Maju itu mundur.",
 		apply=function()
 			local cam=workspace.CurrentCamera
 			cam.CameraType=Enum.CameraType.Scriptable
@@ -439,14 +409,12 @@ SkillDB.Skills = {
 			storeConn("backwards",conn)
 		end,
 		remove=function()
-			removeConn("backwards")
-			workspace.CurrentCamera.CameraType=Enum.CameraType.Custom
+			removeConn("backwards"); workspace.CurrentCamera.CameraType=Enum.CameraType.Custom
 		end,
 	},
 	{
 		id="magnet_body", name="Magnet Body", icon="🧲", rarity="Epic",
-		desc="Benda sekitar tertarik ke kamu.",
-		flavor="Personal gravitational field.",
+		desc="Benda sekitar tertarik ke kamu.", flavor="Personal gravitational field.",
 		apply=function()
 			fireServer("Apply","magnet_body")
 			if not serverMode then
@@ -465,16 +433,13 @@ SkillDB.Skills = {
 				storeConn("magnet",conn)
 			end
 		end,
-		remove=function()
-			removeConn("magnet"); fireServer("Remove","magnet_body")
-		end,
+		remove=function() removeConn("magnet"); fireServer("Remove","magnet_body") end,
 	},
 
 	-- ══ LEGENDARY ══
 	{
 		id="time_warp", name="Time Warp", icon="⏳", rarity="Legendary",
-		desc="Gravitasi drop ke 20. Kamu tetap kenceng.",
-		flavor="LEGENDARY — Waktu itu relatif.",
+		desc="Gravitasi drop ke 20. Kamu tetap kenceng.", flavor="LEGENDARY — Waktu itu relatif.",
 		apply=function()
 			local c,h=getChar(); workspace.Gravity=20; h.WalkSpeed=80; h.JumpPower=120
 			fireServer("Apply","time_warp")
@@ -486,8 +451,7 @@ SkillDB.Skills = {
 	},
 	{
 		id="god_mode", name="God Mode", icon="⚡", rarity="Legendary",
-		desc="Speed + Jump + Giant Head + Rainbow Neon.",
-		flavor="LEGENDARY — Chaos personified.",
+		desc="Speed + Jump + Giant Head + Rainbow Neon.", flavor="LEGENDARY — Chaos personified.",
 		apply=function()
 			local c,h=getChar(); h.WalkSpeed=80; h.JumpPower=180
 			local head=c:FindFirstChild("Head"); if head then head.Size=Vector3.new(5,5,5) end
@@ -511,45 +475,51 @@ SkillDB.Skills = {
 			for _,p in ipairs(c:GetDescendants()) do
 				if p:IsA("BasePart") then p.Material=Enum.Material.SmoothPlastic; p.Color=Color3.fromRGB(163,162,165) end
 			end
-			local head=c:FindFirstChild("Head"); if head and OriginalSizes["Head"] then head.Size=OriginalSizes["Head"] end
+			local head=c:FindFirstChild("Head")
+			if head and OriginalSizes["Head"] then head.Size=OriginalSizes["Head"] end
 			fireServer("Remove","god_mode")
 		end,
 	},
 
-	-- ══════════════════════════════════════════════════════
-	--  CUSTOM SKILL TEMPLATE
-	--  Copy blok ini, ganti isinya, taruh di bawah sini!
+	--[[
+	══════════════════════════════════════════
+	  CUSTOM SKILL TEMPLATE
+	  Copy blok ini dan taruh di atas baris --]]
+	--  Ganti semua nilainya sesuai skill kamu!
 	--
 	-- {
-	--     id      = "nama_unik",       -- harus sama di DiceServer juga!
+	--     id      = "nama_unik",
 	--     name    = "Nama Skill",
-	--     icon    = "🎯",              -- emoji bebas
-	--     rarity  = "Common",          -- Common | Rare | Epic | Legendary
+	--     icon    = "🎯",
+	--     rarity  = "Common",
 	--     desc    = "Deskripsi singkat.",
-	--     flavor  = "Kalimat keren.",  -- opsional
+	--     flavor  = "Kalimat keren.",
 	--     apply = function()
 	--         local c, h = getChar()
 	--         -- tulis efek di sini
+	--         h.WalkSpeed = 50
 	--         fireServer("Apply", "nama_unik")
 	--     end,
 	--     remove = function()
 	--         local c, h = getChar()
-	--         -- tulis cara reset di sini
+	--         -- balik ke normal
+	--         h.WalkSpeed = 16
 	--         fireServer("Remove", "nama_unik")
 	--     end,
 	-- },
-	-- ══════════════════════════════════════════════════════
+	--[[
+	══════════════════════════════════════════
+	--]]
 }
 
--- Weighted random pick
-function SkillDB.Pick(excludeIds, streakBonus)
+local function pickSkill(excludeIds, streakBonus)
 	excludeIds = excludeIds or {}
 	local excSet = {}
 	for _,id in ipairs(excludeIds) do excSet[id]=true end
 	local pool = {}
-	for _,skill in ipairs(SkillDB.Skills) do
+	for _,skill in ipairs(Skills) do
 		if not excSet[skill.id] then
-			local w = SkillDB.Rarity[skill.rarity].weight
+			local w = Rarity[skill.rarity].weight
 			if skill.rarity=="Legendary" and streakBonus then w=w+(streakBonus*4) end
 			for _=1,w do table.insert(pool,skill) end
 		end
@@ -558,724 +528,690 @@ function SkillDB.Pick(excludeIds, streakBonus)
 	return pool[math.random(1,#pool)]
 end
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  STATE
--- ══════════════════════════════════════════════════════
-local activeSkills  = {}   -- { skill=..., addedAt=tick() }
+-- ══════════════════════════════════════════════
+local activeSkills  = {}
 local activeIds     = {}
-local rollHistory   = {}   -- max 20 entri
+local rollHistory   = {}
 local isRolling     = false
 local waitingChoice = false
 local pendingSkill  = nil
 local rollStreak    = 0
+local checkDone     = false
 local MAX_SLOTS     = 5
 local MAX_HISTORY   = 20
-local tradeEnabled  = false
-local giveAllActive = false
+local selectedTarget= nil
+local selectedSkill = nil
 
--- ══════════════════════════════════════════════════════
---  COLOR / RARITY HELPERS
--- ══════════════════════════════════════════════════════
-local RE = { Common="⚪", Rare="🔵", Epic="🟣", Legendary="🟡" }
-local function rC(r)  return SkillDB.Rarity[r] and SkillDB.Rarity[r].color or Color3.fromRGB(200,200,200) end
-local function rG(r)  return SkillDB.Rarity[r] and SkillDB.Rarity[r].glow  or Color3.fromRGB(200,200,200) end
-local function rS(r)  return SkillDB.Rarity[r] and SkillDB.Rarity[r].soundKey or "common" end
-
--- ══════════════════════════════════════════════════════
---  TWEEN HELPERS
--- ══════════════════════════════════════════════════════
-local TWEEN_FAST = TweenInfo.new(0.15, Enum.EasingStyle.Quad)
-local TWEEN_MED  = TweenInfo.new(0.28, Enum.EasingStyle.Quart)
-local TWEEN_BACK = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-
-local function tween(obj, props, info)
-	TweenService:Create(obj, info or TWEEN_MED, props):Play()
-end
-
--- ══════════════════════════════════════════════════════
---  BUILD GUI
--- ══════════════════════════════════════════════════════
-local oldGui = player.PlayerGui:FindFirstChild("DiceOfFateGui")
-if oldGui then oldGui:Destroy() end
+-- ══════════════════════════════════════════════
+--  GUI SETUP
+-- ══════════════════════════════════════════════
+local old = player.PlayerGui:FindFirstChild("DiceOfFateGui")
+if old then old:Destroy() end
 
 local SG = Instance.new("ScreenGui")
 SG.Name="DiceOfFateGui"; SG.ResetOnSpawn=false
 SG.ZIndexBehavior=Enum.ZIndexBehavior.Sibling; SG.Parent=player.PlayerGui
 
+local W,H = 420, 700
+
 -- ── WINDOW ──
-local WIN_W, WIN_H = 420, 680
-local win = Instance.new("Frame", SG)
-win.Name="Window"; win.Size=UDim2.new(0,WIN_W,0,WIN_H)
-win.Position=UDim2.new(0.5,-WIN_W/2,0.5,-WIN_H/2)
-win.BackgroundColor3=Color3.fromRGB(13,11,20)
+local win = Instance.new("Frame",SG)
+win.Name="Win"; win.Size=UDim2.new(0,W,0,H)
+win.Position=UDim2.new(0.5,-W/2,0.5,-H/2)
+win.BackgroundColor3=Color3.fromRGB(12,10,20)
 win.BorderSizePixel=0; win.ClipsDescendants=true
 Instance.new("UICorner",win).CornerRadius=UDim.new(0,16)
 local winStroke=Instance.new("UIStroke",win)
-winStroke.Color=Color3.fromRGB(100,60,180); winStroke.Thickness=1.5; winStroke.Transparency=0.4
+winStroke.Color=Color3.fromRGB(90,50,170); winStroke.Thickness=2; winStroke.Transparency=0.3
 
 -- ── TITLE BAR ──
 local tbar=Instance.new("Frame",win)
-tbar.Size=UDim2.new(1,0,0,48); tbar.BackgroundColor3=Color3.fromRGB(20,15,38)
-tbar.BorderSizePixel=0; tbar.ZIndex=5
+tbar.Size=UDim2.new(1,0,0,50); tbar.Position=UDim2.new(0,0,0,0)
+tbar.BackgroundColor3=Color3.fromRGB(18,14,34); tbar.BorderSizePixel=0; tbar.ZIndex=5
 Instance.new("UICorner",tbar).CornerRadius=UDim.new(0,16)
-local tbarFill=Instance.new("Frame",tbar)
-tbarFill.Size=UDim2.new(1,0,0,16); tbarFill.Position=UDim2.new(0,0,1,-16)
-tbarFill.BackgroundColor3=Color3.fromRGB(20,15,38); tbarFill.BorderSizePixel=0
+-- Fill bottom corners
+local tbarFix=Instance.new("Frame",tbar)
+tbarFix.Size=UDim2.new(1,0,0,16); tbarFix.Position=UDim2.new(0,0,1,-16)
+tbarFix.BackgroundColor3=Color3.fromRGB(18,14,34); tbarFix.BorderSizePixel=0
 
-local titleTxt=Instance.new("TextLabel",tbar)
-titleTxt.Size=UDim2.new(1,-160,1,0); titleTxt.Position=UDim2.new(0,16,0,0)
-titleTxt.BackgroundTransparency=1; titleTxt.Text="🎲  DICE OF FATE"
-titleTxt.TextColor3=Color3.fromRGB(200,160,255); titleTxt.Font=Enum.Font.GothamBold
-titleTxt.TextSize=15; titleTxt.TextXAlignment=Enum.TextXAlignment.Left; titleTxt.ZIndex=6
+local titleLbl=Instance.new("TextLabel",tbar)
+titleLbl.Size=UDim2.new(1,-170,1,0); titleLbl.Position=UDim2.new(0,14,0,0)
+titleLbl.BackgroundTransparency=1; titleLbl.Text="🎲  DICE OF FATE"
+titleLbl.TextColor3=Color3.fromRGB(200,160,255); titleLbl.Font=Enum.Font.GothamBold
+titleLbl.TextSize=15; titleLbl.TextXAlignment=Enum.TextXAlignment.Left; titleLbl.ZIndex=6
 
 local serverBadge=Instance.new("TextLabel",tbar)
-serverBadge.Size=UDim2.new(0,100,0,22); serverBadge.Position=UDim2.new(1,-162,0.5,-11)
-serverBadge.BackgroundColor3=Color3.fromRGB(35,35,35)
-serverBadge.Text="⚫ OFFLINE"; serverBadge.TextSize=10; serverBadge.Font=Enum.Font.GothamBold
-serverBadge.TextColor3=Color3.fromRGB(150,150,150); serverBadge.BorderSizePixel=0; serverBadge.ZIndex=6
+serverBadge.Size=UDim2.new(0,96,0,24); serverBadge.Position=UDim2.new(1,-156,0.5,-12)
+serverBadge.BackgroundColor3=Color3.fromRGB(30,30,30); serverBadge.Text="⚫ OFFLINE"
+serverBadge.TextSize=10; serverBadge.Font=Enum.Font.GothamBold
+serverBadge.TextColor3=Color3.fromRGB(140,140,140); serverBadge.BorderSizePixel=0; serverBadge.ZIndex=6
 Instance.new("UICorner",serverBadge).CornerRadius=UDim.new(0,6)
 
-local function makeCtrl(pos,bg,txt)
+local function makeCtrl(xOff, bg, txt)
 	local b=Instance.new("TextButton",tbar)
-	b.Size=UDim2.new(0,22,0,22); b.Position=pos; b.BackgroundColor3=bg
-	b.Text=txt; b.TextColor3=Color3.fromRGB(255,255,255)
-	b.TextSize=11; b.Font=Enum.Font.GothamBold; b.BorderSizePixel=0; b.ZIndex=7
+	b.Size=UDim2.new(0,24,0,24); b.Position=UDim2.new(1,xOff,0.5,-12)
+	b.BackgroundColor3=bg; b.Text=txt; b.TextColor3=Color3.fromRGB(255,255,255)
+	b.TextSize=12; b.Font=Enum.Font.GothamBold; b.BorderSizePixel=0; b.ZIndex=7
 	Instance.new("UICorner",b).CornerRadius=UDim.new(1,0)
 	return b
 end
-local closeBtn=makeCtrl(UDim2.new(1,-32,0.5,-11), Color3.fromRGB(220,65,80),  "✕")
-local minBtn  =makeCtrl(UDim2.new(1,-58,0.5,-11), Color3.fromRGB(240,160,30), "─")
+local closeBtn=makeCtrl(-30, Color3.fromRGB(210,60,70), "✕")
+local minBtn  =makeCtrl(-58, Color3.fromRGB(230,150,20), "─")
 
 -- ── TAB BAR ──
 local tabBar=Instance.new("Frame",win)
-tabBar.Size=UDim2.new(1,-32,0,36); tabBar.Position=UDim2.new(0,16,0,54)
-tabBar.BackgroundColor3=Color3.fromRGB(20,16,34); tabBar.BorderSizePixel=0
+tabBar.Size=UDim2.new(1,-24,0,38); tabBar.Position=UDim2.new(0,12,0,56)
+tabBar.BackgroundColor3=Color3.fromRGB(18,14,30); tabBar.BorderSizePixel=0
 Instance.new("UICorner",tabBar).CornerRadius=UDim.new(0,10)
-local tabLayout=Instance.new("UIListLayout",tabBar)
-tabLayout.FillDirection=Enum.FillDirection.Horizontal
-tabLayout.HorizontalAlignment=Enum.HorizontalAlignment.Center
-tabLayout.VerticalAlignment=Enum.VerticalAlignment.Center
-tabLayout.Padding=UDim.new(0,4)
-Instance.new("UIPadding",tabBar).PaddingLeft=UDim.new(0,6)
-Instance.new("UIPadding",tabBar).PaddingRight=UDim.new(0,6)
+local tabLL=Instance.new("UIListLayout",tabBar)
+tabLL.FillDirection=Enum.FillDirection.Horizontal
+tabLL.HorizontalAlignment=Enum.HorizontalAlignment.Center
+tabLL.VerticalAlignment=Enum.VerticalAlignment.Center
+tabLL.Padding=UDim.new(0,4)
+local tabPad=Instance.new("UIPadding",tabBar); tabPad.PaddingLeft=UDim.new(0,5); tabPad.PaddingRight=UDim.new(0,5)
 
-local function makeTab(txt, active)
+local function makeTabBtn(label, isActive)
 	local b=Instance.new("TextButton",tabBar)
-	b.Size=UDim2.new(0,88,0,28)
-	b.BackgroundColor3=active and Color3.fromRGB(100,55,200) or Color3.fromRGB(30,24,48)
-	b.Text=txt; b.TextColor3=active and Color3.fromRGB(255,255,255) or Color3.fromRGB(140,120,180)
-	b.Font=Enum.Font.GothamBold; b.TextSize=12; b.BorderSizePixel=0
+	b.Size=UDim2.new(0,90,0,30)
+	b.BackgroundColor3=isActive and Color3.fromRGB(95,48,200) or Color3.fromRGB(28,22,44)
+	b.Text=label; b.Font=Enum.Font.GothamBold; b.TextSize=12; b.BorderSizePixel=0
+	b.TextColor3=isActive and Color3.fromRGB(255,255,255) or Color3.fromRGB(130,110,170)
 	Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
 	return b
 end
-
-local tabMain    = makeTab("🎲 Roll",   true)
-local tabHistory = makeTab("📜 History",false)
-local tabTrade   = makeTab("🤝 Trade",  false)
-local tabSettings= makeTab("⚙️ Settings",false)
+local TAB_ROLL = makeTabBtn("🎲 Roll",    true)
+local TAB_HIST = makeTabBtn("📜 History", false)
+local TAB_TRAD = makeTabBtn("🤝 Trade",   false)
+local TAB_SETT = makeTabBtn("⚙️ Settings",false)
 
 -- ── PAGES ──
+local pageY = 100  -- starting Y for all pages
+local pageH = H - pageY - 8
+
 local function makePage()
 	local f=Instance.new("Frame",win)
-	f.Size=UDim2.new(1,-32,1,-100); f.Position=UDim2.new(0,16,0,98)
-	f.BackgroundTransparency=1; f.Visible=false
+	f.Size=UDim2.new(1,-24,0,pageH); f.Position=UDim2.new(0,12,0,pageY)
+	f.BackgroundTransparency=1; f.Visible=false; f.ClipsDescendants=false
 	return f
 end
 
-local pageMain    = makePage(); pageMain.Visible=true
-local pageHistory = makePage()
-local pageTrade   = makePage()
-local pageSettings= makePage()
+local pageRoll = makePage(); pageRoll.Visible=true
+local pageHist = makePage()
+local pageTrad = makePage()
+local pageSett = makePage()
 
-local allPages = {pageMain, pageHistory, pageTrade, pageSettings}
-local allTabs  = {tabMain, tabHistory, tabTrade, tabSettings}
+local allPages={pageRoll,pageHist,pageTrad,pageSett}
+local allTabs ={TAB_ROLL,TAB_HIST,TAB_TRAD,TAB_SETT}
 
 local function switchTab(idx)
 	for i,pg in ipairs(allPages) do
-		pg.Visible = (i==idx)
-		local active=(i==idx)
-		tween(allTabs[i], {
-			BackgroundColor3=active and Color3.fromRGB(100,55,200) or Color3.fromRGB(30,24,48),
-			TextColor3=active and Color3.fromRGB(255,255,255) or Color3.fromRGB(140,120,180)
-		}, TWEEN_FAST)
+		pg.Visible=(i==idx)
+		local on=(i==idx)
+		tw(allTabs[i],{
+			BackgroundColor3=on and Color3.fromRGB(95,48,200) or Color3.fromRGB(28,22,44),
+			TextColor3=on and Color3.fromRGB(255,255,255) or Color3.fromRGB(130,110,170)
+		},TW_FAST)
 	end
 end
+TAB_ROLL.MouseButton1Click:Connect(function() switchTab(1) end)
+TAB_HIST.MouseButton1Click:Connect(function() switchTab(2) end)
+TAB_TRAD.MouseButton1Click:Connect(function() switchTab(3) end)
+TAB_SETT.MouseButton1Click:Connect(function() switchTab(4) end)
 
-tabMain.MouseButton1Click:Connect(function() switchTab(1) end)
-tabHistory.MouseButton1Click:Connect(function() switchTab(2) end)
-tabTrade.MouseButton1Click:Connect(function() switchTab(3) end)
-tabSettings.MouseButton1Click:Connect(function() switchTab(4) end)
+-- ══════════════════════════════════════════════
+--  PAGE 1: ROLL
+-- ══════════════════════════════════════════════
 
--- ════════════════════════════
---  PAGE 1: MAIN (ROLL)
--- ════════════════════════════
+-- Skill card (top)
+local card=Instance.new("Frame",pageRoll)
+card.Size=UDim2.new(1,0,0,160); card.Position=UDim2.new(0,0,0,0)
+card.BackgroundColor3=Color3.fromRGB(16,12,28); card.BorderSizePixel=0
+Instance.new("UICorner",card).CornerRadius=UDim.new(0,14)
+local cardStroke=Instance.new("UIStroke",card)
+cardStroke.Color=Color3.fromRGB(90,50,170); cardStroke.Thickness=1.5; cardStroke.Transparency=0.4
 
--- Dice card
-local diceCard=Instance.new("Frame",pageMain)
-diceCard.Size=UDim2.new(1,0,0,200); diceCard.Position=UDim2.new(0,0,0,0)
-diceCard.BackgroundColor3=Color3.fromRGB(18,14,32); diceCard.BorderSizePixel=0
-Instance.new("UICorner",diceCard).CornerRadius=UDim.new(0,16)
-local diceCardStroke=Instance.new("UIStroke",diceCard)
-diceCardStroke.Color=Color3.fromRGB(100,60,180); diceCardStroke.Thickness=1.5; diceCardStroke.Transparency=0.5
+-- dice box (left of card)
+local diceBox=Instance.new("Frame",card)
+diceBox.Size=UDim2.new(0,100,0,100); diceBox.Position=UDim2.new(0,14,0.5,-50)
+diceBox.BackgroundColor3=Color3.fromRGB(22,16,42); diceBox.BorderSizePixel=0
+Instance.new("UICorner",diceBox).CornerRadius=UDim.new(0,14)
+local diceStroke=Instance.new("UIStroke",diceBox)
+diceStroke.Color=Color3.fromRGB(130,80,240); diceStroke.Thickness=2; diceStroke.Transparency=0.4
 
--- dice emoji
-local diceLbl=Instance.new("TextLabel",diceCard)
-diceLbl.Size=UDim2.new(0,90,0,90); diceLbl.Position=UDim2.new(0,12,0.5,-45)
-diceLbl.BackgroundColor3=Color3.fromRGB(26,18,50); diceLbl.Text="🎲"
-diceLbl.TextSize=48; diceLbl.Font=Enum.Font.Gotham; diceLbl.TextColor3=Color3.fromRGB(220,190,255)
-diceLbl.BorderSizePixel=0
-Instance.new("UICorner",diceLbl).CornerRadius=UDim.new(0,14)
-local diceGlow=Instance.new("UIStroke",diceLbl)
-diceGlow.Color=Color3.fromRGB(140,90,255); diceGlow.Thickness=2; diceGlow.Transparency=0.5
+local diceEmoji=Instance.new("TextLabel",diceBox)
+diceEmoji.Size=UDim2.new(1,0,1,0); diceEmoji.BackgroundTransparency=1
+diceEmoji.Text="🎲"; diceEmoji.TextSize=50; diceEmoji.Font=Enum.Font.Gotham
 
--- skill info panel (right of dice)
-local infoPanel=Instance.new("Frame",diceCard)
-infoPanel.Size=UDim2.new(1,-118,1,-16); infoPanel.Position=UDim2.new(0,110,0,8)
-infoPanel.BackgroundTransparency=1
+-- Info right side
+local infoBox=Instance.new("Frame",card)
+infoBox.Size=UDim2.new(1,-130,1,-16); infoBox.Position=UDim2.new(0,124,0,8)
+infoBox.BackgroundTransparency=1
 
-local rarityTag=Instance.new("TextLabel",infoPanel)
-rarityTag.Size=UDim2.new(0,110,0,22); rarityTag.Position=UDim2.new(0,0,0,4)
-rarityTag.BackgroundColor3=Color3.fromRGB(30,22,55)
-rarityTag.Text=""; rarityTag.TextSize=11; rarityTag.Font=Enum.Font.GothamBold
-rarityTag.TextColor3=Color3.fromRGB(200,180,255); rarityTag.BorderSizePixel=0; rarityTag.Visible=false
-Instance.new("UICorner",rarityTag).CornerRadius=UDim.new(0,6)
+local rarTag=Instance.new("TextLabel",infoBox)
+rarTag.Size=UDim2.new(0,100,0,20); rarTag.BackgroundColor3=Color3.fromRGB(28,20,50)
+rarTag.Text=""; rarTag.TextSize=10; rarTag.Font=Enum.Font.GothamBold
+rarTag.TextColor3=Color3.fromRGB(200,180,255); rarTag.BorderSizePixel=0; rarTag.Visible=false
+Instance.new("UICorner",rarTag).CornerRadius=UDim.new(0,6)
 
-local skillNameLbl=Instance.new("TextLabel",infoPanel)
-skillNameLbl.Size=UDim2.new(1,0,0,28); skillNameLbl.Position=UDim2.new(0,0,0,30)
-skillNameLbl.BackgroundTransparency=1; skillNameLbl.Text="Roll the dice!"
-skillNameLbl.TextColor3=Color3.fromRGB(215,185,255); skillNameLbl.Font=Enum.Font.GothamBold
-skillNameLbl.TextSize=17; skillNameLbl.TextXAlignment=Enum.TextXAlignment.Left
+local skillTitle=Instance.new("TextLabel",infoBox)
+skillTitle.Size=UDim2.new(1,0,0,26); skillTitle.Position=UDim2.new(0,0,0,26)
+skillTitle.BackgroundTransparency=1; skillTitle.Text="Roll the dice!"
+skillTitle.TextColor3=Color3.fromRGB(220,190,255); skillTitle.Font=Enum.Font.GothamBold
+skillTitle.TextSize=16; skillTitle.TextXAlignment=Enum.TextXAlignment.Left
 
-local skillDescLbl=Instance.new("TextLabel",infoPanel)
-skillDescLbl.Size=UDim2.new(1,0,0,40); skillDescLbl.Position=UDim2.new(0,0,0,60)
-skillDescLbl.BackgroundTransparency=1; skillDescLbl.Text="Tekan ROLL untuk dapat skill acak!"
-skillDescLbl.TextColor3=Color3.fromRGB(150,130,190); skillDescLbl.Font=Enum.Font.Gotham
-skillDescLbl.TextSize=13; skillDescLbl.TextXAlignment=Enum.TextXAlignment.Left; skillDescLbl.TextWrapped=true
+local skillDesc=Instance.new("TextLabel",infoBox)
+skillDesc.Size=UDim2.new(1,0,0,38); skillDesc.Position=UDim2.new(0,0,0,56)
+skillDesc.BackgroundTransparency=1; skillDesc.Text="Tekan ROLL untuk dapat skill acak!"
+skillDesc.TextColor3=Color3.fromRGB(145,125,185); skillDesc.Font=Enum.Font.Gotham
+skillDesc.TextSize=12; skillDesc.TextXAlignment=Enum.TextXAlignment.Left; skillDesc.TextWrapped=true
 
-local flavorLbl=Instance.new("TextLabel",infoPanel)
-flavorLbl.Size=UDim2.new(1,0,0,22); flavorLbl.Position=UDim2.new(0,0,0,104)
+local flavorLbl=Instance.new("TextLabel",infoBox)
+flavorLbl.Size=UDim2.new(1,0,0,20); flavorLbl.Position=UDim2.new(0,0,0,98)
 flavorLbl.BackgroundTransparency=1; flavorLbl.Text=""
-flavorLbl.TextColor3=Color3.fromRGB(100,85,140); flavorLbl.Font=Enum.Font.GothamItalic
-flavorLbl.TextSize=12; flavorLbl.TextXAlignment=Enum.TextXAlignment.Left; flavorLbl.TextWrapped=true
+flavorLbl.TextColor3=Color3.fromRGB(95,80,130); flavorLbl.Font=Enum.Font.Gotham
+flavorLbl.TextSize=11; flavorLbl.TextXAlignment=Enum.TextXAlignment.Left; flavorLbl.TextWrapped=true
 
--- USE / SKIP
-local useBtn=Instance.new("TextButton",pageMain)
-useBtn.Size=UDim2.new(0.47,0,0,48); useBtn.Position=UDim2.new(0,0,0,210)
-useBtn.BackgroundColor3=Color3.fromRGB(60,185,100); useBtn.Text="✅  USE"
+-- ── BUTTONS AREA ──
+-- Check Server button
+local checkBtn=Instance.new("TextButton",pageRoll)
+checkBtn.Size=UDim2.new(1,0,0,40); checkBtn.Position=UDim2.new(0,0,0,168)
+checkBtn.BackgroundColor3=Color3.fromRGB(22,65,145); checkBtn.Text="🔍  CHECK SERVER SUPPORT"
+checkBtn.TextColor3=Color3.fromRGB(255,255,255); checkBtn.Font=Enum.Font.GothamBold
+checkBtn.TextSize=13; checkBtn.BorderSizePixel=0
+Instance.new("UICorner",checkBtn).CornerRadius=UDim.new(0,12)
+local checkStroke=Instance.new("UIStroke",checkBtn)
+checkStroke.Color=Color3.fromRGB(55,120,255); checkStroke.Thickness=1.5
+
+-- USE / SKIP (hidden initially)
+local useBtn=Instance.new("TextButton",pageRoll)
+useBtn.Size=UDim2.new(0.48,0,0,40); useBtn.Position=UDim2.new(0,0,0,168)
+useBtn.BackgroundColor3=Color3.fromRGB(50,175,90); useBtn.Text="✅  USE"
 useBtn.TextColor3=Color3.fromRGB(255,255,255); useBtn.Font=Enum.Font.GothamBold
 useBtn.TextSize=15; useBtn.BorderSizePixel=0; useBtn.Visible=false
 Instance.new("UICorner",useBtn).CornerRadius=UDim.new(0,12)
 
-local skipBtn=Instance.new("TextButton",pageMain)
-skipBtn.Size=UDim2.new(0.47,0,0,48); skipBtn.Position=UDim2.new(0.53,0,0,210)
-skipBtn.BackgroundColor3=Color3.fromRGB(190,60,60); skipBtn.Text="⏭  SKIP"
+local skipBtn=Instance.new("TextButton",pageRoll)
+skipBtn.Size=UDim2.new(0.48,0,0,40); skipBtn.Position=UDim2.new(0.52,0,0,168)
+skipBtn.BackgroundColor3=Color3.fromRGB(180,55,55); skipBtn.Text="⏭  SKIP"
 skipBtn.TextColor3=Color3.fromRGB(255,255,255); skipBtn.Font=Enum.Font.GothamBold
 skipBtn.TextSize=15; skipBtn.BorderSizePixel=0; skipBtn.Visible=false
 Instance.new("UICorner",skipBtn).CornerRadius=UDim.new(0,12)
 
--- Check Server
-local checkBtn=Instance.new("TextButton",pageMain)
-checkBtn.Size=UDim2.new(1,0,0,38); checkBtn.Position=UDim2.new(0,0,0,210)
-checkBtn.BackgroundColor3=Color3.fromRGB(25,70,150); checkBtn.Text="🔍  CHECK SERVER SUPPORT"
-checkBtn.TextColor3=Color3.fromRGB(255,255,255); checkBtn.Font=Enum.Font.GothamBold
-checkBtn.TextSize=13; checkBtn.BorderSizePixel=0
-Instance.new("UICorner",checkBtn).CornerRadius=UDim.new(0,12)
-Instance.new("UIStroke",checkBtn).Color=Color3.fromRGB(60,130,255)
-
 -- Roll Button
-local rollBtn=Instance.new("TextButton",pageMain)
-rollBtn.Size=UDim2.new(1,0,0,54); rollBtn.Position=UDim2.new(0,0,0,258)
-rollBtn.BackgroundColor3=Color3.fromRGB(105,50,210); rollBtn.Text="🎲  ROLL THE DICE"
+local rollBtn=Instance.new("TextButton",pageRoll)
+rollBtn.Size=UDim2.new(1,0,0,52); rollBtn.Position=UDim2.new(0,0,0,216)
+rollBtn.BackgroundColor3=Color3.fromRGB(100,48,205); rollBtn.Text="🎲  ROLL THE DICE"
 rollBtn.TextColor3=Color3.fromRGB(255,255,255); rollBtn.Font=Enum.Font.GothamBold
-rollBtn.TextSize=16; rollBtn.BorderSizePixel=0
+rollBtn.TextSize=17; rollBtn.BorderSizePixel=0
 Instance.new("UICorner",rollBtn).CornerRadius=UDim.new(0,14)
 local rollStroke=Instance.new("UIStroke",rollBtn)
-rollStroke.Color=Color3.fromRGB(170,110,255); rollStroke.Thickness=1.5
+rollStroke.Color=Color3.fromRGB(165,105,255); rollStroke.Thickness=2
 
--- Streak
-local streakLbl=Instance.new("TextLabel",pageMain)
-streakLbl.Size=UDim2.new(1,0,0,22); streakLbl.Position=UDim2.new(0,0,0,320)
+-- Streak label
+local streakLbl=Instance.new("TextLabel",pageRoll)
+streakLbl.Size=UDim2.new(1,0,0,20); streakLbl.Position=UDim2.new(0,0,0,276)
 streakLbl.BackgroundTransparency=1; streakLbl.Text=""
-streakLbl.TextColor3=Color3.fromRGB(255,195,50); streakLbl.Font=Enum.Font.GothamBold
+streakLbl.TextColor3=Color3.fromRGB(255,190,45); streakLbl.Font=Enum.Font.GothamBold
 streakLbl.TextSize=12; streakLbl.TextXAlignment=Enum.TextXAlignment.Center
 
 -- Slots header
-local slotsHeader=Instance.new("TextLabel",pageMain)
-slotsHeader.Size=UDim2.new(1,0,0,18); slotsHeader.Position=UDim2.new(0,0,0,350)
-slotsHeader.BackgroundTransparency=1; slotsHeader.Text="ACTIVE SKILL SLOTS  [0/"..MAX_SLOTS.."]"
-slotsHeader.TextColor3=Color3.fromRGB(110,85,160); slotsHeader.Font=Enum.Font.GothamBold
-slotsHeader.TextSize=11; slotsHeader.TextXAlignment=Enum.TextXAlignment.Left
+local slotsHdr=Instance.new("TextLabel",pageRoll)
+slotsHdr.Size=UDim2.new(1,0,0,16); slotsHdr.Position=UDim2.new(0,0,0,304)
+slotsHdr.BackgroundTransparency=1; slotsHdr.Text="ACTIVE SKILL SLOTS  [0/5]"
+slotsHdr.TextColor3=Color3.fromRGB(100,80,150); slotsHdr.Font=Enum.Font.GothamBold
+slotsHdr.TextSize=11; slotsHdr.TextXAlignment=Enum.TextXAlignment.Left
 
 -- Slots frame
-local slotsFrame=Instance.new("Frame",pageMain)
-slotsFrame.Size=UDim2.new(1,0,0,70); slotsFrame.Position=UDim2.new(0,0,0,372)
-slotsFrame.BackgroundColor3=Color3.fromRGB(18,14,30); slotsFrame.BorderSizePixel=0
+local slotsFrame=Instance.new("Frame",pageRoll)
+slotsFrame.Size=UDim2.new(1,0,0,68); slotsFrame.Position=UDim2.new(0,0,0,324)
+slotsFrame.BackgroundColor3=Color3.fromRGB(16,12,26); slotsFrame.BorderSizePixel=0
 Instance.new("UICorner",slotsFrame).CornerRadius=UDim.new(0,12)
-local slotsLayout=Instance.new("UIListLayout",slotsFrame)
-slotsLayout.FillDirection=Enum.FillDirection.Horizontal
-slotsLayout.Padding=UDim.new(0,6); slotsLayout.VerticalAlignment=Enum.VerticalAlignment.Center
-Instance.new("UIPadding",slotsFrame).PaddingLeft=UDim.new(0,8)
+local slotsLL=Instance.new("UIListLayout",slotsFrame)
+slotsLL.FillDirection=Enum.FillDirection.Horizontal
+slotsLL.Padding=UDim.new(0,6); slotsLL.VerticalAlignment=Enum.VerticalAlignment.Center
+local slotsPad=Instance.new("UIPadding",slotsFrame); slotsPad.PaddingLeft=UDim.new(0,8)
 
 -- Clear all
-local clearBtn=Instance.new("TextButton",pageMain)
-clearBtn.Size=UDim2.new(1,0,0,36); clearBtn.Position=UDim2.new(0,0,0,450)
-clearBtn.BackgroundColor3=Color3.fromRGB(45,30,70); clearBtn.Text="🗑  Clear All Skills"
-clearBtn.TextColor3=Color3.fromRGB(170,135,210); clearBtn.Font=Enum.Font.Gotham
+local clearBtn=Instance.new("TextButton",pageRoll)
+clearBtn.Size=UDim2.new(1,0,0,36); clearBtn.Position=UDim2.new(0,0,0,400)
+clearBtn.BackgroundColor3=Color3.fromRGB(40,28,65); clearBtn.Text="🗑  Clear All Skills"
+clearBtn.TextColor3=Color3.fromRGB(165,130,205); clearBtn.Font=Enum.Font.Gotham
 clearBtn.TextSize=13; clearBtn.BorderSizePixel=0
 Instance.new("UICorner",clearBtn).CornerRadius=UDim.new(0,10)
 
--- ════════════════════════════
+-- ══════════════════════════════════════════════
 --  PAGE 2: HISTORY
--- ════════════════════════════
-local histTitle=Instance.new("TextLabel",pageHistory)
-histTitle.Size=UDim2.new(1,0,0,24); histTitle.BackgroundTransparency=1
-histTitle.Text="📜 Roll History (last 20)"; histTitle.TextColor3=Color3.fromRGB(200,170,255)
-histTitle.Font=Enum.Font.GothamBold; histTitle.TextSize=14; histTitle.TextXAlignment=Enum.TextXAlignment.Left
+-- ══════════════════════════════════════════════
+local histHdr=Instance.new("TextLabel",pageHist)
+histHdr.Size=UDim2.new(1,0,0,22); histHdr.BackgroundTransparency=1
+histHdr.Text="📜 Roll History (last 20)"; histHdr.TextColor3=Color3.fromRGB(195,165,250)
+histHdr.Font=Enum.Font.GothamBold; histHdr.TextSize=14; histHdr.TextXAlignment=Enum.TextXAlignment.Left
 
-local histScroll=Instance.new("ScrollingFrame",pageHistory)
-histScroll.Size=UDim2.new(1,0,1,-32); histScroll.Position=UDim2.new(0,0,0,28)
-histScroll.BackgroundColor3=Color3.fromRGB(16,12,26); histScroll.BorderSizePixel=0
-histScroll.ScrollBarThickness=4; histScroll.ScrollBarImageColor3=Color3.fromRGB(100,60,180)
+local histScroll=Instance.new("ScrollingFrame",pageHist)
+histScroll.Size=UDim2.new(1,0,1,-28); histScroll.Position=UDim2.new(0,0,0,26)
+histScroll.BackgroundColor3=Color3.fromRGB(14,11,24); histScroll.BorderSizePixel=0
+histScroll.ScrollBarThickness=4; histScroll.ScrollBarImageColor3=Color3.fromRGB(90,50,170)
 histScroll.CanvasSize=UDim2.new(0,0,0,0)
 Instance.new("UICorner",histScroll).CornerRadius=UDim.new(0,12)
-local histLayout=Instance.new("UIListLayout",histScroll)
-histLayout.Padding=UDim.new(0,4)
-Instance.new("UIPadding",histScroll).PaddingTop=UDim.new(0,6)
-Instance.new("UIPadding",histScroll).PaddingLeft=UDim.new(0,8)
-Instance.new("UIPadding",histScroll).PaddingRight=UDim.new(0,8)
+local histLL=Instance.new("UIListLayout",histScroll); histLL.Padding=UDim.new(0,4)
+local histPad=Instance.new("UIPadding",histScroll)
+histPad.PaddingTop=UDim.new(0,6); histPad.PaddingLeft=UDim.new(0,8); histPad.PaddingRight=UDim.new(0,8)
 
-local function addHistoryEntry(skill, wasUsed)
-	-- Tambah ke tabel
-	table.insert(rollHistory, 1, {skill=skill, used=wasUsed, time=os.clock()})
-	if #rollHistory > MAX_HISTORY then table.remove(rollHistory) end
-	-- Rebuild history UI
+local function refreshHistory()
 	for _,c in ipairs(histScroll:GetChildren()) do
 		if c:IsA("Frame") then c:Destroy() end
 	end
-	for i, entry in ipairs(rollHistory) do
+	if #rollHistory==0 then
+		local empty=Instance.new("TextLabel",histScroll)
+		empty.Size=UDim2.new(1,-8,0,40); empty.BackgroundTransparency=1
+		empty.Text="Belum ada roll history."; empty.TextColor3=Color3.fromRGB(120,100,155)
+		empty.Font=Enum.Font.Gotham; empty.TextSize=13; empty.TextXAlignment=Enum.TextXAlignment.Center
+	end
+	for _,entry in ipairs(rollHistory) do
 		local row=Instance.new("Frame",histScroll)
-		row.Size=UDim2.new(1,-8,0,36); row.BackgroundColor3=Color3.fromRGB(22,17,38)
+		row.Size=UDim2.new(1,-8,0,38); row.BackgroundColor3=Color3.fromRGB(20,16,34)
 		row.BorderSizePixel=0
 		Instance.new("UICorner",row).CornerRadius=UDim.new(0,8)
-		local stroke=Instance.new("UIStroke",row)
-		stroke.Color=rC(entry.skill.rarity); stroke.Thickness=1; stroke.Transparency=0.6
-		local icon=Instance.new("TextLabel",row)
-		icon.Size=UDim2.new(0,32,1,0); icon.BackgroundTransparency=1
-		icon.Text=entry.skill.icon; icon.TextSize=18; icon.Font=Enum.Font.Gotham
-		local nameLbl=Instance.new("TextLabel",row)
-		nameLbl.Size=UDim2.new(1,-80,1,0); nameLbl.Position=UDim2.new(0,34,0,0)
-		nameLbl.BackgroundTransparency=1; nameLbl.Text=entry.skill.name
-		nameLbl.TextColor3=rC(entry.skill.rarity); nameLbl.Font=Enum.Font.GothamBold
-		nameLbl.TextSize=13; nameLbl.TextXAlignment=Enum.TextXAlignment.Left
-		local statusLbl=Instance.new("TextLabel",row)
-		statusLbl.Size=UDim2.new(0,50,1,0); statusLbl.Position=UDim2.new(1,-52,0,0)
-		statusLbl.BackgroundTransparency=1
-		statusLbl.Text=entry.used and "✅ Used" or "⏭ Skip"
-		statusLbl.TextColor3=entry.used and Color3.fromRGB(100,220,130) or Color3.fromRGB(200,100,100)
-		statusLbl.Font=Enum.Font.Gotham; statusLbl.TextSize=11
+		local rs=Instance.new("UIStroke",row); rs.Color=rC(entry.skill.rarity); rs.Thickness=1; rs.Transparency=0.6
+		local ic=Instance.new("TextLabel",row)
+		ic.Size=UDim2.new(0,36,1,0); ic.BackgroundTransparency=1
+		ic.Text=entry.skill.icon; ic.TextSize=20; ic.Font=Enum.Font.Gotham
+		local nl=Instance.new("TextLabel",row)
+		nl.Size=UDim2.new(1,-86,1,0); nl.Position=UDim2.new(0,36,0,0)
+		nl.BackgroundTransparency=1; nl.Text=entry.skill.name
+		nl.TextColor3=rC(entry.skill.rarity); nl.Font=Enum.Font.GothamBold
+		nl.TextSize=13; nl.TextXAlignment=Enum.TextXAlignment.Left
+		local sl=Instance.new("TextLabel",row)
+		sl.Size=UDim2.new(0,56,1,0); sl.Position=UDim2.new(1,-58,0,0)
+		sl.BackgroundTransparency=1
+		sl.Text=entry.used and "✅ Used" or "⏭ Skip"
+		sl.TextColor3=entry.used and Color3.fromRGB(80,210,120) or Color3.fromRGB(200,90,90)
+		sl.Font=Enum.Font.Gotham; sl.TextSize=11
 	end
-	histScroll.CanvasSize=UDim2.new(0,0,0,#rollHistory*40+10)
+	histScroll.CanvasSize=UDim2.new(0,0,0,#rollHistory*42+10)
 end
+refreshHistory()
 
--- ════════════════════════════
+-- ══════════════════════════════════════════════
 --  PAGE 3: TRADE
--- ════════════════════════════
-local tradeLockedLbl=Instance.new("TextLabel",pageTrade)
-tradeLockedLbl.Size=UDim2.new(1,0,0,60); tradeLockedLbl.Position=UDim2.new(0,0,0.3,0)
-tradeLockedLbl.BackgroundTransparency=1
-tradeLockedLbl.Text="🔒 Trade dinonaktifkan\nAktifkan di tab ⚙️ Settings"
-tradeLockedLbl.TextColor3=Color3.fromRGB(140,120,170); tradeLockedLbl.Font=Enum.Font.Gotham
-tradeLockedLbl.TextSize=14; tradeLockedLbl.TextXAlignment=Enum.TextXAlignment.Center; tradeLockedLbl.TextWrapped=true
+-- ══════════════════════════════════════════════
+local tradeLocked=Instance.new("TextLabel",pageTrad)
+tradeLocked.Size=UDim2.new(1,0,0,60); tradeLocked.Position=UDim2.new(0,0,0.35,0)
+tradeLocked.BackgroundTransparency=1
+tradeLocked.Text="🔒 Trade dinonaktifkan\nAktifkan di tab ⚙️ Settings"
+tradeLocked.TextColor3=Color3.fromRGB(130,110,160); tradeLocked.Font=Enum.Font.Gotham
+tradeLocked.TextSize=14; tradeLocked.TextXAlignment=Enum.TextXAlignment.Center; tradeLocked.TextWrapped=true
 
-local tradePanel=Instance.new("Frame",pageTrade)
+local tradePanel=Instance.new("Frame",pageTrad)
 tradePanel.Size=UDim2.new(1,0,1,0); tradePanel.BackgroundTransparency=1; tradePanel.Visible=false
 
 local tradeTitleLbl=Instance.new("TextLabel",tradePanel)
-tradeTitleLbl.Size=UDim2.new(1,0,0,24); tradeTitleLbl.BackgroundTransparency=1
-tradeTitleLbl.Text="🤝 Trade Skill ke Player"; tradeTitleLbl.TextColor3=Color3.fromRGB(200,170,255)
-tradeTitleLbl.Font=Enum.Font.GothamBold; tradeTitleLbl.TextSize=14; tradeTitleLbl.TextXAlignment=Enum.TextXAlignment.Left
+tradeTitleLbl.Size=UDim2.new(1,0,0,22); tradeTitleLbl.BackgroundTransparency=1
+tradeTitleLbl.Text="🤝 Trade Skill ke Player Lain"
+tradeTitleLbl.TextColor3=Color3.fromRGB(195,165,250); tradeTitleLbl.Font=Enum.Font.GothamBold
+tradeTitleLbl.TextSize=14; tradeTitleLbl.TextXAlignment=Enum.TextXAlignment.Left
 
--- Player list scroll
+-- Player list
 local playerScroll=Instance.new("ScrollingFrame",tradePanel)
-playerScroll.Size=UDim2.new(1,0,0,120); playerScroll.Position=UDim2.new(0,0,0,30)
-playerScroll.BackgroundColor3=Color3.fromRGB(16,12,26); playerScroll.BorderSizePixel=0
-playerScroll.ScrollBarThickness=4; playerScroll.ScrollBarImageColor3=Color3.fromRGB(100,60,180)
+playerScroll.Size=UDim2.new(1,0,0,110); playerScroll.Position=UDim2.new(0,0,0,28)
+playerScroll.BackgroundColor3=Color3.fromRGB(14,11,24); playerScroll.BorderSizePixel=0
+playerScroll.ScrollBarThickness=4; playerScroll.ScrollBarImageColor3=Color3.fromRGB(90,50,170)
 playerScroll.CanvasSize=UDim2.new(0,0,0,0)
 Instance.new("UICorner",playerScroll).CornerRadius=UDim.new(0,10)
-local playerLayout=Instance.new("UIListLayout",playerScroll)
-playerLayout.Padding=UDim.new(0,4)
-Instance.new("UIPadding",playerScroll).PaddingLeft=UDim.new(0,6)
-Instance.new("UIPadding",playerScroll).PaddingTop=UDim.new(0,6)
+local playerLL=Instance.new("UIListLayout",playerScroll); playerLL.Padding=UDim.new(0,4)
+local playerPad=Instance.new("UIPadding",playerScroll)
+playerPad.PaddingLeft=UDim.new(0,6); playerPad.PaddingTop=UDim.new(0,6)
 
-local selectedTradeTarget = nil
-local selectedTradeSkill  = nil
-
--- Skill selector for trade
-local tradeSlotsTitle=Instance.new("TextLabel",tradePanel)
-tradeSlotsTitle.Size=UDim2.new(1,0,0,20); tradeSlotsTitle.Position=UDim2.new(0,0,0,158)
-tradeSlotsTitle.BackgroundTransparency=1; tradeSlotsTitle.Text="Pilih skill yang mau di-trade:"
-tradeSlotsTitle.TextColor3=Color3.fromRGB(160,140,200); tradeSlotsTitle.Font=Enum.Font.Gotham
-tradeSlotsTitle.TextSize=12; tradeSlotsTitle.TextXAlignment=Enum.TextXAlignment.Left
+-- Skill selector
+local tradeSkillHdr=Instance.new("TextLabel",tradePanel)
+tradeSkillHdr.Size=UDim2.new(1,0,0,18); tradeSkillHdr.Position=UDim2.new(0,0,0,146)
+tradeSkillHdr.BackgroundTransparency=1; tradeSkillHdr.Text="Pilih skill yang mau di-trade:"
+tradeSkillHdr.TextColor3=Color3.fromRGB(155,135,195); tradeSkillHdr.Font=Enum.Font.Gotham
+tradeSkillHdr.TextSize=12; tradeSkillHdr.TextXAlignment=Enum.TextXAlignment.Left
 
 local tradeSkillScroll=Instance.new("ScrollingFrame",tradePanel)
-tradeSkillScroll.Size=UDim2.new(1,0,0,100); tradeSkillScroll.Position=UDim2.new(0,0,0,180)
-tradeSkillScroll.BackgroundColor3=Color3.fromRGB(16,12,26); tradeSkillScroll.BorderSizePixel=0
-tradeSkillScroll.ScrollBarThickness=4; tradeSkillScroll.ScrollBarImageColor3=Color3.fromRGB(100,60,180)
+tradeSkillScroll.Size=UDim2.new(1,0,0,80); tradeSkillScroll.Position=UDim2.new(0,0,0,168)
+tradeSkillScroll.BackgroundColor3=Color3.fromRGB(14,11,24); tradeSkillScroll.BorderSizePixel=0
+tradeSkillScroll.ScrollBarThickness=4; tradeSkillScroll.ScrollBarImageColor3=Color3.fromRGB(90,50,170)
 tradeSkillScroll.CanvasSize=UDim2.new(0,0,0,0)
 Instance.new("UICorner",tradeSkillScroll).CornerRadius=UDim.new(0,10)
-local tradeSkillLayout=Instance.new("UIListLayout",tradeSkillScroll)
-tradeSkillLayout.FillDirection=Enum.FillDirection.Horizontal; tradeSkillLayout.Padding=UDim.new(0,6)
-tradeSkillLayout.VerticalAlignment=Enum.VerticalAlignment.Center
+local tsLL=Instance.new("UIListLayout",tradeSkillScroll)
+tsLL.FillDirection=Enum.FillDirection.Horizontal; tsLL.Padding=UDim.new(0,6)
+tsLL.VerticalAlignment=Enum.VerticalAlignment.Center
 Instance.new("UIPadding",tradeSkillScroll).PaddingLeft=UDim.new(0,8)
 
 local sendTradeBtn=Instance.new("TextButton",tradePanel)
-sendTradeBtn.Size=UDim2.new(1,0,0,44); sendTradeBtn.Position=UDim2.new(0,0,0,290)
-sendTradeBtn.BackgroundColor3=Color3.fromRGB(50,130,220); sendTradeBtn.Text="📤  Send Trade Offer"
+sendTradeBtn.Size=UDim2.new(1,0,0,42); sendTradeBtn.Position=UDim2.new(0,0,0,258)
+sendTradeBtn.BackgroundColor3=Color3.fromRGB(45,120,215); sendTradeBtn.Text="📤  Send Trade Offer"
 sendTradeBtn.TextColor3=Color3.fromRGB(255,255,255); sendTradeBtn.Font=Enum.Font.GothamBold
 sendTradeBtn.TextSize=14; sendTradeBtn.BorderSizePixel=0
 Instance.new("UICorner",sendTradeBtn).CornerRadius=UDim.new(0,12)
 
-local tradeStatusLbl=Instance.new("TextLabel",tradePanel)
-tradeStatusLbl.Size=UDim2.new(1,0,0,30); tradeStatusLbl.Position=UDim2.new(0,0,0,342)
-tradeStatusLbl.BackgroundTransparency=1; tradeStatusLbl.Text=""
-tradeStatusLbl.TextColor3=Color3.fromRGB(180,160,220); tradeStatusLbl.Font=Enum.Font.Gotham
-tradeStatusLbl.TextSize=13; tradeStatusLbl.TextXAlignment=Enum.TextXAlignment.Center; tradeStatusLbl.TextWrapped=true
+local tradeStatus=Instance.new("TextLabel",tradePanel)
+tradeStatus.Size=UDim2.new(1,0,0,28); tradeStatus.Position=UDim2.new(0,0,0,308)
+tradeStatus.BackgroundTransparency=1; tradeStatus.Text=""
+tradeStatus.TextColor3=Color3.fromRGB(175,155,215); tradeStatus.Font=Enum.Font.Gotham
+tradeStatus.TextSize=13; tradeStatus.TextXAlignment=Enum.TextXAlignment.Center; tradeStatus.TextWrapped=true
 
--- Trade incoming notification
-local tradeNotif=Instance.new("Frame",SG)
-tradeNotif.Size=UDim2.new(0,340,0,110); tradeNotif.Position=UDim2.new(0.5,-170,1,-130)
-tradeNotif.BackgroundColor3=Color3.fromRGB(18,14,32); tradeNotif.BorderSizePixel=0
-tradeNotif.Visible=false
-Instance.new("UICorner",tradeNotif).CornerRadius=UDim.new(0,14)
-local notifStroke=Instance.new("UIStroke",tradeNotif)
-notifStroke.Color=Color3.fromRGB(50,130,220); notifStroke.Thickness=1.5
-local notifTitle=Instance.new("TextLabel",tradeNotif)
-notifTitle.Size=UDim2.new(1,-16,0,28); notifTitle.Position=UDim2.new(0,12,0,8)
-notifTitle.BackgroundTransparency=1; notifTitle.Text="🤝 Incoming Trade!"
-notifTitle.TextColor3=Color3.fromRGB(100,180,255); notifTitle.Font=Enum.Font.GothamBold
-notifTitle.TextSize=14; notifTitle.TextXAlignment=Enum.TextXAlignment.Left
-local notifDesc=Instance.new("TextLabel",tradeNotif)
-notifDesc.Size=UDim2.new(1,-16,0,28); notifDesc.Position=UDim2.new(0,12,0,34)
-notifDesc.BackgroundTransparency=1; notifDesc.Text="Player wants to trade..."
-notifDesc.TextColor3=Color3.fromRGB(180,160,220); notifDesc.Font=Enum.Font.Gotham
-notifDesc.TextSize=13; notifDesc.TextWrapped=true
-local notifAccept=Instance.new("TextButton",tradeNotif)
-notifAccept.Size=UDim2.new(0.45,0,0,32); notifAccept.Position=UDim2.new(0.04,0,1,-40)
-notifAccept.BackgroundColor3=Color3.fromRGB(60,185,100); notifAccept.Text="✅ Accept"
-notifAccept.TextColor3=Color3.fromRGB(255,255,255); notifAccept.Font=Enum.Font.GothamBold
-notifAccept.TextSize=13; notifAccept.BorderSizePixel=0
-Instance.new("UICorner",notifAccept).CornerRadius=UDim.new(0,8)
-local notifDecline=Instance.new("TextButton",tradeNotif)
-notifDecline.Size=UDim2.new(0.45,0,0,32); notifDecline.Position=UDim2.new(0.51,0,1,-40)
-notifDecline.BackgroundColor3=Color3.fromRGB(190,60,60); notifDecline.Text="❌ Decline"
-notifDecline.TextColor3=Color3.fromRGB(255,255,255); notifDecline.Font=Enum.Font.GothamBold
-notifDecline.TextSize=13; notifDecline.BorderSizePixel=0
-Instance.new("UICorner",notifDecline).CornerRadius=UDim.new(0,8)
-
-local pendingTradeOffer = nil
-
--- ════════════════════════════
+-- ══════════════════════════════════════════════
 --  PAGE 4: SETTINGS
--- ════════════════════════════
-local function makeToggle(parent, yPos, labelTxt, defaultOn)
+-- ══════════════════════════════════════════════
+local settHdr=Instance.new("TextLabel",pageSett)
+settHdr.Size=UDim2.new(1,0,0,22); settHdr.BackgroundTransparency=1
+settHdr.Text="⚙️ Settings"; settHdr.TextColor3=Color3.fromRGB(195,165,250)
+settHdr.Font=Enum.Font.GothamBold; settHdr.TextSize=14; settHdr.TextXAlignment=Enum.TextXAlignment.Left
+
+local tradeEnabled = false
+local giveAllState = false
+
+local function makeToggleRow(parent, y, label, sublabel, defaultOn)
 	local row=Instance.new("Frame",parent)
-	row.Size=UDim2.new(1,0,0,48); row.Position=UDim2.new(0,0,0,yPos)
-	row.BackgroundColor3=Color3.fromRGB(18,14,30); row.BorderSizePixel=0
+	row.Size=UDim2.new(1,0,0,52); row.Position=UDim2.new(0,0,0,y)
+	row.BackgroundColor3=Color3.fromRGB(16,12,26); row.BorderSizePixel=0
 	Instance.new("UICorner",row).CornerRadius=UDim.new(0,10)
 	local lbl=Instance.new("TextLabel",row)
-	lbl.Size=UDim2.new(1,-70,1,0); lbl.Position=UDim2.new(0,14,0,0)
-	lbl.BackgroundTransparency=1; lbl.Text=labelTxt
-	lbl.TextColor3=Color3.fromRGB(200,180,240); lbl.Font=Enum.Font.Gotham
-	lbl.TextSize=13; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.TextWrapped=true
-	local toggle=Instance.new("TextButton",row)
-	toggle.Size=UDim2.new(0,52,0,28); toggle.Position=UDim2.new(1,-62,0.5,-14)
-	toggle.BackgroundColor3=defaultOn and Color3.fromRGB(80,200,120) or Color3.fromRGB(60,50,80)
-	toggle.Text=defaultOn and "ON" or "OFF"
-	toggle.TextColor3=Color3.fromRGB(255,255,255); toggle.Font=Enum.Font.GothamBold
-	toggle.TextSize=12; toggle.BorderSizePixel=0
-	Instance.new("UICorner",toggle).CornerRadius=UDim.new(0,8)
+	lbl.Size=UDim2.new(1,-70,0,26); lbl.Position=UDim2.new(0,12,0,4)
+	lbl.BackgroundTransparency=1; lbl.Text=label
+	lbl.TextColor3=Color3.fromRGB(200,180,235); lbl.Font=Enum.Font.GothamBold
+	lbl.TextSize=13; lbl.TextXAlignment=Enum.TextXAlignment.Left
+	local sub=Instance.new("TextLabel",row)
+	sub.Size=UDim2.new(1,-70,0,18); sub.Position=UDim2.new(0,12,0,28)
+	sub.BackgroundTransparency=1; sub.Text=sublabel
+	sub.TextColor3=Color3.fromRGB(120,100,155); sub.Font=Enum.Font.Gotham
+	sub.TextSize=11; sub.TextXAlignment=Enum.TextXAlignment.Left
+	local tog=Instance.new("TextButton",row)
+	tog.Size=UDim2.new(0,54,0,28); tog.Position=UDim2.new(1,-62,0.5,-14)
+	tog.BackgroundColor3=defaultOn and Color3.fromRGB(70,190,110) or Color3.fromRGB(55,45,80)
+	tog.Text=defaultOn and "ON" or "OFF"; tog.TextColor3=Color3.fromRGB(255,255,255)
+	tog.Font=Enum.Font.GothamBold; tog.TextSize=12; tog.BorderSizePixel=0
+	Instance.new("UICorner",tog).CornerRadius=UDim.new(0,8)
 	local state=defaultOn
-	toggle.MouseButton1Click:Connect(function()
+	tog.MouseButton1Click:Connect(function()
 		state=not state
-		tween(toggle,{BackgroundColor3=state and Color3.fromRGB(80,200,120) or Color3.fromRGB(60,50,80)},TWEEN_FAST)
-		toggle.Text=state and "ON" or "OFF"
+		tw(tog,{BackgroundColor3=state and Color3.fromRGB(70,190,110) or Color3.fromRGB(55,45,80)},TW_FAST)
+		tog.Text=state and "ON" or "OFF"
 	end)
-	return toggle, function() return state end
+	return tog, function() return state end
 end
 
-local settingsTitle=Instance.new("TextLabel",pageSettings)
-settingsTitle.Size=UDim2.new(1,0,0,24); settingsTitle.BackgroundTransparency=1
-settingsTitle.Text="⚙️ Settings"; settingsTitle.TextColor3=Color3.fromRGB(200,170,255)
-settingsTitle.Font=Enum.Font.GothamBold; settingsTitle.TextSize=14; settingsTitle.TextXAlignment=Enum.TextXAlignment.Left
+local togTrade, getTrade = makeToggleRow(pageSett, 28,  "🤝 Enable Trade",   "Izinkan trade skill ke player lain", false)
+local togGive,  getGive  = makeToggleRow(pageSett, 88,  "📡 Give All GUI",   "Semua player dapat GUI ini", false)
+local togSound, getSound = makeToggleRow(pageSett, 148, "🔊 Sound Effects",  "Efek suara saat roll & skill", true)
 
-local tradeToggle, getTradeState = makeToggle(pageSettings, 30, "🤝 Enable Trade System\nIzinkan trade skill ke player lain", false)
-local giveToggle, getGiveState   = makeToggle(pageSettings, 86, "📡 Give All — Bagikan GUI\nSemua player di server dapat GUI ini", false)
-local soundToggle, getSoundState = makeToggle(pageSettings, 142,"🔊 Sound Effects\nNyalakan efek suara saat roll & skill", true)
+local giveBtn=Instance.new("TextButton",pageSett)
+giveBtn.Size=UDim2.new(1,0,0,42); giveBtn.Position=UDim2.new(0,0,0,210)
+giveBtn.BackgroundColor3=Color3.fromRGB(35,95,195); giveBtn.Text="📡  Broadcast GUI ke Semua Player"
+giveBtn.TextColor3=Color3.fromRGB(255,255,255); giveBtn.Font=Enum.Font.GothamBold
+giveBtn.TextSize=13; giveBtn.BorderSizePixel=0
+Instance.new("UICorner",giveBtn).CornerRadius=UDim.new(0,12)
 
--- Give All button
-local giveAllBtn=Instance.new("TextButton",pageSettings)
-giveAllBtn.Size=UDim2.new(1,0,0,44); giveAllBtn.Position=UDim2.new(0,0,0,198)
-giveAllBtn.BackgroundColor3=Color3.fromRGB(40,100,200); giveAllBtn.Text="📡  Broadcast GUI ke Semua Player"
-giveAllBtn.TextColor3=Color3.fromRGB(255,255,255); giveAllBtn.Font=Enum.Font.GothamBold
-giveAllBtn.TextSize=13; giveAllBtn.BorderSizePixel=0
-Instance.new("UICorner",giveAllBtn).CornerRadius=UDim.new(0,12)
+local settNote=Instance.new("TextLabel",pageSett)
+settNote.Size=UDim2.new(1,0,0,36); settNote.Position=UDim2.new(0,0,0,260)
+settNote.BackgroundTransparency=1
+settNote.Text="⚠️ Give All & Trade butuh Server Support aktif.\nCheck server dulu di tab 🎲 Roll."
+settNote.TextColor3=Color3.fromRGB(175,135,75); settNote.Font=Enum.Font.Gotham
+settNote.TextSize=11; settNote.TextXAlignment=Enum.TextXAlignment.Left; settNote.TextWrapped=true
 
-local settingsNote=Instance.new("TextLabel",pageSettings)
-settingsNote.Size=UDim2.new(1,0,0,40); settingsNote.Position=UDim2.new(0,0,0,250)
-settingsNote.BackgroundTransparency=1
-settingsNote.Text="⚠️ Give All & Trade butuh Server Support (FREEDICE).\nCheck Server di tab 🎲 Roll dulu."
-settingsNote.TextColor3=Color3.fromRGB(180,140,80); settingsNote.Font=Enum.Font.Gotham
-settingsNote.TextSize=11; settingsNote.TextXAlignment=Enum.TextXAlignment.Left; settingsNote.TextWrapped=true
+-- ══════════════════════════════════════════════
+--  TRADE INCOMING NOTIF (floating)
+-- ══════════════════════════════════════════════
+local tradeNotif=Instance.new("Frame",SG)
+tradeNotif.Size=UDim2.new(0,320,0,108); tradeNotif.Position=UDim2.new(0.5,-160,1,-10)
+tradeNotif.BackgroundColor3=Color3.fromRGB(16,12,26); tradeNotif.BorderSizePixel=0; tradeNotif.Visible=false
+Instance.new("UICorner",tradeNotif).CornerRadius=UDim.new(0,14)
+local tnStroke=Instance.new("UIStroke",tradeNotif)
+tnStroke.Color=Color3.fromRGB(45,120,215); tnStroke.Thickness=1.5
 
--- ══════════════════════════════════════════════════════
+local tnTitle=Instance.new("TextLabel",tradeNotif)
+tnTitle.Size=UDim2.new(1,-12,0,26); tnTitle.Position=UDim2.new(0,10,0,6)
+tnTitle.BackgroundTransparency=1; tnTitle.Text="🤝 Incoming Trade!"
+tnTitle.TextColor3=Color3.fromRGB(90,170,255); tnTitle.Font=Enum.Font.GothamBold
+tnTitle.TextSize=14; tnTitle.TextXAlignment=Enum.TextXAlignment.Left
+
+local tnDesc=Instance.new("TextLabel",tradeNotif)
+tnDesc.Size=UDim2.new(1,-12,0,26); tnDesc.Position=UDim2.new(0,10,0,30)
+tnDesc.BackgroundTransparency=1; tnDesc.Text="..."; tnDesc.TextColor3=Color3.fromRGB(175,155,215)
+tnDesc.Font=Enum.Font.Gotham; tnDesc.TextSize=12; tnDesc.TextWrapped=true
+
+local tnAccept=Instance.new("TextButton",tradeNotif)
+tnAccept.Size=UDim2.new(0.45,0,0,30); tnAccept.Position=UDim2.new(0.03,0,1,-38)
+tnAccept.BackgroundColor3=Color3.fromRGB(50,175,90); tnAccept.Text="✅ Accept"
+tnAccept.TextColor3=Color3.fromRGB(255,255,255); tnAccept.Font=Enum.Font.GothamBold
+tnAccept.TextSize=13; tnAccept.BorderSizePixel=0
+Instance.new("UICorner",tnAccept).CornerRadius=UDim.new(0,8)
+
+local tnDecline=Instance.new("TextButton",tradeNotif)
+tnDecline.Size=UDim2.new(0.45,0,0,30); tnDecline.Position=UDim2.new(0.52,0,1,-38)
+tnDecline.BackgroundColor3=Color3.fromRGB(180,55,55); tnDecline.Text="❌ Decline"
+tnDecline.TextColor3=Color3.fromRGB(255,255,255); tnDecline.Font=Enum.Font.GothamBold
+tnDecline.TextSize=13; tnDecline.BorderSizePixel=0
+Instance.new("UICorner",tnDecline).CornerRadius=UDim.new(0,8)
+
+local pendingOffer = nil
+
+-- ══════════════════════════════════════════════
 --  SLOT BUILDER
--- ══════════════════════════════════════════════════════
-local slotObjects = {}
+-- ══════════════════════════════════════════════
+local slotObjs={}
 
 local function buildTradeSkillPicker()
 	for _,c in ipairs(tradeSkillScroll:GetChildren()) do
 		if c:IsA("TextButton") then c:Destroy() end
 	end
-	selectedTradeSkill=nil
+	selectedSkill=nil
 	local total=0
 	for _,entry in ipairs(activeSkills) do
-		local s=entry.skill
+		local s=entry.skill; total=total+1
 		local btn=Instance.new("TextButton",tradeSkillScroll)
-		btn.Size=UDim2.new(0,56,0,56); btn.BackgroundColor3=Color3.fromRGB(26,20,44)
-		btn.Text=s.icon; btn.TextSize=24; btn.Font=Enum.Font.Gotham
+		btn.Size=UDim2.new(0,58,0,58); btn.BackgroundColor3=Color3.fromRGB(22,17,38)
+		btn.Text=s.icon; btn.TextSize=26; btn.Font=Enum.Font.Gotham
 		btn.TextColor3=Color3.fromRGB(255,255,255); btn.BorderSizePixel=0
 		Instance.new("UICorner",btn).CornerRadius=UDim.new(0,10)
-		local str=Instance.new("UIStroke",btn); str.Color=rC(s.rarity); str.Thickness=2
+		local bstr=Instance.new("UIStroke",btn); bstr.Color=rC(s.rarity); bstr.Thickness=2
 		btn.MouseButton1Click:Connect(function()
-			selectedTradeSkill=s
+			selectedSkill=s
 			for _,c2 in ipairs(tradeSkillScroll:GetChildren()) do
-				if c2:IsA("TextButton") then
-					tween(c2,{BackgroundColor3=Color3.fromRGB(26,20,44)},TWEEN_FAST)
-				end
+				if c2:IsA("TextButton") then tw(c2,{BackgroundColor3=Color3.fromRGB(22,17,38)},TW_FAST) end
 			end
-			tween(btn,{BackgroundColor3=Color3.fromRGB(60,40,100)},TWEEN_FAST)
-			tradeStatusLbl.Text="Skill dipilih: "..s.icon.." "..s.name
+			tw(btn,{BackgroundColor3=Color3.fromRGB(55,38,90)},TW_FAST)
+			tradeStatus.Text="Skill dipilih: "..s.icon.." "..s.name
 		end)
-		total=total+1
 	end
-	tradeSkillScroll.CanvasSize=UDim2.new(0,total*62,0,0)
+	tradeSkillScroll.CanvasSize=UDim2.new(0,total*64+8,0,0)
 end
 
 local function buildPlayerList()
 	for _,c in ipairs(playerScroll:GetChildren()) do
-		if c:IsA("TextButton") then c:Destroy() end
+		if c:IsA("TextButton") or c:IsA("TextLabel") then c:Destroy() end
 	end
-	selectedTradeTarget=nil
+	selectedTarget=nil
 	local count=0
 	for _,p in ipairs(Players:GetPlayers()) do
 		if p~=player then
+			count=count+1
 			local btn=Instance.new("TextButton",playerScroll)
-			btn.Size=UDim2.new(1,-12,0,30); btn.BackgroundColor3=Color3.fromRGB(22,17,36)
-			btn.Text="👤 "..p.Name; btn.Font=Enum.Font.Gotham; btn.TextSize=13
-			btn.TextColor3=Color3.fromRGB(200,180,240); btn.BorderSizePixel=0
+			btn.Size=UDim2.new(1,-10,0,30); btn.BackgroundColor3=Color3.fromRGB(20,16,32)
+			btn.Text="👤  "..p.Name; btn.Font=Enum.Font.Gotham; btn.TextSize=13
+			btn.TextColor3=Color3.fromRGB(195,175,235); btn.BorderSizePixel=0
 			btn.TextXAlignment=Enum.TextXAlignment.Left
 			Instance.new("UICorner",btn).CornerRadius=UDim.new(0,8)
-			local pad=Instance.new("UIPadding",btn); pad.PaddingLeft=UDim.new(0,10)
+			Instance.new("UIPadding",btn).PaddingLeft=UDim.new(0,10)
 			btn.MouseButton1Click:Connect(function()
-				selectedTradeTarget=p.Name
+				selectedTarget=p.Name
 				for _,c2 in ipairs(playerScroll:GetChildren()) do
-					if c2:IsA("TextButton") then tween(c2,{BackgroundColor3=Color3.fromRGB(22,17,36)},TWEEN_FAST) end
+					if c2:IsA("TextButton") then tw(c2,{BackgroundColor3=Color3.fromRGB(20,16,32)},TW_FAST) end
 				end
-				tween(btn,{BackgroundColor3=Color3.fromRGB(40,30,70)},TWEEN_FAST)
-				tradeStatusLbl.Text="Target: "..p.Name
+				tw(btn,{BackgroundColor3=Color3.fromRGB(38,28,65)},TW_FAST)
+				tradeStatus.Text="Target: "..p.Name
 			end)
-			count=count+1
 		end
 	end
 	playerScroll.CanvasSize=UDim2.new(0,0,0,count*34+8)
 	if count==0 then
-		local none=Instance.new("TextLabel",playerScroll)
-		none.Size=UDim2.new(1,-12,0,30); none.BackgroundTransparency=1
-		none.Text="Tidak ada player lain di server"; none.TextColor3=Color3.fromRGB(130,110,160)
-		none.Font=Enum.Font.Gotham; none.TextSize=13
+		local nl=Instance.new("TextLabel",playerScroll)
+		nl.Size=UDim2.new(1,-10,0,30); nl.BackgroundTransparency=1
+		nl.Text="Tidak ada player lain di server"
+		nl.TextColor3=Color3.fromRGB(120,100,150); nl.Font=Enum.Font.Gotham; nl.TextSize=13
 	end
 end
 
 local function rebuildSlots()
-	for _,s in ipairs(slotObjects) do s:Destroy() end
-	slotObjects={}
-	slotsHeader.Text="ACTIVE SKILL SLOTS  ["..#activeSkills.."/"..MAX_SLOTS.."]"
+	for _,s in ipairs(slotObjs) do s:Destroy() end
+	slotObjs={}
+	slotsHdr.Text="ACTIVE SKILL SLOTS  ["..#activeSkills.."/"..MAX_SLOTS.."]"
 	for i,entry in ipairs(activeSkills) do
 		local s=entry.skill
 		local slot=Instance.new("Frame",slotsFrame)
-		slot.Size=UDim2.new(0,56,0,56); slot.BackgroundColor3=Color3.fromRGB(26,20,44)
+		slot.Size=UDim2.new(0,56,0,56); slot.BackgroundColor3=Color3.fromRGB(22,17,38)
 		slot.BorderSizePixel=0
 		Instance.new("UICorner",slot).CornerRadius=UDim.new(0,10)
-		local str=Instance.new("UIStroke",slot); str.Color=rC(s.rarity); str.Thickness=2
-		local iconLbl=Instance.new("TextLabel",slot)
-		iconLbl.Size=UDim2.new(1,0,0.65,0); iconLbl.BackgroundTransparency=1
-		iconLbl.Text=s.icon; iconLbl.TextSize=22; iconLbl.Font=Enum.Font.Gotham
-		iconLbl.TextColor3=Color3.fromRGB(255,255,255)
-		local rarLbl=Instance.new("TextLabel",slot)
-		rarLbl.Size=UDim2.new(1,-2,0.35,0); rarLbl.Position=UDim2.new(0,1,0.65,0)
-		rarLbl.BackgroundTransparency=1
-		rarLbl.Text=s.rarity=="Legendary" and "LGND" or s.rarity
-		rarLbl.TextSize=8; rarLbl.Font=Enum.Font.GothamBold; rarLbl.TextColor3=rC(s.rarity)
+		local ss=Instance.new("UIStroke",slot); ss.Color=rC(s.rarity); ss.Thickness=2
+		local ic=Instance.new("TextLabel",slot)
+		ic.Size=UDim2.new(1,0,0.64,0); ic.BackgroundTransparency=1
+		ic.Text=s.icon; ic.TextSize=22; ic.Font=Enum.Font.Gotham; ic.TextColor3=Color3.fromRGB(255,255,255)
+		local rl=Instance.new("TextLabel",slot)
+		rl.Size=UDim2.new(1,-2,0.36,0); rl.Position=UDim2.new(0,1,0.64,0)
+		rl.BackgroundTransparency=1; rl.Text=s.rarity=="Legendary" and "LGND" or s.rarity
+		rl.TextSize=8; rl.Font=Enum.Font.GothamBold; rl.TextColor3=rC(s.rarity)
 		local rb=Instance.new("TextButton",slot); rb.Size=UDim2.new(1,0,1,0)
 		rb.BackgroundTransparency=1; rb.Text=""; rb.ZIndex=10
 		rb.MouseEnter:Connect(function()
-			iconLbl.Text="✕"
-			tween(slot,{BackgroundColor3=Color3.fromRGB(90,25,25)},TWEEN_FAST)
+			ic.Text="✕"; tw(slot,{BackgroundColor3=Color3.fromRGB(85,22,22)},TW_FAST)
 		end)
 		rb.MouseLeave:Connect(function()
-			iconLbl.Text=s.icon
-			tween(slot,{BackgroundColor3=Color3.fromRGB(26,20,44)},TWEEN_FAST)
+			ic.Text=s.icon; tw(slot,{BackgroundColor3=Color3.fromRGB(22,17,38)},TW_FAST)
 		end)
 		rb.MouseButton1Click:Connect(function()
-			pcall(s.remove)
-			table.remove(activeSkills,i)
-			activeIds[s.id]=nil
-			rebuildSlots()
-			buildTradeSkillPicker()
+			pcall(s.remove); table.remove(activeSkills,i); activeIds[s.id]=nil
+			rebuildSlots(); buildTradeSkillPicker()
 		end)
-		table.insert(slotObjects,slot)
+		table.insert(slotObjs,slot)
 	end
 	for _=1,MAX_SLOTS-#activeSkills do
-		local empty=Instance.new("Frame",slotsFrame)
-		empty.Size=UDim2.new(0,56,0,56); empty.BackgroundColor3=Color3.fromRGB(18,14,26)
-		empty.BorderSizePixel=0
-		Instance.new("UICorner",empty).CornerRadius=UDim.new(0,10)
-		local es=Instance.new("UIStroke",empty)
-		es.Color=Color3.fromRGB(50,40,75); es.Thickness=1.5; es.Transparency=0.6
-		local el=Instance.new("TextLabel",empty)
-		el.Size=UDim2.new(1,0,1,0); el.BackgroundTransparency=1
-		el.Text="+"; el.TextSize=22; el.Font=Enum.Font.GothamBold
-		el.TextColor3=Color3.fromRGB(50,40,70)
-		table.insert(slotObjects,empty)
+		local e=Instance.new("Frame",slotsFrame)
+		e.Size=UDim2.new(0,56,0,56); e.BackgroundColor3=Color3.fromRGB(16,12,24); e.BorderSizePixel=0
+		Instance.new("UICorner",e).CornerRadius=UDim.new(0,10)
+		local es=Instance.new("UIStroke",e); es.Color=Color3.fromRGB(45,35,70); es.Thickness=1.5; es.Transparency=0.5
+		local el=Instance.new("TextLabel",e); el.Size=UDim2.new(1,0,1,0); el.BackgroundTransparency=1
+		el.Text="+"; el.TextSize=22; el.Font=Enum.Font.GothamBold; el.TextColor3=Color3.fromRGB(45,35,65)
+		table.insert(slotObjs,e)
 	end
 end
 rebuildSlots()
 
--- ══════════════════════════════════════════════════════
---  DRAG
--- ══════════════════════════════════════════════════════
-local dragging,dragStart,startPos=false,nil,nil
+-- ══════════════════════════════════════════════
+--  DRAGGING
+-- ══════════════════════════════════════════════
+local drag,dragStart,winStart=false,nil,nil
 tbar.InputBegan:Connect(function(i)
 	if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-		dragging=true; dragStart=i.Position; startPos=win.Position
+		drag=true; dragStart=i.Position; winStart=win.Position
 	end
 end)
 tbar.InputChanged:Connect(function(i)
-	if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+	if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
 		local d=i.Position-dragStart
-		win.Position=UDim2.new(startPos.X.Scale,startPos.X.Offset+d.X,startPos.Y.Scale,startPos.Y.Offset+d.Y)
+		win.Position=UDim2.new(winStart.X.Scale,winStart.X.Offset+d.X,winStart.Y.Scale,winStart.Y.Offset+d.Y)
 	end
 end)
 tbar.InputEnded:Connect(function(i)
-	if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=false end
+	if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end
 end)
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  MINIMIZE & CLOSE
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 local minimized=false
 minBtn.MouseButton1Click:Connect(function()
 	minimized=not minimized
 	if minimized then
-		local allFrames={tabBar,pageMain,pageHistory,pageTrade,pageSettings}
-		for _,f in ipairs(allFrames) do f.Visible=false end
-		tween(win,{Size=UDim2.new(0,WIN_W,0,48)},TWEEN_MED)
+		for _,pg in ipairs(allPages) do pg.Visible=false end
+		tabBar.Visible=false
+		tw(win,{Size=UDim2.new(0,W,0,50)},TW_MED)
 		minBtn.Text="□"
 	else
-		tween(win,{Size=UDim2.new(0,WIN_W,0,WIN_H)},TWEEN_BACK)
-		task.wait(0.3)
-		tabBar.Visible=true; pageMain.Visible=true
+		tw(win,{Size=UDim2.new(0,W,0,H)},TW_BACK)
+		task.wait(0.32); tabBar.Visible=true; pageRoll.Visible=true
 		minBtn.Text="─"
 	end
 end)
-
 closeBtn.MouseButton1Click:Connect(function()
-	for k,_ in pairs(Connections) do removeConn(k) end
-	tween(win,TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.In),{
+	for k in pairs(Connections) do removeConn(k) end
+	tw(win,TweenInfo.new(0.22,Enum.EasingStyle.Back,Enum.EasingDirection.In),{
 		Size=UDim2.new(0,0,0,0),
-		Position=UDim2.new(win.Position.X.Scale,win.Position.X.Offset+WIN_W/2,
-			win.Position.Y.Scale,win.Position.Y.Offset+WIN_H/2)
+		Position=UDim2.new(win.Position.X.Scale,win.Position.X.Offset+W/2,
+			win.Position.Y.Scale,win.Position.Y.Offset+H/2)
 	})
 	task.wait(0.25); SG:Destroy()
 end)
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  ROLL LOGIC
--- ══════════════════════════════════════════════════════
-local diceEmojis={"⚀","⚁","⚂","⚃","⚄","⚅"}
+-- ══════════════════════════════════════════════
+local DICE_FACES={"⚀","⚁","⚂","⚃","⚄","⚅"}
 
 local function showChoice(skill)
 	pendingSkill=skill; waitingChoice=true
-	-- Animate in
-	useBtn.Visible=true; skipBtn.Visible=true
 	checkBtn.Visible=false; rollBtn.Visible=false
-	useBtn.BackgroundTransparency=1; skipBtn.BackgroundTransparency=1
-	tween(useBtn,{BackgroundTransparency=0},TWEEN_FAST)
-	tween(skipBtn,{BackgroundTransparency=0},TWEEN_FAST)
-	-- Rarity effects
-	tween(diceGlow,{Color=rG(skill.rarity),Transparency=0},TWEEN_MED)
-	tween(diceCardStroke,{Color=rG(skill.rarity),Transparency=0.2},TWEEN_MED)
-	rarityTag.Text=RE[skill.rarity].."  "..skill.rarity:upper()
-	rarityTag.TextColor3=rC(skill.rarity)
-	tween(rarityTag,{BackgroundColor3=rC(skill.rarity):Lerp(Color3.fromRGB(0,0,0),0.7)},TWEEN_FAST)
-	rarityTag.Visible=true
-	-- Skill info
-	skillNameLbl.Text=skill.name; skillNameLbl.TextColor3=rC(skill.rarity)
-	skillDescLbl.Text=skill.desc
-	flavorLbl.Text=skill.flavor or ""
-	-- Sound
-	if getSoundState() then playSound(rS(skill.rarity)) end
+	useBtn.Visible=true; skipBtn.Visible=true
+	tw(diceStroke,{Color=rG(skill.rarity),Transparency=0.1},TW_MED)
+	tw(cardStroke,{Color=rG(skill.rarity),Transparency=0.2},TW_MED)
+	rarTag.Text=RE[skill.rarity].."  "..skill.rarity:upper()
+	rarTag.TextColor3=rC(skill.rarity); rarTag.Visible=true
+	skillTitle.Text=skill.name; skillTitle.TextColor3=rC(skill.rarity)
+	skillDesc.Text=skill.desc; flavorLbl.Text=skill.flavor or ""
+	soundEnabled=getSound()
+	playSound(Rarity[skill.rarity].sfx)
 end
 
 local function hideChoice()
+	pendingSkill=nil; waitingChoice=false
 	useBtn.Visible=false; skipBtn.Visible=false
-	checkBtn.Visible=not checkDone and true or false
+	checkBtn.Visible=not checkDone
 	rollBtn.Visible=true
-	waitingChoice=false; pendingSkill=nil
-	tween(diceGlow,{Color=Color3.fromRGB(140,90,255),Transparency=0.5},TWEEN_MED)
-	tween(diceCardStroke,{Color=Color3.fromRGB(100,60,180),Transparency=0.5},TWEEN_MED)
-	rarityTag.Visible=false
+	tw(diceStroke,{Color=Color3.fromRGB(130,80,240),Transparency=0.4},TW_MED)
+	tw(cardStroke,{Color=Color3.fromRGB(90,50,170),Transparency=0.4},TW_MED)
+	rarTag.Visible=false
 end
-
-local checkDone=false
 
 local function updateStreak()
 	if rollStreak>=3 then
-		streakLbl.Text="🔥 Streak: "..rollStreak.."x — Legendary chance naik!"
-		streakLbl.TextColor3=Color3.fromRGB(255,160,40)
+		streakLbl.Text="🔥 Streak "..rollStreak.."x — Legendary chance naik!"
+		streakLbl.TextColor3=Color3.fromRGB(255,185,40)
 	elseif rollStreak>0 then
 		streakLbl.Text="Skip streak: "..rollStreak.."x"
-		streakLbl.TextColor3=Color3.fromRGB(200,200,200)
+		streakLbl.TextColor3=Color3.fromRGB(190,190,190)
 	else streakLbl.Text="" end
 end
 
 rollBtn.MouseButton1Click:Connect(function()
 	if isRolling or waitingChoice then return end
 	if #activeSkills>=MAX_SLOTS then
-		skillNameLbl.Text="⚠️ Slot penuh!"; skillDescLbl.Text="Remove skill dulu."
+		skillTitle.Text="⚠️ Slot penuh!"; skillDesc.Text="Remove skill dulu (hover slot)."
 		return
 	end
 	isRolling=true
-	rollBtn.Text="Rolling..."; tween(rollBtn,{BackgroundColor3=Color3.fromRGB(60,35,120)},TWEEN_FAST)
-	skillNameLbl.Text="Rolling..."; skillDescLbl.Text=""; flavorLbl.Text=""
-	rarityTag.Visible=false
-	if getSoundState() then playSound("roll") end
+	tw(rollBtn,{BackgroundColor3=Color3.fromRGB(55,32,115)},TW_FAST)
+	rollBtn.Text="Rolling..."
+	skillTitle.Text="Rolling..."; skillDesc.Text=""; flavorLbl.Text=""; rarTag.Visible=false
+	soundEnabled=getSound(); playSound("roll")
 	local elapsed,interval=0,0.07
 	while elapsed<1.4 do
-		diceLbl.Text=diceEmojis[math.random(1,#diceEmojis)]
+		diceEmoji.Text=DICE_FACES[math.random(1,6)]
 		task.wait(interval); elapsed=elapsed+interval; interval=math.min(interval+0.013,0.22)
 	end
 	local excList={}
 	for id in pairs(activeIds) do table.insert(excList,id) end
-	local skill=SkillDB.Pick(excList, rollStreak>=3 and rollStreak or nil)
-	tween(rollBtn,{BackgroundColor3=Color3.fromRGB(105,50,210)},TWEEN_FAST)
+	local skill=pickSkill(excList, rollStreak>=3 and rollStreak or nil)
+	tw(rollBtn,{BackgroundColor3=Color3.fromRGB(100,48,205)},TW_FAST)
 	rollBtn.Text="🎲  ROLL THE DICE"; isRolling=false
 	if not skill then
-		diceLbl.Text="😵"; skillNameLbl.Text="Semua skill aktif!"
-		skillDescLbl.Text="Clear dulu beberapa skill."
-		return
+		diceEmoji.Text="😵"; skillTitle.Text="Semua skill aktif!"
+		skillDesc.Text="Clear dulu beberapa skill."; return
 	end
-	diceLbl.Text=skill.icon
+	diceEmoji.Text=skill.icon
 	showChoice(skill)
 end)
 
@@ -1284,268 +1220,193 @@ useBtn.MouseButton1Click:Connect(function()
 	local skill=pendingSkill
 	local ok,err=pcall(skill.apply)
 	if ok then
-		table.insert(activeSkills,{skill=skill,addedAt=tick()})
-		activeIds[skill.id]=true
+		table.insert(activeSkills,{skill=skill}); activeIds[skill.id]=true
 		rollStreak=0; updateStreak(); rebuildSlots(); buildTradeSkillPicker()
-		addHistoryEntry(skill, true)
-		skillNameLbl.Text="✅ "..skill.name; skillNameLbl.TextColor3=rC(skill.rarity)
-		local modeStr=serverMode and " 🌐" or " 💻"
-		skillDescLbl.Text="Skill aktif!"..modeStr
-		flavorLbl.Text=skill.flavor or ""
-		if getSoundState() then playSound("use") end
+		table.insert(rollHistory,1,{skill=skill,used=true})
+		if #rollHistory>MAX_HISTORY then table.remove(rollHistory) end
+		refreshHistory()
+		skillTitle.Text="✅ "..skill.name; skillTitle.TextColor3=rC(skill.rarity)
+		skillDesc.Text="Aktif!"..(serverMode and " 🌐" or " 💻"); flavorLbl.Text=skill.flavor or ""
+		soundEnabled=getSound(); playSound("use")
 	else
-		skillNameLbl.Text="❌ Error"; skillDescLbl.Text=tostring(err)
-		skillNameLbl.TextColor3=Color3.fromRGB(255,100,100)
-		warn("[DiceCore] Apply error:",err)
+		skillTitle.Text="❌ Error!"; skillDesc.Text=tostring(err)
+		skillTitle.TextColor3=Color3.fromRGB(255,90,90)
+		warn("[DiceCore] Error apply:",err)
 	end
 	hideChoice()
 end)
 
 skipBtn.MouseButton1Click:Connect(function()
 	if not pendingSkill then return end
-	addHistoryEntry(pendingSkill, false)
+	table.insert(rollHistory,1,{skill=pendingSkill,used=false})
+	if #rollHistory>MAX_HISTORY then table.remove(rollHistory) end
+	refreshHistory()
 	rollStreak=rollStreak+1; updateStreak()
-	skillNameLbl.Text="Roll the dice!"; skillNameLbl.TextColor3=Color3.fromRGB(215,185,255)
-	skillDescLbl.Text="Dilewatin! Roll lagi."; flavorLbl.Text=""
-	diceLbl.Text="🎲"
-	if getSoundState() then playSound("skip") end
+	skillTitle.Text="Roll the dice!"; skillTitle.TextColor3=Color3.fromRGB(220,190,255)
+	skillDesc.Text="Dilewatin! Roll lagi."; flavorLbl.Text=""; diceEmoji.Text="🎲"
+	soundEnabled=getSound(); playSound("skip")
 	hideChoice()
 end)
 
 clearBtn.MouseButton1Click:Connect(function()
-	for _,entry in ipairs(activeSkills) do pcall(entry.skill.remove) end
-	if serverMode and REMOTE then REMOTE:FireServer("ClearAll","") end
-	for k,_ in pairs(Connections) do removeConn(k) end
-	activeSkills={}; activeIds={}; rollStreak=0; updateStreak(); rebuildSlots(); buildTradeSkillPicker()
+	for _,e in ipairs(activeSkills) do pcall(e.skill.remove) end
+	if serverMode and REMOTE then pcall(function() REMOTE:FireServer("ClearAll","") end) end
+	for k in pairs(Connections) do removeConn(k) end
+	activeSkills={}; activeIds={}; rollStreak=0; updateStreak()
+	rebuildSlots(); buildTradeSkillPicker()
 	local c=player.Character
 	if c then
 		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and OriginalSizes[p.Name] then
-				pcall(function() p.Size=OriginalSizes[p.Name] end)
-			end
+			if p:IsA("BasePart") and OriginalSizes[p.Name] then pcall(function() p.Size=OriginalSizes[p.Name] end) end
 		end
+		local h2=c:FindFirstChildOfClass("Humanoid")
+		if h2 then h2.WalkSpeed=16; h2.JumpPower=50 end
 	end
 	workspace.Gravity=196.2
-	local h2=c and c:FindFirstChildOfClass("Humanoid")
-	if h2 then h2.WalkSpeed=16; h2.JumpPower=50 end
-	skillNameLbl.Text="Roll the dice!"; skillNameLbl.TextColor3=Color3.fromRGB(215,185,255)
-	skillDescLbl.Text="Semua skill di-reset!"; flavorLbl.Text=""; diceLbl.Text="🎲"
+	skillTitle.Text="Roll the dice!"; skillTitle.TextColor3=Color3.fromRGB(220,190,255)
+	skillDesc.Text="Semua skill di-reset!"; flavorLbl.Text=""; diceEmoji.Text="🎲"
 end)
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  CHECK SERVER
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 checkBtn.MouseButton1Click:Connect(function()
-	checkBtn.Text="⏳ Searching FREEDICE..."
-	tween(checkBtn,{BackgroundColor3=Color3.fromRGB(40,40,60)},TWEEN_FAST)
-	tween(serverBadge,{BackgroundColor3=Color3.fromRGB(40,40,40)},TWEEN_FAST)
+	checkBtn.Text="⏳ Mencari FREEDICE..."
+	tw(checkBtn,{BackgroundColor3=Color3.fromRGB(35,35,55)},TW_FAST)
 	task.wait(1.2)
-	local found=checkServer()
-	checkDone=true
+	local found=checkServer(); checkDone=true
 	checkBtn.Visible=false
 	if found then
-		tween(serverBadge,{BackgroundColor3=Color3.fromRGB(20,90,45)},TWEEN_FAST)
 		serverBadge.Text="🌐 SERVER MODE"
-		serverBadge.TextColor3=Color3.fromRGB(100,255,150)
-		skillDescLbl.Text="Server support aktif!\nEfek keliatan semua orang 🌐"
+		tw(serverBadge,{BackgroundColor3=Color3.fromRGB(18,85,42)},TW_FAST)
+		serverBadge.TextColor3=Color3.fromRGB(90,245,145)
+		skillDesc.Text="Server aktif! Efek keliatan semua 🌐"
+		-- Connect trade remote
+		if TRADE_REMOTE then
+			TRADE_REMOTE.OnClientEvent:Connect(function(action,...)
+				local args={...}
+				if action=="IncomingOffer" then
+					local from,data=args[1],args[2]; pendingOffer=data
+					tnTitle.Text="🤝 Trade dari "..from.."!"
+					tnDesc.Text=data.skillIcon.." "..data.skillName.." ("..data.skillRarity..")"
+					tradeNotif.Visible=true
+					tw(tradeNotif,{Position=UDim2.new(0.5,-160,1,-120)},TW_BACK)
+					soundEnabled=getSound(); playSound("trade")
+				elseif action=="TradeAccepted" then
+					local who,data=args[1],args[2]
+					for i,e in ipairs(activeSkills) do
+						if e.skill.id==data.skillId then
+							pcall(e.skill.remove); table.remove(activeSkills,i); activeIds[data.skillId]=nil; break
+						end
+					end
+					rebuildSlots(); buildTradeSkillPicker()
+					tradeStatus.Text="✅ "..who.." menerima trade!"
+				elseif action=="TradeComplete" then
+					local data=args[1]
+					for _,sk in ipairs(Skills) do
+						if sk.id==data.skillId and #activeSkills<MAX_SLOTS then
+							pcall(sk.apply); table.insert(activeSkills,{skill=sk}); activeIds[sk.id]=true
+							rebuildSlots(); buildTradeSkillPicker()
+							skillTitle.Text="🎁 Dapat "..sk.name.." dari trade!"
+							skillTitle.TextColor3=rC(sk.rarity); break
+						end
+					end
+				elseif action=="TradeDeclined" then
+					tradeStatus.Text="❌ "..args[1].." menolak trade."
+				end
+			end)
+		end
 	else
-		tween(serverBadge,{BackgroundColor3=Color3.fromRGB(80,50,20)},TWEEN_FAST)
 		serverBadge.Text="💻 LOCAL ONLY"
-		serverBadge.TextColor3=Color3.fromRGB(255,175,70)
-		skillDescLbl.Text="No server. Efek local only 💻"
+		tw(serverBadge,{BackgroundColor3=Color3.fromRGB(75,48,18)},TW_FAST)
+		serverBadge.TextColor3=Color3.fromRGB(255,170,65)
+		skillDesc.Text="No server. Efek local only 💻"
 	end
 end)
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  SETTINGS ACTIONS
--- ══════════════════════════════════════════════════════
-tradeToggle.MouseButton1Click:Connect(function()
+-- ══════════════════════════════════════════════
+togTrade.MouseButton1Click:Connect(function()
 	task.wait(0.05)
-	tradeEnabled=getTradeState()
-	tradeLockedLbl.Visible=not tradeEnabled
+	tradeEnabled=getTrade()
+	tradeLocked.Visible=not tradeEnabled
 	tradePanel.Visible=tradeEnabled
-	if tradeEnabled then buildPlayerList() end
+	if tradeEnabled then buildPlayerList(); buildTradeSkillPicker() end
 end)
 
-giveAllBtn.MouseButton1Click:Connect(function()
+giveBtn.MouseButton1Click:Connect(function()
 	if not serverMode or not GIVE_REMOTE then
-		settingsNote.Text="❌ Butuh server support! Check server dulu di tab 🎲 Roll."
-		tween(settingsNote,{TextColor3=Color3.fromRGB(220,80,80)},TWEEN_FAST)
+		settNote.Text="❌ Butuh server support! Check server dulu."
+		tw(settNote,{TextColor3=Color3.fromRGB(215,75,75)},TW_FAST)
+		task.wait(2)
+		settNote.Text="⚠️ Give All & Trade butuh Server Support aktif.\nCheck server dulu di tab 🎲 Roll."
+		tw(settNote,{TextColor3=Color3.fromRGB(175,135,75)},TW_FAST)
 		return
 	end
-	GIVE_REMOTE:FireServer("GiveAll")
-	giveAllBtn.Text="✅ GUI Broadcasted!"
-	tween(giveAllBtn,{BackgroundColor3=Color3.fromRGB(30,130,70)},TWEEN_FAST)
+	pcall(function() GIVE_REMOTE:FireServer("GiveAll") end)
+	giveBtn.Text="✅ GUI Terbroadcast!"
+	tw(giveBtn,{BackgroundColor3=Color3.fromRGB(28,120,62)},TW_FAST)
 	task.wait(3)
-	giveAllBtn.Text="📡  Broadcast GUI ke Semua Player"
-	tween(giveAllBtn,{BackgroundColor3=Color3.fromRGB(40,100,200)},TWEEN_FAST)
-	settingsNote.Text="⚠️ Give All & Trade butuh Server Support.\nCheck Server di tab 🎲 Roll dulu."
-	tween(settingsNote,{TextColor3=Color3.fromRGB(180,140,80)},TWEEN_FAST)
+	giveBtn.Text="📡  Broadcast GUI ke Semua Player"
+	tw(giveBtn,{BackgroundColor3=Color3.fromRGB(35,95,195)},TW_FAST)
 end)
 
--- ══════════════════════════════════════════════════════
---  SEND TRADE
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
+--  TRADE ACTIONS
+-- ══════════════════════════════════════════════
 sendTradeBtn.MouseButton1Click:Connect(function()
 	if not serverMode or not TRADE_REMOTE then
-		tradeStatusLbl.Text="❌ Butuh server support!"
-		return
+		tradeStatus.Text="❌ Butuh server support!"; return
 	end
-	if not selectedTradeTarget then
-		tradeStatusLbl.Text="⚠️ Pilih player dulu!"; return
-	end
-	if not selectedTradeSkill then
-		tradeStatusLbl.Text="⚠️ Pilih skill dulu!"; return
-	end
-	local offerData={
-		from=player.Name,
-		skillId=selectedTradeSkill.id,
-		skillName=selectedTradeSkill.name,
-		skillIcon=selectedTradeSkill.icon,
-		skillRarity=selectedTradeSkill.rarity,
-	}
-	TRADE_REMOTE:FireServer("Offer", selectedTradeTarget, offerData)
-	tradeStatusLbl.Text="📤 Offer terkirim ke "..selectedTradeTarget.."!"
-	if getSoundState() then playSound("trade") end
+	if not selectedTarget then tradeStatus.Text="⚠️ Pilih player dulu!"; return end
+	if not selectedSkill  then tradeStatus.Text="⚠️ Pilih skill dulu!"; return end
+	pcall(function()
+		TRADE_REMOTE:FireServer("Offer", selectedTarget, {
+			from=player.Name, skillId=selectedSkill.id,
+			skillName=selectedSkill.name, skillIcon=selectedSkill.icon,
+			skillRarity=selectedSkill.rarity,
+		})
+	end)
+	tradeStatus.Text="📤 Offer terkirim ke "..selectedTarget.."!"
+	soundEnabled=getSound(); playSound("trade")
 end)
 
--- ══════════════════════════════════════════════════════
---  TRADE INCOMING HANDLER
--- ══════════════════════════════════════════════════════
-local function handleTradeRemote(action, ...)
-	local args={...}
-	if action=="IncomingOffer" then
-		local senderName,offerData=args[1],args[2]
-		pendingTradeOffer=offerData
-		notifTitle.Text="🤝 Trade dari "..senderName.."!"
-		notifDesc.Text=offerData.skillIcon.." "..offerData.skillName.." ("..offerData.skillRarity..")"
-		tradeNotif.Visible=true
-		tween(tradeNotif,{Position=UDim2.new(0.5,-170,1,-130)},TWEEN_BACK)
-		if getSoundState() then playSound("trade") end
-
-	elseif action=="TradeAccepted" then
-		local accepterName,data=args[1],args[2]
-		-- Hapus skill dari slot sender
-		for i,entry in ipairs(activeSkills) do
-			if entry.skill.id==data.skillId then
-				pcall(entry.skill.remove)
-				table.remove(activeSkills,i)
-				activeIds[data.skillId]=nil
-				break
-			end
-		end
-		rebuildSlots(); buildTradeSkillPicker()
-		tradeStatusLbl.Text="✅ "..accepterName.." menerima trade!"
-
-	elseif action=="TradeComplete" then
-		-- Receiver dapat skill baru
-		local data=args[1]
-		for _,skill in ipairs(SkillDB.Skills) do
-			if skill.id==data.skillId then
-				if #activeSkills<MAX_SLOTS then
-					local ok=pcall(skill.apply)
-					if ok then
-						table.insert(activeSkills,{skill=skill,addedAt=tick()})
-						activeIds[skill.id]=true
-						rebuildSlots(); buildTradeSkillPicker()
-						skillNameLbl.Text="🎁 Dapat "..skill.name.." dari trade!"
-						skillNameLbl.TextColor3=rC(skill.rarity)
-					end
-				end
-				break
-			end
-		end
-
-	elseif action=="TradeDeclined" then
-		tradeStatusLbl.Text="❌ "..args[1].." menolak trade."
-	end
-end
-
--- Connect trade remote kalau server mode aktif
-local function connectTradeRemote()
-	if TRADE_REMOTE then
-		TRADE_REMOTE.OnClientEvent:Connect(function(action,...)
-			handleTradeRemote(action,...)
-		end)
-	end
-end
-
--- Accept / Decline trade notif
-notifAccept.MouseButton1Click:Connect(function()
-	if not pendingTradeOffer or not TRADE_REMOTE then return end
-	TRADE_REMOTE:FireServer("Accept", pendingTradeOffer.from, pendingTradeOffer)
-	tradeNotif.Visible=false; pendingTradeOffer=nil
+tnAccept.MouseButton1Click:Connect(function()
+	if not pendingOffer or not TRADE_REMOTE then return end
+	pcall(function() TRADE_REMOTE:FireServer("Accept", pendingOffer.from, pendingOffer) end)
+	tradeNotif.Visible=false; pendingOffer=nil
 end)
-notifDecline.MouseButton1Click:Connect(function()
-	if not pendingTradeOffer or not TRADE_REMOTE then return end
-	TRADE_REMOTE:FireServer("Decline", pendingTradeOffer.from, pendingTradeOffer)
-	tradeNotif.Visible=false; pendingTradeOffer=nil
+tnDecline.MouseButton1Click:Connect(function()
+	if not pendingOffer or not TRADE_REMOTE then return end
+	pcall(function() TRADE_REMOTE:FireServer("Decline", pendingOffer.from, pendingOffer) end)
+	tradeNotif.Visible=false; pendingOffer=nil
 end)
 
--- ══════════════════════════════════════════════════════
---  GIVE ALL — receive GUI
--- ══════════════════════════════════════════════════════
--- Kalau server ada, listen untuk event DICE_GIVEGUI
-task.spawn(function()
-	task.wait(2) -- tunggu sebentar biar game load
-	local gr=ReplicatedStorage:FindFirstChild("DICE_GIVEGUI")
-	if gr then
-		gr.OnClientEvent:Connect(function(action)
-			if action=="ReceiveGUI" then
-				-- Script ini sudah jalan, GUI sudah ada
-				-- Kalau belum ada, ini trigger re-execute
-				if not player.PlayerGui:FindFirstChild("DiceOfFateGui") then
-					-- Re-spawn GUI
-					warn("[DiceCore] GUI tidak ditemukan, reload...")
-				else
-					-- Flash notification
-					local notifFlash=Instance.new("Frame",SG)
-					notifFlash.Size=UDim2.new(0,280,0,50)
-					notifFlash.Position=UDim2.new(0.5,-140,0,20)
-					notifFlash.BackgroundColor3=Color3.fromRGB(40,100,200)
-					notifFlash.BorderSizePixel=0
-					Instance.new("UICorner",notifFlash).CornerRadius=UDim.new(0,10)
-					local fl=Instance.new("TextLabel",notifFlash)
-					fl.Size=UDim2.new(1,0,1,0); fl.BackgroundTransparency=1
-					fl.Text="🎲 Dice of Fate tersedia! Cek GUI kamu."; fl.TextWrapped=true
-					fl.TextColor3=Color3.fromRGB(255,255,255); fl.Font=Enum.Font.GothamBold; fl.TextSize=13
-					tween(notifFlash,{BackgroundTransparency=0},TWEEN_FAST)
-					task.wait(3)
-					tween(notifFlash,{BackgroundTransparency=1},TWEEN_MED)
-					task.wait(0.3); notifFlash:Destroy()
-				end
-			end
-		end)
-	end
-end)
-
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  HOVER EFFECTS
--- ══════════════════════════════════════════════════════
-local function hover(btn,n,h)
-	btn.MouseEnter:Connect(function() tween(btn,{BackgroundColor3=h},TWEEN_FAST) end)
-	btn.MouseLeave:Connect(function() tween(btn,{BackgroundColor3=n},TWEEN_FAST) end)
+-- ══════════════════════════════════════════════
+local function hover(btn, n, h)
+	btn.MouseEnter:Connect(function() tw(btn,{BackgroundColor3=h},TW_FAST) end)
+	btn.MouseLeave:Connect(function() tw(btn,{BackgroundColor3=n},TW_FAST) end)
 end
-hover(rollBtn,   Color3.fromRGB(105,50,210),  Color3.fromRGB(135,75,255))
-hover(useBtn,    Color3.fromRGB(60,185,100),  Color3.fromRGB(45,215,90))
-hover(skipBtn,   Color3.fromRGB(190,60,60),   Color3.fromRGB(220,45,45))
-hover(clearBtn,  Color3.fromRGB(45,30,70),    Color3.fromRGB(65,48,105))
-hover(checkBtn,  Color3.fromRGB(25,70,150),   Color3.fromRGB(40,100,210))
-hover(giveAllBtn,Color3.fromRGB(40,100,200),  Color3.fromRGB(55,125,240))
-hover(sendTradeBtn,Color3.fromRGB(50,130,220),Color3.fromRGB(70,155,255))
+hover(rollBtn,   Color3.fromRGB(100,48,205),  Color3.fromRGB(130,72,255))
+hover(useBtn,    Color3.fromRGB(50,175,90),   Color3.fromRGB(38,210,80))
+hover(skipBtn,   Color3.fromRGB(180,55,55),   Color3.fromRGB(215,40,40))
+hover(clearBtn,  Color3.fromRGB(40,28,65),    Color3.fromRGB(58,44,95))
+hover(checkBtn,  Color3.fromRGB(22,65,145),   Color3.fromRGB(36,95,200))
+hover(giveBtn,   Color3.fromRGB(35,95,195),   Color3.fromRGB(50,120,240))
+hover(sendTradeBtn,Color3.fromRGB(45,120,215),Color3.fromRGB(65,148,255))
 
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 --  OPEN ANIMATION
--- ══════════════════════════════════════════════════════
+-- ══════════════════════════════════════════════
 win.Size=UDim2.new(0,0,0,0); win.Position=UDim2.new(0.5,0,0.5,0)
-tabBar.Visible=false; pageMain.Visible=false; task.wait(0.05)
-tween(win,TWEEN_BACK,{Size=UDim2.new(0,WIN_W,0,WIN_H),Position=UDim2.new(0.5,-WIN_W/2,0.5,-WIN_H/2)})
-task.wait(0.3); tabBar.Visible=true; pageMain.Visible=true
+tabBar.Visible=false; pageRoll.Visible=false
+task.wait(0.05)
+tw(win,TW_BACK,{Size=UDim2.new(0,W,0,H),Position=UDim2.new(0.5,-W/2,0.5,-H/2)})
+task.wait(0.35); tabBar.Visible=true; pageRoll.Visible=true
 
--- Connect trade remote setelah GUI ready
-task.spawn(function()
-	task.wait(1)
-	connectTradeRemote()
-end)
-
-print("[DiceCore v5] ✅ Loaded! Tabs: Roll | History | Trade | Settings 🎲")
+print("[DiceCore v5.1] ✅ Loaded!")
+print("  Tabs: 🎲 Roll | 📜 History | 🤝 Trade | ⚙️ Settings")
+print("  Server: Klik CHECK SERVER untuk detect")
