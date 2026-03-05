@@ -6,8 +6,8 @@
 -- ══════════════════════════════
 --  ⚙️  GANTI INI SESUAI REPO KAMU
 -- ══════════════════════════════
-local GITHUB_USER = "username"       -- ← ganti username GitHub kamu
-local GITHUB_REPO = "repo"           -- ← ganti nama repo kamu
+local GITHUB_USER = "HaZck"       -- ← ganti username GitHub kamu
+local GITHUB_REPO = "ScriptHub"           -- ← ganti nama repo kamu
 local GITHUB_BRANCH = "main"         -- ← ganti kalau branch kamu "master"
 
 -- ══════════════════════════════
