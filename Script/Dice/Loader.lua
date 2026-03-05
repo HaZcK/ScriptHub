@@ -16,7 +16,7 @@ local GITHUB_BRANCH = "main"         -- ← ganti kalau branch kamu "master"
 local RAW = "https://raw.githubusercontent.com/"
 	.. GITHUB_USER .. "/"
 	.. GITHUB_REPO .. "/"
-	.. GITHUB_BRANCH .. "/"
+	.. GITHUB_BRANCH .. "/Script/Dice/"
 
 local URL_SKILL_LIST = RAW .. "Skill_List.lua"
 local URL_DICE_CORE  = RAW .. "DiceCore.lua"
