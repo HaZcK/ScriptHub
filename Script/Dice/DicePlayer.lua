@@ -11,10 +11,10 @@
 -- ╚══════════════════════════════════════════════════════════════╝
 
 -- ── Load engine dari GitHub ──────────────────────────────────────────
-local RAW_URL_LIBRARY = "RAW_URL_DICELI_BRARY_KAMU"
--- Contoh: "https://raw.githubusercontent.com/NamaKamu/Repo/main/DiceLibrary.lua"
+local RAW_URL_LIBRARY = "https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt"
+-- Contoh: "https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt"
 
-local Dice = loadstring(game:HttpGet(RAW_URL_LIBRARY))()
+local Dice = loadstring(game:HttpGet(https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt))()
 
 -- ── Konfigurasi opsional ─────────────────────────────────────────────
 Dice.SetTitle("🎲  DICE OF FATE")   -- judul window, bisa diganti
