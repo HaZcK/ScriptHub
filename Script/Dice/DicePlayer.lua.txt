@@ -1,0 +1,539 @@
+-- ╔══════════════════════════════════════════════════════════════╗
+-- ║                DICE OF FATE — DicePlayer.lua                 ║
+-- ║                                                              ║
+-- ║  File ini yang kamu edit untuk tambah / ubah skill.          ║
+-- ║  Engine diambil dari DiceLibrary via loadstring.             ║
+-- ║                                                              ║
+-- ║  CARA PAKAI:                                                 ║
+-- ║  1. Upload DiceLibrary.lua ke GitHub                         ║
+-- ║  2. Ganti RAW_URL_LIBRARY di bawah dengan raw URL-nya        ║
+-- ║  3. Execute file ini di executor                             ║
+-- ╚══════════════════════════════════════════════════════════════╝
+
+-- ── Load engine dari GitHub ──────────────────────────────────────────
+local RAW_URL_LIBRARY = "RAW_URL_DICELI_BRARY_KAMU"
+-- Contoh: "https://raw.githubusercontent.com/NamaKamu/Repo/main/DiceLibrary.lua"
+
+local Dice = loadstring(game:HttpGet(RAW_URL_LIBRARY))()
+
+-- ── Konfigurasi opsional ─────────────────────────────────────────────
+Dice.SetTitle("🎲  DICE OF FATE")   -- judul window, bisa diganti
+Dice.SetMaxSlots(5)                  -- max skill aktif sekaligus
+
+-- ════════════════════════════════════════════════════════════════════
+--  HELPER LOKAL
+--  Shortcut supaya apply/remove lebih ringkas
+-- ════════════════════════════════════════════════════════════════════
+local RunService = game:GetService("RunService")
+
+local function getChar()
+	return Dice.GetChar()
+end
+
+local function origSize(partName)
+	return Dice.GetOrigSize(partName)
+end
+
+-- ════════════════════════════════════════════════════════════════════
+--  SKILL BAWAAN (DEFAULT SKILLS)
+--  Skill-skill ini selalu ada. Jangan hapus kecuali memang mau.
+-- ════════════════════════════════════════════════════════════════════
+
+-- ── COMMON ──────────────────────────────────────────────────────────
+
+Dice.AddSkill({
+	id      = "speed_demon",
+	name    = "Speed Demon",
+	icon    = "💨",
+	rarity  = "Common",
+	desc    = "WalkSpeed jadi 100. Ngebut banget!",
+	flavor  = "Angin aja kalah.",
+	apply = function()
+		local c,h = getChar()
+		h.WalkSpeed = 100
+		Dice.FireServer("Apply", "speed_demon")
+	end,
+	remove = function()
+		local c,h = getChar()
+		h.WalkSpeed = 16
+		Dice.FireServer("Remove", "speed_demon")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "super_jump",
+	name    = "Super Jump",
+	icon    = "🚀",
+	rarity  = "Common",
+	desc    = "JumpPower jadi 200. Nyentuh langit!",
+	flavor  = "Gravity? Belum kenal.",
+	apply = function()
+		local c,h = getChar()
+		h.JumpPower = 200
+		Dice.FireServer("Apply", "super_jump")
+	end,
+	remove = function()
+		local c,h = getChar()
+		h.JumpPower = 50
+		Dice.FireServer("Remove", "super_jump")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "giant_head",
+	name    = "Giant Head",
+	icon    = "🗿",
+	rarity  = "Common",
+	desc    = "Kepala jadi 5x lebih gede.",
+	flavor  = "Braincell makin banyak.",
+	apply = function()
+		local c,h = getChar()
+		local head = c:FindFirstChild("Head")
+		if head then head.Size = Vector3.new(5,5,5) end
+		Dice.FireServer("Apply", "giant_head")
+	end,
+	remove = function()
+		local c,h = getChar()
+		local head = c:FindFirstChild("Head")
+		if head and origSize("Head") then head.Size = origSize("Head") end
+		Dice.FireServer("Remove", "giant_head")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "tiny_legs",
+	name    = "Tiny Legs",
+	icon    = "🦵",
+	rarity  = "Common",
+	desc    = "Kaki mengecil drastis. Lucu banget.",
+	flavor  = "Kaki kamu mana??",
+	apply = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot"}) do
+			local p = c:FindFirstChild(n); if p then p.Size = Vector3.new(0.4,0.4,0.4) end
+		end
+		Dice.FireServer("Apply", "tiny_legs")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot"}) do
+			local p = c:FindFirstChild(n); if p and origSize(n) then p.Size = origSize(n) end
+		end
+		Dice.FireServer("Remove", "tiny_legs")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "buff_arms",
+	name    = "Buff Arms",
+	icon    = "💪",
+	rarity  = "Common",
+	desc    = "Lengan super gede. Siap tinju meteor.",
+	flavor  = "Arms day everyday.",
+	apply = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
+			local p = c:FindFirstChild(n); if p then p.Size = Vector3.new(2.5,2.5,2.5) end
+		end
+		Dice.FireServer("Apply", "buff_arms")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
+			local p = c:FindFirstChild(n); if p and origSize(n) then p.Size = origSize(n) end
+		end
+		Dice.FireServer("Remove", "buff_arms")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "noodle_arms",
+	name    = "Noodle Arms",
+	icon    = "🍜",
+	rarity  = "Common",
+	desc    = "Lengan super panjang menjuntai.",
+	flavor  = "Nyampe lantai dari berdiri.",
+	apply = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
+			local p = c:FindFirstChild(n); if p then p.Size = Vector3.new(0.3,3.5,0.3) end
+		end
+		Dice.FireServer("Apply", "noodle_arms")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
+			local p = c:FindFirstChild(n); if p and origSize(n) then p.Size = origSize(n) end
+		end
+		Dice.FireServer("Remove", "noodle_arms")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "phantom",
+	name    = "Phantom Mode",
+	icon    = "👻",
+	rarity  = "Common",
+	desc    = "Badan transparan 80%.",
+	flavor  = "Boo!",
+	apply = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then p.Transparency=0.8 end
+		end
+		Dice.FireServer("Apply", "phantom")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") then p.Transparency=0 end
+		end
+		Dice.FireServer("Remove", "phantom")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "golden_skin",
+	name    = "Golden Touch",
+	icon    = "✨",
+	rarity  = "Common",
+	desc    = "Seluruh badan jadi emas berkilau.",
+	flavor  = "Midas wishes.",
+	apply = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then p.BrickColor=BrickColor.new("Bright yellow") end
+		end
+		Dice.FireServer("Apply", "golden_skin")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") then p.Color=Color3.fromRGB(163,162,165) end
+		end
+		Dice.FireServer("Remove", "golden_skin")
+	end,
+})
+
+-- ── RARE ────────────────────────────────────────────────────────────
+
+Dice.AddSkill({
+	id      = "rainbow_body",
+	name    = "Rainbow Body",
+	icon    = "🌈",
+	rarity  = "Rare",
+	desc    = "Warna badan berubah pelangi nonstop.",
+	flavor  = "Serotonin overload.",
+	apply = function()
+		Dice.FireServer("Apply", "rainbow_body")
+		Dice.SaveConn("rainbow", RunService.Heartbeat:Connect(function()
+			local c = game:GetService("Players").LocalPlayer.Character
+			if not c then return end
+			local t = tick()
+			for _,p in ipairs(c:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then
+					p.Color = Color3.fromHSV((t*0.5 + p.Name:len()*0.05) % 1, 1, 1)
+				end
+			end
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("rainbow")
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") then p.Color=Color3.fromRGB(163,162,165) end
+		end
+		Dice.FireServer("Remove", "rainbow_body")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "anti_gravity",
+	name    = "Anti Gravity",
+	icon    = "🪐",
+	rarity  = "Rare",
+	desc    = "Gravitasi berkurang. Lompat terasa melayang.",
+	flavor  = "Space walk vibes.",
+	apply = function()
+		local c,h = getChar(); h.JumpPower=150
+		local hrp = c:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local old = hrp:FindFirstChild("_AG"); if old then old:Destroy() end
+			local bf = Instance.new("BodyForce")
+			bf.Name="_AG"; bf.Force=Vector3.new(0,workspace.Gravity*hrp:GetMass()*0.75,0); bf.Parent=hrp
+		end
+		Dice.FireServer("Apply", "anti_gravity")
+	end,
+	remove = function()
+		local c,h = getChar(); h.JumpPower=50
+		local hrp = c:FindFirstChild("HumanoidRootPart")
+		if hrp then local bf=hrp:FindFirstChild("_AG"); if bf then bf:Destroy() end end
+		Dice.FireServer("Remove", "anti_gravity")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "ice_body",
+	name    = "Frozen Soul",
+	icon    = "🧊",
+	rarity  = "Rare",
+	desc    = "Badan jadi es transparan biru dingin.",
+	flavor  = "Dingin sampai jiwa.",
+	apply = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then
+				p.BrickColor=BrickColor.new("Pastel blue"); p.Material=Enum.Material.Ice; p.Transparency=0.35
+			end
+		end
+		Dice.FireServer("Apply", "ice_body")
+	end,
+	remove = function()
+		local c,h = getChar()
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") then p.Material=Enum.Material.SmoothPlastic; p.Transparency=0 end
+		end
+		Dice.FireServer("Remove", "ice_body")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "lava_trail",
+	name    = "Lava Trail",
+	icon    = "🔥",
+	rarity  = "Rare",
+	desc    = "Ninggalin jejak api saat berjalan.",
+	flavor  = "Floor is literally lava.",
+	apply = function()
+		Dice.FireServer("Apply", "lava_trail")
+		local last = 0
+		Dice.SaveConn("lava", RunService.Heartbeat:Connect(function()
+			local now=tick(); if now-last<0.15 then return end
+			local lp = game:GetService("Players").LocalPlayer
+			local c2=lp.Character; local h2=c2 and c2:FindFirstChildOfClass("Humanoid")
+			local hrp=c2 and c2:FindFirstChild("HumanoidRootPart")
+			if not hrp or not h2 or h2.MoveDirection.Magnitude<0.1 then return end
+			last=now
+			local f=Instance.new("Part"); f.Size=Vector3.new(1.5,0.2,1.5)
+			f.CFrame=CFrame.new(hrp.Position-Vector3.new(0,3,0))
+			f.Anchored=true; f.CanCollide=false
+			f.BrickColor=BrickColor.new("Bright orange"); f.Material=Enum.Material.Neon; f.Parent=workspace
+			local fi=Instance.new("Fire",f); fi.Heat=8; fi.Size=5
+			game:GetService("Debris"):AddItem(f,2)
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("lava")
+		Dice.FireServer("Remove", "lava_trail")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "spinning_head",
+	name    = "Spinning Head",
+	icon    = "🌀",
+	rarity  = "Rare",
+	desc    = "Kepala muter nonstop.",
+	flavor  = "360 no scope.",
+	apply = function()
+		Dice.FireServer("Apply", "spinning_head")
+		Dice.SaveConn("spin", RunService.Heartbeat:Connect(function(dt)
+			local c = game:GetService("Players").LocalPlayer.Character; if not c then return end
+			local head = c:FindFirstChild("Head")
+			if head then head.CFrame=head.CFrame*CFrame.Angles(0,math.rad(300*dt),0) end
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("spin")
+		Dice.FireServer("Remove", "spinning_head")
+	end,
+})
+
+-- ── EPIC ────────────────────────────────────────────────────────────
+
+Dice.AddSkill({
+	id      = "ant_size",
+	name    = "Ant Size",
+	icon    = "🐜",
+	rarity  = "Epic",
+	desc    = "Tubuh mengecil jadi 0.3x.",
+	flavor  = "Siapa kamu? Mana kamu?",
+	apply = function()
+		local c,h = getChar(); h.WalkSpeed=10
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then p.Size=p.Size*0.3 end
+		end
+		Dice.FireServer("Apply", "ant_size")
+	end,
+	remove = function()
+		local c,h = getChar(); h.WalkSpeed=16
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and origSize(p.Name) then p.Size=origSize(p.Name) end
+		end
+		Dice.FireServer("Remove", "ant_size")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "giant_mode",
+	name    = "Giant Mode",
+	icon    = "🏔️",
+	rarity  = "Epic",
+	desc    = "Tumbuh jadi raksasa 3x ukuran.",
+	flavor  = "Fee-fi-fo-fum.",
+	apply = function()
+		local c,h = getChar(); h.WalkSpeed=24; h.JumpPower=80
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then p.Size=p.Size*3 end
+		end
+		Dice.FireServer("Apply", "giant_mode")
+	end,
+	remove = function()
+		local c,h = getChar(); h.WalkSpeed=16; h.JumpPower=50
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") and origSize(p.Name) then p.Size=origSize(p.Name) end
+		end
+		Dice.FireServer("Remove", "giant_mode")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "backwards_brain",
+	name    = "Backwards Brain",
+	icon    = "🔄",
+	rarity  = "Epic",
+	desc    = "Kamera terbalik 180°. Maju jadi mundur.",
+	flavor  = "Lain di mulut lain di hati.",
+	apply = function()
+		local cam = workspace.CurrentCamera
+		cam.CameraType = Enum.CameraType.Scriptable
+		Dice.SaveConn("cam", RunService.Heartbeat:Connect(function()
+			local c = game:GetService("Players").LocalPlayer.Character; if not c then return end
+			local hrp = c:FindFirstChild("HumanoidRootPart")
+			if hrp then cam.CFrame=CFrame.new(hrp.Position+Vector3.new(0,6,14))*CFrame.Angles(-0.12,math.pi,0) end
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("cam")
+		workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
+	end,
+})
+
+Dice.AddSkill({
+	id      = "magnet_body",
+	name    = "Magnet Body",
+	icon    = "🧲",
+	rarity  = "Epic",
+	desc    = "Benda-benda sekitar tertarik ke kamu.",
+	flavor  = "Personal gravitational field.",
+	apply = function()
+		Dice.FireServer("Apply", "magnet_body")
+		Dice.SaveConn("magnet", RunService.Heartbeat:Connect(function()
+			local c = game:GetService("Players").LocalPlayer.Character; if not c then return end
+			local hrp = c:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+			for _,obj in ipairs(workspace:GetChildren()) do
+				if obj:IsA("BasePart") and not obj.Anchored and obj~=hrp and not c:IsAncestorOf(obj) then
+					local d=(obj.Position-hrp.Position).Magnitude
+					if d<25 and d>0.1 then
+						obj.AssemblyLinearVelocity=obj.AssemblyLinearVelocity+(hrp.Position-obj.Position).Unit*(180/d)
+					end
+				end
+			end
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("magnet")
+		Dice.FireServer("Remove", "magnet_body")
+	end,
+})
+
+-- ── LEGENDARY ───────────────────────────────────────────────────────
+
+Dice.AddSkill({
+	id      = "time_warp",
+	name    = "Time Warp",
+	icon    = "⏳",
+	rarity  = "Legendary",
+	desc    = "Gravitasi drop ke 20. Kamu tetap kenceng.",
+	flavor  = "Waktu itu relatif.",
+	apply = function()
+		local c,h = getChar(); workspace.Gravity=20; h.WalkSpeed=80; h.JumpPower=120
+		Dice.FireServer("Apply", "time_warp")
+	end,
+	remove = function()
+		local c,h = getChar(); workspace.Gravity=196.2; h.WalkSpeed=16; h.JumpPower=50
+		Dice.FireServer("Remove", "time_warp")
+	end,
+})
+
+Dice.AddSkill({
+	id      = "god_mode",
+	name    = "God Mode",
+	icon    = "⚡",
+	rarity  = "Legendary",
+	desc    = "Speed + Jump + Giant Head + Rainbow Neon.",
+	flavor  = "Pure chaos.",
+	apply = function()
+		local c,h = getChar(); h.WalkSpeed=80; h.JumpPower=180
+		local head=c:FindFirstChild("Head"); if head then head.Size=Vector3.new(5,5,5) end
+		Dice.FireServer("Apply", "god_mode")
+		Dice.SaveConn("god", RunService.Heartbeat:Connect(function()
+			local c2=game:GetService("Players").LocalPlayer.Character; if not c2 then return end
+			local t=tick()
+			for _,p in ipairs(c2:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name~="HumanoidRootPart" then
+					p.Color=Color3.fromHSV((t*1.5+p.Name:len()*0.1)%1,1,1); p.Material=Enum.Material.Neon
+				end
+			end
+		end))
+	end,
+	remove = function()
+		Dice.DropConn("god")
+		local c,h = getChar(); h.WalkSpeed=16; h.JumpPower=50
+		for _,p in ipairs(c:GetDescendants()) do
+			if p:IsA("BasePart") then p.Material=Enum.Material.SmoothPlastic; p.Color=Color3.fromRGB(163,162,165) end
+		end
+		local head=c:FindFirstChild("Head")
+		if head and origSize("Head") then head.Size=origSize("Head") end
+		Dice.FireServer("Remove", "god_mode")
+	end,
+})
+
+-- ════════════════════════════════════════════════════════════════════
+--  CUSTOM SKILL  —  tambah skill kamu di sini!
+--  Copy blok di bawah, ganti isinya, taruh sebelum Dice.Launch()
+-- ════════════════════════════════════════════════════════════════════
+
+--[[
+
+Dice.AddSkill({
+	id      = "nama_unik",         -- WAJIB unik, sama seperti di DiceServer
+	name    = "Nama Skill",        -- nama tampilan di GUI
+	icon    = "🎯",                -- emoji bebas
+	rarity  = "Common",            -- Common | Rare | Epic | Legendary
+	desc    = "Deskripsi singkat.",
+	flavor  = "Kalimat keren.",    -- opsional, muncul kecil di bawah desc
+	apply = function()
+		local c, h = getChar()    -- c = Character, h = Humanoid
+		-- tulis efek di sini, contoh:
+		h.WalkSpeed = 50
+		-- kalau butuh loop (efek terus-menerus):
+		Dice.SaveConn("key_unik", RunService.Heartbeat:Connect(function(dt)
+			-- kode loop di sini
+		end))
+		Dice.FireServer("Apply", "nama_unik")  -- sync ke server
+	end,
+	remove = function()
+		local c, h = getChar()
+		Dice.DropConn("key_unik")  -- stop loop kalau ada
+		h.WalkSpeed = 16
+		Dice.FireServer("Remove", "nama_unik")
+	end,
+})
+
+--]]
+
+-- ════════════════════════════════════════════════════════════════════
+--  LAUNCH — jangan hapus, harus ada di paling bawah
+-- ════════════════════════════════════════════════════════════════════
+Dice.Launch()
