@@ -14,7 +14,7 @@
 local RAW_URL_LIBRARY = "https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt"
 -- Contoh: "https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt"
 
-local Dice = loadstring(game:HttpGet(https://github.com/HaZcK/ScriptHub/releases/download/Dice/DiceLibrary.lua.txt))()
+local Dice = loadstring(game:HttpGet(RAW_URL_LIBRARY))()
 
 -- ── Konfigurasi opsional ─────────────────────────────────────────────
 Dice.SetTitle("🎲  DICE OF FATE")   -- judul window, bisa diganti
