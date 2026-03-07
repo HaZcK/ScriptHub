@@ -286,6 +286,40 @@ local function applyEffect(plr, skillId, data)
 			end
 		end
 
+	elseif eff == "GiveF3X" then
+		local ok, model = pcall(function()
+			return game:GetService("InsertService"):LoadAsset(142785488)
+		end)
+		if ok and model then
+			local bp = plr:FindFirstChild("Backpack")
+			if bp then
+				for _, t in ipairs(bp:GetChildren()) do
+					if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then t:Destroy() end
+				end
+			end
+			if char then
+				for _, t in ipairs(char:GetChildren()) do
+					if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then t:Destroy() end
+				end
+			end
+			local tool = model:FindFirstChildOfClass("Tool")
+			if tool then tool.Parent = plr.Backpack end
+			model:Destroy()
+		end
+
+	elseif eff == "RemoveF3X" then
+		local bp = plr:FindFirstChild("Backpack")
+		if bp then
+			for _, t in ipairs(bp:GetChildren()) do
+				if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then t:Destroy() end
+			end
+		end
+		if char then
+			for _, t in ipairs(char:GetChildren()) do
+				if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then t:Destroy() end
+			end
+		end
+
 	elseif eff == "AntiGravity" then
 		if hum then hum.JumpPower = 150 end
 		local hrp = char:FindFirstChild("HumanoidRootPart")
