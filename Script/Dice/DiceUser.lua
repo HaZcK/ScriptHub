@@ -272,6 +272,65 @@ Dice.AddSkill({
 })
 
 --]]
+Dice.AddSkill({
+      id      = "F3X",     -- must be unique across all skills
+      name    = "F3X Btools",    -- display name in GUI
+      icon    = "🔨",            -- any emoji
+      rarity  = "Legendary",        -- Common | Rare | Epic | Legendary
+      desc    = "makes you have btools and can build anything.",
+      flavor  = "with this you can organize your world",  -- optional, shows small below desc
+      apply = function()
+      local player = game:GetService("Players").LocalPlayer -- Load F3X tool from Roblox catalog (asset id 142785488)
+        local ok, result = pcall(function()
+            return game:GetObjects("rbxassetid://142785488")
+        end)
+
+        if not ok or not result or not result[1] then
+            warn("[F3X] Failed to load asset! Error: " .. tostring(result))
+            return
+        end
+
+        local tool = result[1]
+
+        -- Remove old F3X if already in backpack
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            local old = backpack:FindFirstChild(tool.Name)
+            if old then old:Destroy() end
+        end
+
+        -- Also check if currently equipped
+        local char = player.Character
+        if char then
+            local equipped = char:FindFirstChild(tool.Name)
+            if equipped then equipped:Destroy() end
+        end
+
+        -- Insert into backpack
+        tool.Parent = player.Backpack
+    end,
+    remove = function()
+        local player = game:GetService("Players").LocalPlayer
+
+        -- Remove from backpack
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            local tool = backpack:FindFirstChild("Building Tools")
+                      or backpack:FindFirstChild("F3X")
+                      or backpack:FindFirstChild("Building Tools by F3X")
+            if tool then tool:Destroy() end
+        end
+
+        -- Remove if equipped
+        local char = player.Character
+        if char then
+            local tool = char:FindFirstChildOfClass("Tool")
+            if tool and (tool.Name:find("Build") or tool.Name:find("F3X")) then
+                tool:Destroy()
+            end
+        end
+    end,
+})
 
 -- ════════════════════════════════════════════════════════════════════
 --  OPTIONAL CUSTOMIZATION
