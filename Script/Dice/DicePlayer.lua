@@ -515,7 +515,7 @@ Dice.AddSkill({
 --]]
 
 -- ════════════════════════════════════════════════════════════════════
---  LAUNCH — jangan hapus, harus di paling bawah
+--  Jangan hapus return ini!
+--  DiceUser.lua butuh ini untuk tambah skill custom.
 -- ════════════════════════════════════════════════════════════════════
-Dice.Launch()
 return Dice
