@@ -518,3 +518,4 @@ Dice.AddSkill({
 --  LAUNCH — jangan hapus, harus di paling bawah
 -- ════════════════════════════════════════════════════════════════════
 Dice.Launch()
+return Dice
