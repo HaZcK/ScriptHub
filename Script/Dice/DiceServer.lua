@@ -1,515 +1,351 @@
 -- ╔══════════════════════════════════════════════════════════════╗
--- ║                   DICE OF FATE — DiceServer                  ║
--- ║         Taruh MANUAL di: ServerScriptService > DiceServer    ║
--- ║                        Version 2.0                           ║
+-- ║               DICE OF FATE — DiceServer.lua                  ║
+-- ║                                                              ║
+-- ║  Taruh di ServerScriptService                                ║
+-- ║  Tidak perlu edit apapun di sini.                            ║
+-- ║  Semua skill custom cukup di DicePlayer.lua saja.            ║
 -- ╚══════════════════════════════════════════════════════════════╝
 
 local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local HttpService       = game:GetService("HttpService")
+local RunService        = game:GetService("RunService")
 
--- ══════════════════════════════════════════════════════
---  REMOTE SETUP
--- ══════════════════════════════════════════════════════
-local function makeRemote(name, parent, class)
-	local old = parent:FindFirstChild(name)
-	if old then old:Destroy() end
-	local r = Instance.new(class or "RemoteEvent")
-	r.Name = name
-	r.Parent = parent
+-- ── Buat Remote Events / Functions ──────────────────────────────────
+local function mkRemote(name, class)
+	local r = ReplicatedStorage:FindFirstChild(name)
+	if not r then
+		r = Instance.new(class); r.Name = name; r.Parent = ReplicatedStorage
+	end
 	return r
 end
 
--- FREEDICE   = tanda server support aktif
--- DICE_ACTION = skill apply/remove/clearall
--- DICE_TRADE  = trade skill antar player
--- DICE_GIVEGUI= broadcast GUI ke semua player
-local FREEDICE    = makeRemote("FREEDICE",    ReplicatedStorage)
-local DICE_ACTION = makeRemote("DICE_ACTION", ReplicatedStorage)
-local DICE_TRADE  = makeRemote("DICE_TRADE",  ReplicatedStorage)
-local DICE_GIVEGUI= makeRemote("DICE_GIVEGUI",ReplicatedStorage)
-local DICE_PING   = makeRemote("DICE_PING",   ReplicatedStorage, "RemoteFunction")
+local FREEDICE  = mkRemote("FREEDICE",    "RemoteEvent")
+local R_PING    = mkRemote("DICE_PING",   "RemoteFunction")
+local R_ACTION  = mkRemote("DICE_ACTION", "RemoteEvent")
+local R_TRADE   = mkRemote("DICE_TRADE",  "RemoteEvent")
+local R_GIVE    = mkRemote("DICE_GIVEGUI","RemoteEvent")
 
--- Ping handler — client tanya "server ada?" server jawab true
-DICE_PING.OnServerInvoke = function(player)
+-- ── Ping handler ─────────────────────────────────────────────────────
+R_PING.OnServerInvoke = function(player)
 	return true
 end
 
-print("[DiceServer] ✅ All remotes created")
+-- ══════════════════════════════════════════════════════════════════
+--  UNIVERSAL SKILL HANDLER
+--  Server tidak perlu tahu isi skill.
+--  Client kirim efek apa yang harus dijalankan (EffectType + data).
+--  Server apply ke character player yang bersangkutan.
+-- ══════════════════════════════════════════════════════════════════
 
--- ══════════════════════════════════════════════════════
---  SKILL REGISTRY
---  Semua efek server-side didefinisikan di sini.
---  Format setiap skill:
---
---  ["skill_id"] = {
---      apply  = function(char, hum) ... end,
---      remove = function(char, hum) ... end,
---      loop   = true/false,  -- kalau true, server loop tiap 0.1s
---      loopFn = function(char, hum) ... end,  -- isi loop
---  }
---
---  Untuk tambah custom skill:
---  1. Tambah entry baru di bawah dengan id yang sama seperti di DiceCore
---  2. Isi apply dan remove
---  3. Kalau butuh efek terus-menerus (rainbow, lava, dll) set loop=true
--- ══════════════════════════════════════════════════════
-local SkillRegistry = {}
+-- Simpan loop connections per player per skill
+local ActiveLoops = {}  -- ActiveLoops[player][skillId] = connection
 
--- ── HELPER ──
-local function resetBody(char, hum)
-	hum.WalkSpeed = 16
-	hum.JumpPower = 50
-	for _,p in ipairs(char:GetDescendants()) do
-		if p:IsA("BasePart") then
-			p.Transparency = 0
-			p.Material = Enum.Material.SmoothPlastic
-			p.Color = Color3.fromRGB(163,162,165)
-		end
+local function getLoop(plr, id)
+	if not ActiveLoops[plr] then ActiveLoops[plr] = {} end
+	return ActiveLoops[plr][id]
+end
+local function saveLoop(plr, id, conn)
+	if not ActiveLoops[plr] then ActiveLoops[plr] = {} end
+	if ActiveLoops[plr][id] then
+		pcall(function() ActiveLoops[plr][id]:Disconnect() end)
 	end
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if hrp then
-		local bf = hrp:FindFirstChild("_AntiGrav")
-		if bf then bf:Destroy() end
+	ActiveLoops[plr][id] = conn
+end
+local function dropLoop(plr, id)
+	if ActiveLoops[plr] and ActiveLoops[plr][id] then
+		pcall(function() ActiveLoops[plr][id]:Disconnect() end)
+		ActiveLoops[plr][id] = nil
+	end
+end
+local function dropAllLoops(plr)
+	if ActiveLoops[plr] then
+		for id, conn in pairs(ActiveLoops[plr]) do
+			pcall(function() conn:Disconnect() end)
+		end
+		ActiveLoops[plr] = nil
 	end
 end
 
--- ══════════════════════════════
---  ⬇ SKILL DEFINITIONS ⬇
--- ══════════════════════════════
+-- Simpan original sizes per player
+local OrigSizes = {}
 
-SkillRegistry["speed_demon"] = {
-	apply = function(c,h) h.WalkSpeed = 100 end,
-	remove = function(c,h) h.WalkSpeed = 16 end,
-}
+Players.PlayerAdded:Connect(function(plr)
+	plr.CharacterAdded:Connect(function(char)
+		OrigSizes[plr] = {}
+		for _, p in ipairs(char:GetDescendants()) do
+			if p:IsA("BasePart") then OrigSizes[plr][p.Name] = p.Size end
+		end
+	end)
+end)
 
-SkillRegistry["super_jump"] = {
-	apply = function(c,h) h.JumpPower = 200 end,
-	remove = function(c,h) h.JumpPower = 50 end,
-}
+Players.PlayerRemoving:Connect(function(plr)
+	dropAllLoops(plr)
+	OrigSizes[plr] = nil
+end)
 
-SkillRegistry["giant_head"] = {
-	apply = function(c,h)
-		local head = c:FindFirstChild("Head")
-		if head then head.Size = Vector3.new(5,5,5) end
-	end,
-	remove = function(c,h)
-		local head = c:FindFirstChild("Head")
-		if head then head.Size = Vector3.new(2,1,1) end
-	end,
-}
+-- ── Helpers ──────────────────────────────────────────────────────────
+local function getChar(plr)
+	local char = plr.Character
+	local hum  = char and char:FindFirstChildOfClass("Humanoid")
+	return char, hum
+end
 
-SkillRegistry["tiny_legs"] = {
-	apply = function(c,h)
-		for _,n in ipairs({"LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(0.4,0.4,0.4) end
+local function resetBody(plr)
+	local char, hum = getChar(plr)
+	if not char then return end
+	if hum then hum.WalkSpeed = 16; hum.JumpPower = 50 end
+	local orig = OrigSizes[plr] or {}
+	for _, p in ipairs(char:GetDescendants()) do
+		if p:IsA("BasePart") and orig[p.Name] then
+			pcall(function() p.Size = orig[p.Name] end)
 		end
-	end,
-	remove = function(c,h)
-		for _,n in ipairs({"LeftUpperLeg","LeftLowerLeg","LeftFoot","RightUpperLeg","RightLowerLeg","RightFoot"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(1,1,1) end
-		end
-	end,
-}
+	end
+	pcall(function() workspace.Gravity = 196.2 end)
+end
 
-SkillRegistry["buff_arms"] = {
-	apply = function(c,h)
-		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(2.5,2.5,2.5) end
-		end
-	end,
-	remove = function(c,h)
-		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(1,1,1) end
-		end
-	end,
-}
+-- ── Built-in server effects ───────────────────────────────────────────
+--  Client bisa kirim "EffectApply" dengan data:
+--  { effect = "SetSpeed", value = 100 }
+--  { effect = "SetJump",  value = 200 }
+--  { effect = "ScalePart", part = "Head", size = {5,5,5} }
+--  { effect = "SetColor", color = {255,180,0} }
+--  { effect = "SetMaterial", material = "Ice" }
+--  { effect = "SetTransparency", value = 0.8 }
+--  { effect = "SetGravity", value = 20 }
+--  { effect = "Rainbow" }
+--  { effect = "LavaTrail" }
+--  { effect = "SpinHead" }
+--  { effect = "Magnet" }
+--  { effect = "ResetBody" }
 
-SkillRegistry["noodle_arms"] = {
-	apply = function(c,h)
-		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(0.3,3.5,0.3) end
-		end
-	end,
-	remove = function(c,h)
-		for _,n in ipairs({"LeftUpperArm","LeftLowerArm","LeftHand","RightUpperArm","RightLowerArm","RightHand"}) do
-			local p = c:FindFirstChild(n)
-			if p then p.Size = Vector3.new(1,1,1) end
-		end
-	end,
-}
+local function applyEffect(plr, skillId, data)
+	local char, hum = getChar(plr)
+	if not char then return end
 
-SkillRegistry["phantom"] = {
-	apply = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.Transparency = 0.8 end
-		end
-	end,
-	remove = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") then p.Transparency = 0 end
-		end
-	end,
-}
+	local eff = data.effect
 
-SkillRegistry["golden_skin"] = {
-	apply = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-				p.BrickColor = BrickColor.new("Bright yellow")
+	if eff == "SetSpeed" then
+		if hum then hum.WalkSpeed = data.value or 16 end
+
+	elseif eff == "SetJump" then
+		if hum then hum.JumpPower = data.value or 50 end
+
+	elseif eff == "SetGravity" then
+		workspace.Gravity = data.value or 196.2
+
+	elseif eff == "ScalePart" then
+		local part = char:FindFirstChild(data.part)
+		if part and data.size then
+			part.Size = Vector3.new(data.size[1], data.size[2], data.size[3])
+		end
+
+	elseif eff == "ScaleGroup" then
+		-- data.parts = {"LeftUpperArm","LeftLowerArm",...}
+		-- data.size  = {x,y,z}
+		for _, name in ipairs(data.parts or {}) do
+			local p = char:FindFirstChild(name)
+			if p and data.size then
+				p.Size = Vector3.new(data.size[1], data.size[2], data.size[3])
 			end
 		end
-	end,
-	remove = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") then p.Color = Color3.fromRGB(163,162,165) end
-		end
-	end,
-}
 
-SkillRegistry["rainbow_body"] = {
-	loop = true,
-	loopFn = function(c,h)
-		local t = tick()
-		for _,p in ipairs(c:GetDescendants()) do
+	elseif eff == "ScaleAll" then
+		-- data.mult = 3 (kali semua part)
+		for _, p in ipairs(char:GetDescendants()) do
 			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-				p.Color = Color3.fromHSV((t*0.5 + p.Name:len()*0.05) % 1, 1, 1)
+				pcall(function() p.Size = p.Size * (data.mult or 1) end)
 			end
 		end
-	end,
-	apply = function(c,h) end,
-	remove = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") then p.Color = Color3.fromRGB(163,162,165) end
-		end
-	end,
-}
 
-SkillRegistry["anti_gravity"] = {
-	apply = function(c,h)
-		h.JumpPower = 150
-		local hrp = c:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local old = hrp:FindFirstChild("_AntiGrav")
-			if old then old:Destroy() end
-			local bf = Instance.new("BodyForce")
-			bf.Name = "_AntiGrav"
-			bf.Force = Vector3.new(0, workspace.Gravity * hrp:GetMass() * 0.75, 0)
-			bf.Parent = hrp
-		end
-	end,
-	remove = function(c,h)
-		h.JumpPower = 50
-		local hrp = c:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local bf = hrp:FindFirstChild("_AntiGrav")
-			if bf then bf:Destroy() end
-		end
-	end,
-}
-
-SkillRegistry["ice_body"] = {
-	apply = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
+	elseif eff == "SetColor" then
+		local col = data.color and Color3.fromRGB(data.color[1], data.color[2], data.color[3])
+		for _, p in ipairs(char:GetDescendants()) do
 			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-				p.BrickColor = BrickColor.new("Pastel blue")
-				p.Material = Enum.Material.Ice
-				p.Transparency = 0.35
+				if col then p.Color = col
+				elseif data.brickColor then p.BrickColor = BrickColor.new(data.brickColor) end
 			end
 		end
-	end,
-	remove = function(c,h)
-		for _,p in ipairs(c:GetDescendants()) do
+
+	elseif eff == "SetMaterial" then
+		local mat = Enum.Material[data.material] or Enum.Material.SmoothPlastic
+		for _, p in ipairs(char:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+				p.Material = mat
+			end
+		end
+
+	elseif eff == "SetTransparency" then
+		for _, p in ipairs(char:GetDescendants()) do
+			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+				p.Transparency = data.value or 0
+			end
+		end
+
+	elseif eff == "Rainbow" then
+		saveLoop(plr, skillId, RunService.Heartbeat:Connect(function()
+			local c2 = plr.Character; if not c2 then return end
+			local t = tick()
+			for _, p in ipairs(c2:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+					p.Color = Color3.fromHSV((t * 0.5 + p.Name:len() * 0.05) % 1, 1, 1)
+				end
+			end
+		end))
+
+	elseif eff == "LavaTrail" then
+		local last = 0
+		saveLoop(plr, skillId, RunService.Heartbeat:Connect(function()
+			local now = tick(); if now - last < 0.15 then return end
+			local c2 = plr.Character
+			local h2 = c2 and c2:FindFirstChildOfClass("Humanoid")
+			local hrp = c2 and c2:FindFirstChild("HumanoidRootPart")
+			if not hrp or not h2 or h2.MoveDirection.Magnitude < 0.1 then return end
+			last = now
+			local f = Instance.new("Part")
+			f.Size = Vector3.new(2, 0.2, 2)
+			f.CFrame = CFrame.new(hrp.Position - Vector3.new(0, 3, 0))
+			f.Anchored = true; f.CanCollide = false
+			f.BrickColor = BrickColor.new("Bright orange")
+			f.Material = Enum.Material.Neon; f.Parent = workspace
+			Instance.new("Fire", f).Heat = 8
+			game:GetService("Debris"):AddItem(f, 2)
+		end))
+
+	elseif eff == "SpinHead" then
+		saveLoop(plr, skillId, RunService.Heartbeat:Connect(function(dt)
+			local c2 = plr.Character; if not c2 then return end
+			local head = c2:FindFirstChild("Head")
+			if head then head.CFrame = head.CFrame * CFrame.Angles(0, math.rad(300 * dt), 0) end
+		end))
+
+	elseif eff == "Magnet" then
+		saveLoop(plr, skillId, RunService.Heartbeat:Connect(function()
+			local c2 = plr.Character; if not c2 then return end
+			local hrp = c2:FindFirstChild("HumanoidRootPart"); if not hrp then return end
+			for _, obj in ipairs(workspace:GetChildren()) do
+				if obj:IsA("BasePart") and not obj.Anchored and obj ~= hrp and not c2:IsAncestorOf(obj) then
+					local d = (obj.Position - hrp.Position).Magnitude
+					if d < 25 and d > 0.1 then
+						obj.AssemblyLinearVelocity = obj.AssemblyLinearVelocity
+							+ (hrp.Position - obj.Position).Unit * (180 / d)
+					end
+				end
+			end
+		end))
+
+	elseif eff == "GodMode" then
+		if hum then hum.WalkSpeed = 80; hum.JumpPower = 180 end
+		local head = char:FindFirstChild("Head")
+		if head then head.Size = Vector3.new(5, 5, 5) end
+		saveLoop(plr, skillId, RunService.Heartbeat:Connect(function()
+			local c2 = plr.Character; if not c2 then return end
+			local t = tick()
+			for _, p in ipairs(c2:GetDescendants()) do
+				if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
+					p.Color = Color3.fromHSV((t * 1.5 + p.Name:len() * 0.1) % 1, 1, 1)
+					p.Material = Enum.Material.Neon
+				end
+			end
+		end))
+
+	elseif eff == "ResetBody" then
+		dropAllLoops(plr)
+		resetBody(plr)
+
+	elseif eff == "StopLoop" then
+		dropLoop(plr, skillId)
+
+	elseif eff == "ResetColor" then
+		for _, p in ipairs(char:GetDescendants()) do
 			if p:IsA("BasePart") then
+				p.Color = Color3.fromRGB(163, 162, 165)
 				p.Material = Enum.Material.SmoothPlastic
 				p.Transparency = 0
 			end
 		end
-	end,
-}
 
-SkillRegistry["lava_trail"] = {
-	loop = true,
-	loopFn = function(c,h)
-		local hrp = c:FindFirstChild("HumanoidRootPart")
-		if not hrp then return end
-		if h.MoveDirection.Magnitude < 0.1 then return end
-		local fire = Instance.new("Part")
-		fire.Size = Vector3.new(1.5,0.2,1.5)
-		fire.CFrame = CFrame.new(hrp.Position - Vector3.new(0,3,0))
-		fire.Anchored = true ; fire.CanCollide = false
-		fire.BrickColor = BrickColor.new("Bright orange")
-		fire.Material = Enum.Material.Neon
-		fire.Parent = workspace
-		local f = Instance.new("Fire", fire)
-		f.Heat = 8 ; f.Size = 5
-		game:GetService("Debris"):AddItem(fire, 2)
-	end,
-	apply = function(c,h) end,
-	remove = function(c,h) end,
-}
-
-SkillRegistry["spinning_head"] = {
-	loop = true,
-	loopFn = function(c,h)
-		local head = c:FindFirstChild("Head")
-		if head then head.CFrame = head.CFrame * CFrame.Angles(0, math.rad(15), 0) end
-	end,
-	apply = function(c,h) end,
-	remove = function(c,h) end,
-}
-
-SkillRegistry["ant_size"] = {
-	apply = function(c,h)
-		h.WalkSpeed = 10
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.Size = p.Size * 0.3 end
+	elseif eff == "ResetPart" then
+		local orig = OrigSizes[plr] or {}
+		if data.part then
+			local p = char:FindFirstChild(data.part)
+			if p and orig[data.part] then p.Size = orig[data.part] end
 		end
-	end,
-	remove = function(c,h)
-		h.WalkSpeed = 16
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.Size = p.Size / 0.3 end
-		end
-	end,
-}
 
-SkillRegistry["giant_mode"] = {
-	apply = function(c,h)
-		h.WalkSpeed = 24 ; h.JumpPower = 80
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.Size = p.Size * 3 end
+	elseif eff == "ResetGroup" then
+		local orig = OrigSizes[plr] or {}
+		for _, name in ipairs(data.parts or {}) do
+			local p = char:FindFirstChild(name)
+			if p and orig[name] then p.Size = orig[name] end
 		end
-	end,
-	remove = function(c,h)
-		h.WalkSpeed = 16 ; h.JumpPower = 50
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then p.Size = p.Size / 3 end
-		end
-	end,
-}
 
-SkillRegistry["magnet_body"] = {
-	loop = true,
-	loopFn = function(c,h)
-		local hrp = c:FindFirstChild("HumanoidRootPart")
-		if not hrp then return end
-		for _,obj in ipairs(workspace:GetChildren()) do
-			if obj:IsA("BasePart") and not obj.Anchored and obj ~= hrp and not c:IsAncestorOf(obj) then
-				local dist = (obj.Position - hrp.Position).Magnitude
-				if dist < 25 and dist > 0.1 then
-					obj.AssemblyLinearVelocity = obj.AssemblyLinearVelocity
-						+ (hrp.Position - obj.Position).Unit * (180/dist)
-				end
+	elseif eff == "ResetAllParts" then
+		local orig = OrigSizes[plr] or {}
+		for _, p in ipairs(char:GetDescendants()) do
+			if p:IsA("BasePart") and orig[p.Name] then
+				pcall(function() p.Size = orig[p.Name] end)
 			end
 		end
-	end,
-	apply = function(c,h) end,
-	remove = function(c,h) end,
-}
 
-SkillRegistry["time_warp"] = {
-	apply = function(c,h)
-		workspace.Gravity = 20
-		h.WalkSpeed = 80 ; h.JumpPower = 120
-	end,
-	remove = function(c,h)
-		workspace.Gravity = 196.2
-		h.WalkSpeed = 16 ; h.JumpPower = 50
-	end,
-}
-
-SkillRegistry["god_mode"] = {
-	loop = true,
-	loopFn = function(c,h)
-		local t = tick()
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") and p.Name ~= "HumanoidRootPart" then
-				p.Color = Color3.fromHSV((t*1.5 + p.Name:len()*0.1) % 1, 1, 1)
-				p.Material = Enum.Material.Neon
-			end
+	elseif eff == "AntiGravity" then
+		if hum then hum.JumpPower = 150 end
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local old = hrp:FindFirstChild("_AG"); if old then old:Destroy() end
+			local bf = Instance.new("BodyForce")
+			bf.Name = "_AG"
+			bf.Force = Vector3.new(0, workspace.Gravity * hrp:GetMass() * 0.75, 0)
+			bf.Parent = hrp
 		end
-	end,
-	apply = function(c,h)
-		h.WalkSpeed = 80 ; h.JumpPower = 180
-		local head = c:FindFirstChild("Head")
-		if head then head.Size = Vector3.new(5,5,5) end
-	end,
-	remove = function(c,h)
-		h.WalkSpeed = 16 ; h.JumpPower = 50
-		for _,p in ipairs(c:GetDescendants()) do
-			if p:IsA("BasePart") then
-				p.Material = Enum.Material.SmoothPlastic
-				p.Color = Color3.fromRGB(163,162,165)
-			end
-		end
-		local head = c:FindFirstChild("Head")
-		if head then head.Size = Vector3.new(2,1,1) end
-	end,
-}
 
--- ══════════════════════════════════════════════════════
---  CUSTOM SKILL TEMPLATE
---  Copy blok ini dan ganti isinya untuk tambah skill baru!
---
--- SkillRegistry["id_skill_kamu"] = {
---     apply = function(c, h)
---         -- c = Character, h = Humanoid
---         -- Tulis efek saat skill diaktifkan di sini
---         h.WalkSpeed = 50
---     end,
---     remove = function(c, h)
---         -- Tulis cara balik ke normal di sini
---         h.WalkSpeed = 16
---     end,
---     -- Opsional: kalau butuh efek loop (terus jalan)
---     loop = true,
---     loopFn = function(c, h)
---         -- Ini dipanggil tiap 0.1 detik selama skill aktif
---     end,
--- }
--- ══════════════════════════════════════════════════════
-
--- ══════════════════════════════════════════════════════
---  LOOP MANAGER
--- ══════════════════════════════════════════════════════
-local activeLoops = {}  -- [userId] = { [skillId] = thread }
-
-local function startLoop(player, skillId, char, hum)
-	local reg = SkillRegistry[skillId]
-	if not reg or not reg.loop then return end
-	local userId = player.UserId
-	if not activeLoops[userId] then activeLoops[userId] = {} end
-	-- Stop existing loop kalau ada
-	if activeLoops[userId][skillId] then
-		task.cancel(activeLoops[userId][skillId])
-	end
-	activeLoops[userId][skillId] = task.spawn(function()
-		while char and char.Parent and char:GetAttribute("skill_"..skillId) do
-			pcall(reg.loopFn, char, hum)
-			task.wait(0.1)
-		end
-	end)
-end
-
-local function stopLoop(player, skillId)
-	local userId = player.UserId
-	if activeLoops[userId] and activeLoops[userId][skillId] then
-		task.cancel(activeLoops[userId][skillId])
-		activeLoops[userId][skillId] = nil
+	elseif eff == "RemoveAntiGravity" then
+		if hum then hum.JumpPower = 50 end
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hrp then local bf = hrp:FindFirstChild("_AG"); if bf then bf:Destroy() end end
 	end
 end
 
--- ══════════════════════════════════════════════════════
---  MAIN ACTION HANDLER
--- ══════════════════════════════════════════════════════
-DICE_ACTION.OnServerEvent:Connect(function(player, action, data)
-	local char = player.Character
-	if not char then return end
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
+-- ── Main action handler ───────────────────────────────────────────────
+R_ACTION.OnServerEvent:Connect(function(plr, action, skillId, effectData)
+	if action == "Effect" then
+		-- Client kirim effect langsung
+		-- effectData = { effect = "SetSpeed", value = 100 }
+		pcall(function() applyEffect(plr, skillId, effectData or {}) end)
 
-	if action == "Apply" then
-		local skillId = data
-		local reg = SkillRegistry[skillId]
-		if not reg then
-			warn("[DiceServer] Unknown skill:", skillId)
-			return
-		end
-		pcall(reg.apply, char, hum)
-		char:SetAttribute("skill_"..skillId, true)
-		startLoop(player, skillId, char, hum)
-		print("[DiceServer] ✅ "..player.Name.." → Apply: "..skillId)
-
-	elseif action == "Remove" then
-		local skillId = data
-		local reg = SkillRegistry[skillId]
-		char:SetAttribute("skill_"..skillId, nil)
-		stopLoop(player, skillId)
-		if reg then pcall(reg.remove, char, hum) end
-		print("[DiceServer] 🗑 "..player.Name.." → Remove: "..skillId)
+	elseif action == "StopLoop" then
+		dropLoop(plr, skillId)
 
 	elseif action == "ClearAll" then
-		-- Stop semua loop
-		for skillId, _ in pairs(activeLoops[player.UserId] or {}) do
-			stopLoop(player, skillId)
-		end
-		-- Remove semua skill
-		for skillId, reg in pairs(SkillRegistry) do
-			char:SetAttribute("skill_"..skillId, nil)
-			pcall(reg.remove, char, hum)
-		end
-		-- Hard reset
-		pcall(resetBody, char, hum)
-		workspace.Gravity = 196.2
-		print("[DiceServer] 🗑 "..player.Name.." → Clear All")
+		dropAllLoops(plr)
+		resetBody(plr)
 	end
 end)
 
--- ══════════════════════════════════════════════════════
---  TRADE HANDLER
--- ══════════════════════════════════════════════════════
-DICE_TRADE.OnServerEvent:Connect(function(sender, action, targetName, skillData)
-
+-- ── Trade handler ─────────────────────────────────────────────────────
+R_TRADE.OnServerEvent:Connect(function(fromPlr, action, targetName, data)
 	if action == "Offer" then
-		-- Cari target player
 		local target = Players:FindFirstChild(targetName)
-		if not target then return end
-		-- Forward offer ke target
-		DICE_TRADE:FireClient(target, "IncomingOffer", sender.Name, skillData)
-		print("[DiceServer] 🤝 Trade offer: "..sender.Name.." → "..targetName)
+		if target then R_TRADE:FireClient(target, "IncomingOffer", fromPlr.Name, data) end
 
 	elseif action == "Accept" then
-		-- skillData = { senderName, skillId, skillName, skillIcon, skillRarity }
-		local senderName = skillData.from
-		local senderPlayer = Players:FindFirstChild(senderName)
-		if not senderPlayer then return end
-		-- Konfirmasi ke sender bahwa trade diterima
-		DICE_TRADE:FireClient(senderPlayer, "TradeAccepted", sender.Name, skillData)
-		-- Konfirmasi ke receiver
-		DICE_TRADE:FireClient(sender, "TradeComplete", skillData)
-		print("[DiceServer] ✅ Trade accepted: "..senderName.." ↔ "..sender.Name)
+		local from = Players:FindFirstChild(targetName)
+		if from then
+			R_TRADE:FireClient(from,    "TradeAccepted", fromPlr.Name, data)
+			R_TRADE:FireClient(fromPlr, "TradeComplete", data)
+		end
 
 	elseif action == "Decline" then
-		local senderName = skillData.from
-		local senderPlayer = Players:FindFirstChild(senderName)
-		if senderPlayer then
-			DICE_TRADE:FireClient(senderPlayer, "TradeDeclined", sender.Name)
-		end
-		print("[DiceServer] ❌ Trade declined by "..sender.Name)
+		local from = Players:FindFirstChild(targetName)
+		if from then R_TRADE:FireClient(from, "TradeDeclined", fromPlr.Name) end
 	end
 end)
 
--- ══════════════════════════════════════════════════════
---  GIVE ALL GUI HANDLER
---  Ketika host aktifkan "Give All", semua player dapat GUI
--- ══════════════════════════════════════════════════════
-DICE_GIVEGUI.OnServerEvent:Connect(function(sender, action)
+-- ── Give All handler ──────────────────────────────────────────────────
+R_GIVE.OnServerEvent:Connect(function(plr, action)
 	if action == "GiveAll" then
-		print("[DiceServer] 📡 "..sender.Name.." broadcasting GUI to all players...")
 		for _, p in ipairs(Players:GetPlayers()) do
-			if p ~= sender then
-				DICE_GIVEGUI:FireClient(p, "ReceiveGUI")
-			end
+			if p ~= plr then R_GIVE:FireClient(p, "ReceiveGUI") end
 		end
 	end
 end)
 
--- Cleanup saat player leave
-Players.PlayerRemoving:Connect(function(player)
-	local userId = player.UserId
-	if activeLoops[userId] then
-		for skillId, _ in pairs(activeLoops[userId]) do
-			stopLoop(player, skillId)
-		end
-		activeLoops[userId] = nil
-	end
-end)
-
-print("[DiceServer] 🎲 Version 2.0 Ready!")
-print("[DiceServer] Remotes: FREEDICE | DICE_ACTION | DICE_TRADE | DICE_GIVEGUI | DICE_PING")
+print("[DiceServer] ✅ Ready — Universal skill handler aktif")
