@@ -258,17 +258,10 @@ Dice.AddSkill({
         local player = game:GetService("Players").LocalPlayer
         local TweenService = game:GetService("TweenService")
 
-        -- Load F3X ke backpack
-        local ok, model = pcall(function()
-            return game:GetService("InsertService"):LoadAsset(142785488)
-        end)
-        if ok and model then
-            local tool = model:FindFirstChildOfClass("Tool")
-            if tool then tool.Parent = player.Backpack end
-            model:Destroy()
-        end
+        -- Server yang insert F3X ke backpack
+        Dice.FX("F3X", { effect = "GiveF3X" })
 
-        -- GUI notif
+        -- Notif GUI slide up dari bawah
         local old = player.PlayerGui:FindFirstChild("F3XNotif")
         if old then old:Destroy() end
 
@@ -309,16 +302,18 @@ Dice.AddSkill({
         sub.TextXAlignment = Enum.TextXAlignment.Left
 
         -- Slide in
-        TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-            Position = UDim2.new(0.5, -140, 1, -75)
-        }):Play()
+        TweenService:Create(frame,
+            TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+            {Position = UDim2.new(0.5, -140, 1, -75)}
+        ):Play()
 
         -- Auto hide setelah 4 detik
         task.delay(4, function()
             if frame and frame.Parent then
-                TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
-                    Position = UDim2.new(0.5, -140, 1, 10)
-                }):Play()
+                TweenService:Create(frame,
+                    TweenInfo.new(0.3, Enum.EasingStyle.Quad),
+                    {Position = UDim2.new(0.5, -140, 1, 10)}
+                ):Play()
                 task.wait(0.35)
                 if sg and sg.Parent then sg:Destroy() end
             end
@@ -327,32 +322,14 @@ Dice.AddSkill({
     remove = function()
         local player = game:GetService("Players").LocalPlayer
 
-        -- Hapus dari backpack
-        local backpack = player:FindFirstChild("Backpack")
-        if backpack then
-            for _, t in ipairs(backpack:GetChildren()) do
-                if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then
-                    t:Destroy()
-                end
-            end
-        end
+        -- Server hapus F3X dari backpack
+        Dice.FX("F3X", { effect = "RemoveF3X" })
 
-        -- Hapus kalau lagi equipped
-        local char = player.Character
-        if char then
-            for _, t in ipairs(char:GetChildren()) do
-                if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then
-                    t:Destroy()
-                end
-            end
-        end
-
-        -- Hapus GUI
+        -- Hapus GUI notif
         local sg = player.PlayerGui:FindFirstChild("F3XNotif")
         if sg then sg:Destroy() end
     end,
 })
-
 -- ════════════════════════════════════════════════════════════════════
 --  ✏️  YOUR CUSTOM SKILLS — add them below here!
 --      Copy any example above, change the id/name/icon/rarity,
