@@ -247,6 +247,112 @@ Dice.AddSkill({
     end,
 })
 
+Dice.AddSkill({
+    id      = "F3X",
+    name    = "F3X Btools",
+    icon    = "🔨",
+    rarity  = "Legendary",
+    desc    = "Gives you F3X Building Tools. Build anything!",
+    flavor  = "With this, you can organize your world.",
+    apply = function()
+        local player = game:GetService("Players").LocalPlayer
+        local TweenService = game:GetService("TweenService")
+
+        -- Load F3X ke backpack
+        local ok, model = pcall(function()
+            return game:GetService("InsertService"):LoadAsset(142785488)
+        end)
+        if ok and model then
+            local tool = model:FindFirstChildOfClass("Tool")
+            if tool then tool.Parent = player.Backpack end
+            model:Destroy()
+        end
+
+        -- GUI notif
+        local old = player.PlayerGui:FindFirstChild("F3XNotif")
+        if old then old:Destroy() end
+
+        local sg = Instance.new("ScreenGui")
+        sg.Name = "F3XNotif"; sg.ResetOnSpawn = false
+        sg.DisplayOrder = 997; sg.Parent = player.PlayerGui
+
+        local frame = Instance.new("Frame", sg)
+        frame.Size = UDim2.new(0, 280, 0, 60)
+        frame.Position = UDim2.new(0.5, -140, 1, 10)
+        frame.BackgroundColor3 = Color3.fromRGB(18, 14, 30)
+        frame.BorderSizePixel = 0
+        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+        local fs = Instance.new("UIStroke", frame)
+        fs.Color = Color3.fromRGB(255, 180, 0); fs.Thickness = 1.5
+
+        local icon = Instance.new("TextLabel", frame)
+        icon.Size = UDim2.new(0, 50, 1, 0)
+        icon.BackgroundTransparency = 1
+        icon.Text = "🔨"; icon.TextSize = 26; icon.Font = Enum.Font.Gotham
+
+        local txt = Instance.new("TextLabel", frame)
+        txt.Size = UDim2.new(1, -55, 0.5, 0)
+        txt.Position = UDim2.new(0, 50, 0, 4)
+        txt.BackgroundTransparency = 1
+        txt.Text = "F3X Btools — Active!"
+        txt.TextColor3 = Color3.fromRGB(255, 180, 0)
+        txt.Font = Enum.Font.GothamBold; txt.TextSize = 13
+        txt.TextXAlignment = Enum.TextXAlignment.Left
+
+        local sub = Instance.new("TextLabel", frame)
+        sub.Size = UDim2.new(1, -55, 0.5, 0)
+        sub.Position = UDim2.new(0, 50, 0.5, -2)
+        sub.BackgroundTransparency = 1
+        sub.Text = "Check your Backpack 🎒"
+        sub.TextColor3 = Color3.fromRGB(160, 130, 200)
+        sub.Font = Enum.Font.Gotham; sub.TextSize = 11
+        sub.TextXAlignment = Enum.TextXAlignment.Left
+
+        -- Slide in
+        TweenService:Create(frame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = UDim2.new(0.5, -140, 1, -75)
+        }):Play()
+
+        -- Auto hide setelah 4 detik
+        task.delay(4, function()
+            if frame and frame.Parent then
+                TweenService:Create(frame, TweenInfo.new(0.3, Enum.EasingStyle.Quad), {
+                    Position = UDim2.new(0.5, -140, 1, 10)
+                }):Play()
+                task.wait(0.35)
+                if sg and sg.Parent then sg:Destroy() end
+            end
+        end)
+    end,
+    remove = function()
+        local player = game:GetService("Players").LocalPlayer
+
+        -- Hapus dari backpack
+        local backpack = player:FindFirstChild("Backpack")
+        if backpack then
+            for _, t in ipairs(backpack:GetChildren()) do
+                if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then
+                    t:Destroy()
+                end
+            end
+        end
+
+        -- Hapus kalau lagi equipped
+        local char = player.Character
+        if char then
+            for _, t in ipairs(char:GetChildren()) do
+                if t:IsA("Tool") and (t.Name:find("Build") or t.Name:find("F3X")) then
+                    t:Destroy()
+                end
+            end
+        end
+
+        -- Hapus GUI
+        local sg = player.PlayerGui:FindFirstChild("F3XNotif")
+        if sg then sg:Destroy() end
+    end,
+})
+
 -- ════════════════════════════════════════════════════════════════════
 --  ✏️  YOUR CUSTOM SKILLS — add them below here!
 --      Copy any example above, change the id/name/icon/rarity,
