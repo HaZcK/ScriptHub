@@ -416,6 +416,168 @@ Dice.AddSkill({
 	end,
 })
 
+  Dice.AddSkill({
+	id      = "Darkness",
+	name    = "Dark",
+	icon    = "🌚",
+	rarity  = "Epic",
+	desc    = "Membuat Kamu Jadi Buta",
+	flavor  = "Makes Vision Disappear",
+	apply = function()
+		local player     = game:GetService("Players").LocalPlayer
+		local RunService = game:GetService("RunService")
+		local TweenService = game:GetService("TweenService")
+
+		-- Hapus sisa kalau ada
+		local oldGui = player.PlayerGui:FindFirstChild("DarkFogGui")
+		if oldGui then oldGui:Destroy() end
+
+		-- Buat ScreenGui untuk fog
+		local sg = Instance.new("ScreenGui")
+		sg.Name            = "DarkFogGui"
+		sg.ResetOnSpawn    = false
+		sg.ZIndexBehavior  = Enum.ZIndexBehavior.Sibling
+		sg.DisplayOrder    = 998
+		sg.Parent          = player.PlayerGui
+
+		-- Background hitam penuh
+		local bg = Instance.new("Frame", sg)
+		bg.Size                  = UDim2.new(1, 0, 1, 0)
+		bg.BackgroundColor3      = Color3.fromRGB(0, 0, 0)
+		bg.BackgroundTransparency = 1  -- mulai transparan dulu
+		bg.BorderSizePixel       = 0
+		bg.ZIndex                = 998
+
+		-- Lubang terang di tengah (efek vignette/spotlight)
+		-- Pakai ImageLabel dengan gradient radial
+		local hole = Instance.new("ImageLabel", bg)
+		hole.Size               = UDim2.new(0, 320, 0, 320)
+		hole.Position           = UDim2.new(0.5, -160, 0.5, -160)
+		hole.BackgroundTransparency = 1
+		hole.Image              = "rbxassetid://6394looKup" -- gradient gelap ke terang
+		-- Karena kita tidak bisa pakai aset custom, kita pakai UIGradient
+		hole.Image              = ""
+		hole.ZIndex             = 999
+
+		-- Pakai beberapa frame dengan UICorner + gradient untuk bikin efek spotlight
+		-- Frame gelap kiri
+		local function makeFogEdge(side)
+			local f = Instance.new("Frame", bg)
+			f.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+			f.BackgroundTransparency = 1
+			f.BorderSizePixel        = 0
+			f.ZIndex                 = 999
+			return f
+		end
+
+		-- Pakai UIGradient di background untuk efek vignette radial
+		-- Trick: pakai 4 gradient dari 4 sisi
+		local function makeVignetteSide(anchor, pos, size, rotation)
+			local f = Instance.new("Frame", bg)
+			f.AnchorPoint            = anchor
+			f.Position               = pos
+			f.Size                   = size
+			f.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+			f.BackgroundTransparency = 1
+			f.BorderSizePixel        = 0
+			f.ZIndex                 = 999
+			local g = Instance.new("UIGradient", f)
+			g.Color     = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(0,0,0)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(0,0,0)),
+			})
+			g.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),    -- ujung: hitam pekat
+				NumberSequenceKeypoint.new(0.55, 0), -- masih pekat
+				NumberSequenceKeypoint.new(1, 1),    -- tengah: transparan (kelihatan)
+			})
+			g.Rotation = rotation
+			return f
+		end
+
+		-- Fog dari 4 arah, bertemu di tengah membentuk lingkaran gelap
+		local fogTop    = makeVignetteSide(Vector2.new(0.5,0), UDim2.new(0.5,0,0,0),    UDim2.new(1,0,0.65,0), 270)
+		local fogBottom = makeVignetteSide(Vector2.new(0.5,1), UDim2.new(0.5,0,1,0),    UDim2.new(1,0,0.65,0), 90)
+		local fogLeft   = makeVignetteSide(Vector2.new(0,0.5), UDim2.new(0,0,0.5,0),    UDim2.new(0.55,0,1,0), 0)
+		local fogRight  = makeVignetteSide(Vector2.new(1,0.5), UDim2.new(1,0,0.5,0),    UDim2.new(0.55,0,1,0), 180)
+
+		-- Corner fog biar tidak ada celah di sudut
+		local function makeCorner(ap, pos)
+			local f = Instance.new("Frame", bg)
+			f.AnchorPoint            = ap
+			f.Position               = pos
+			f.Size                   = UDim2.new(0.45, 0, 0.45, 0)
+			f.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+			f.BackgroundTransparency = 1
+			f.BorderSizePixel        = 0
+			f.ZIndex                 = 999
+			local g = Instance.new("UIGradient", f)
+			g.Transparency = NumberSequence.new({
+				NumberSequenceKeypoint.new(0, 0),
+				NumberSequenceKeypoint.new(0.7, 0),
+				NumberSequenceKeypoint.new(1, 1),
+			})
+			g.Rotation = 45
+			return f
+		end
+		makeCorner(Vector2.new(0,0), UDim2.new(0,0,0,0))
+		makeCorner(Vector2.new(1,0), UDim2.new(1,0,0,0))
+		makeCorner(Vector2.new(0,1), UDim2.new(0,0,1,0))
+		makeCorner(Vector2.new(1,1), UDim2.new(1,0,1,0))
+
+		-- Fade in: semua fog muncul pelan-pelan
+		TweenService:Create(bg, TweenInfo.new(2, Enum.EasingStyle.Quad), {
+			BackgroundTransparency = 0.02
+		}):Play()
+
+		local fogParts = {fogTop, fogBottom, fogLeft, fogRight}
+		for _, f in ipairs(fogParts) do
+			TweenService:Create(f, TweenInfo.new(2, Enum.EasingStyle.Quad), {
+				BackgroundTransparency = 0
+			}):Play()
+		end
+
+		-- Efek napas/pulse: fog sedikit mengembang mengecil terus
+		Dice.SaveConn("dark_pulse", RunService.Heartbeat:Connect(function()
+			local t    = tick()
+			-- Oscillasi kecil: lubang terang mengecil membesar sedikit
+			local pulse = math.sin(t * 0.8) * 0.03  -- ±3% ukuran
+
+			fogTop.Size    = UDim2.new(1, 0, 0.65 + pulse, 0)
+			fogBottom.Size = UDim2.new(1, 0, 0.65 + pulse, 0)
+			fogLeft.Size   = UDim2.new(0.55 + pulse, 0, 1, 0)
+			fogRight.Size  = UDim2.new(0.55 + pulse, 0, 1, 0)
+		end))
+
+		Dice.FireServer("Apply", "Darkness")
+	end,
+
+	remove = function()
+		local player       = game:GetService("Players").LocalPlayer
+		local TweenService = game:GetService("TweenService")
+
+		Dice.DropConn("dark_pulse")
+
+		local sg = player.PlayerGui:FindFirstChild("DarkFogGui")
+		if sg then
+			-- Fade semua keluar dulu
+			for _, f in ipairs(sg:GetDescendants()) do
+				if f:IsA("Frame") then
+					TweenService:Create(f, TweenInfo.new(1.5, Enum.EasingStyle.Quad), {
+						BackgroundTransparency = 1
+					}):Play()
+				end
+			end
+			-- Destroy setelah fade selesai
+			task.delay(1.6, function()
+				if sg and sg.Parent then sg:Destroy() end
+			end)
+		end
+
+		Dice.FireServer("Remove", "Darkness")
+	end,
+})
+	
 Dice.AddSkill({
 	id      = "magnet_body",
 	name    = "Magnet Body",
