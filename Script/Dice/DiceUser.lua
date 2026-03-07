@@ -15,6 +15,8 @@ local RAW_URL_PLAYER = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/h
 
 local Dice = loadstring(game:HttpGet(RAW_URL_PLAYER))()
 
+local old = game:GetService("Players").LocalPlayer.PlayerGui:FindFirstChild("DiceGui")
+if old then old:Destroy() end
 --[[
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   FULL API REFERENCE
