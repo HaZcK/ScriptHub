@@ -3,30 +3,28 @@
 --   LocalScript — hanya terlihat oleh executer
 -- ██████████████████████████████████████████
 
-local Players       = game:GetService("Players")
-local RunService    = game:GetService("RunService")
-local TweenService  = game:GetService("TweenService")
-local Chat          = game:GetService("Chat")
-local SoundService  = game:GetService("SoundService")
+local Players      = game:GetService("Players")
+local RunService   = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Chat         = game:GetService("Chat")
+local SoundService = game:GetService("SoundService")
 
-local LocalPlayer   = Players.LocalPlayer
+local LocalPlayer  = Players.LocalPlayer
 
 -- ════════════════════════════════════════════
 --  CONFIG
 -- ════════════════════════════════════════════
 local FLOWER_SOUND_ID   = "rbxassetid://117135792761068"
-local SOUND_PITCH       = 0.01   -- PlaybackSpeed
+local SOUND_PITCH       = 0.01
 local SOUND_VOLUME      = 99
-
-local SPAWN_DELAY       = 8      -- detik sebelum NPC muncul
-local TRIGGER_WAIT      = 5      -- detik "..." sebelum transform
+local SPAWN_DELAY       = 8
+local TRIGGER_WAIT      = 5
 local CHASE_SPEED       = 24
 local NORMAL_SPEED      = 14
 local CHAT_INTERVAL_MIN = 5
 local CHAT_INTERVAL_MAX = 9
-local KILL_DISTANCE     = 4      -- studs, NPC menyentuh = player mati
+local KILL_DISTANCE     = 4
 
--- Kata kunci trigger
 local TRIGGER_KEYWORDS = {
 	"strange","aneh","ganjil","weird","étrange","extraño","seltsam","странный",
 	"bot","bots","bot's","robot","robots","robot's","нпс","npc",
@@ -34,195 +32,170 @@ local TRIGGER_KEYWORDS = {
 	"not real","not human","impostor","imposter","automated","machine",
 }
 
--- Chat NPC mode player (20 baris)
 local NPC_CHATS = {
-	"Hai bro!",
-	"Let's playing!",
-	"Wanna team up?",
-	"This game is fun haha",
-	"Hey! What are you doing?",
-	"Bro come here!",
-	"Let's go explore!",
-	"Hiii :D",
-	"Ayo main bareng!",
-	"Seru banget nih game",
-	"You seem kinda fun to play with!",
-	"Have you been here long?",
-	"I just joined, is this place good?",
-	"Bro your outfit is cool ngl",
-	"Can you show me around?",
-	"I keep getting lost lol",
-	"What server is this?",
-	"Do you hear anything weird?",
-	"I feel like we've met before...",
-	"Stay close, okay?",
+	"Hai bro!","Let's playing!","Wanna team up?","This game is fun haha",
+	"Hey! What are you doing?","Bro come here!","Let's go explore!",
+	"Hiii :D","Ayo main bareng!","Seru banget nih game",
+	"You seem kinda fun to play with!","Have you been here long?",
+	"I just joined, is this place good?","Bro your outfit is cool ngl",
+	"Can you show me around?","I keep getting lost lol",
+	"What server is this?","Do you hear anything weird?",
+	"I feel like we've met before...","Stay close, okay?",
 }
 
 -- ════════════════════════════════════════════
---  BLOOD EFFECT — merah ↔ hitam loop
+--  HELPER: buat Part + Weld ke root
 -- ════════════════════════════════════════════
-local effectGui = nil
+local function makePart(model, root, name, size, offsetCF, color, transparency)
+	local p = Instance.new("Part")
+	p.Name         = name
+	p.Size         = size
+	p.Color        = color or Color3.fromRGB(163,162,165)
+	p.Material     = Enum.Material.SmoothPlastic
+	p.CanCollide   = false
+	p.Anchored     = false
+	p.Transparency = transparency or 0
+	p.CastShadow   = false
+	p.Parent       = model
 
-local function createBloodEffect()
-	if effectGui then effectGui:Destroy() end
+	local w = Instance.new("Motor6D")
+	w.Name   = name.."_weld"
+	w.Part0  = root
+	w.Part1  = p
+	w.C1     = offsetCF:Inverse()
+	w.Parent = root
 
-	local gui = Instance.new("ScreenGui")
-	gui.Name              = "FlowerEffect"
-	gui.ResetOnSpawn      = false
-	gui.ZIndexBehavior    = Enum.ZIndexBehavior.Sibling
-	gui.IgnoreGuiInset    = true
-	gui.Parent            = LocalPlayer.PlayerGui
-
-	local bg = Instance.new("Frame")
-	bg.Name                   = "BG"
-	bg.Size                   = UDim2.new(1,0,1,0)
-	bg.BackgroundColor3       = Color3.fromRGB(180, 0, 0)
-	bg.BackgroundTransparency = 0
-	bg.BorderSizePixel        = 0
-	bg.ZIndex                 = 10
-	bg.Parent                 = gui
-
-	-- Vignette (tepi gelap)
-	local vig = Instance.new("ImageLabel")
-	vig.Size                  = UDim2.new(1,0,1,0)
-	vig.BackgroundTransparency = 1
-	vig.Image                 = "rbxassetid://1316045217"
-	vig.ImageColor3           = Color3.fromRGB(0,0,0)
-	vig.ImageTransparency     = 0
-	vig.ZIndex                = 11
-	vig.Parent                = gui
-
-	effectGui = gui
-
-	-- Loop merah → hitam → merah
-	task.spawn(function()
-		local info = TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-		while effectGui and effectGui.Parent do
-			local frame = effectGui:FindFirstChild("BG")
-			if not frame then break end
-
-			-- → hitam
-			TweenService:Create(frame, info, {
-				BackgroundColor3 = Color3.fromRGB(5, 0, 0)
-			}):Play()
-			task.wait(1.2)
-
-			if not effectGui or not effectGui.Parent then break end
-			frame = effectGui:FindFirstChild("BG")
-			if not frame then break end
-
-			-- → merah
-			TweenService:Create(frame, info, {
-				BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-			}):Play()
-			task.wait(1.2)
-		end
-	end)
-end
-
-local function removeBloodEffect()
-	if effectGui then effectGui:Destroy(); effectGui = nil end
+	return p
 end
 
 -- ════════════════════════════════════════════
---  SOUND
+--  BUILD: Avatar player biasa (warna skin default)
 -- ════════════════════════════════════════════
-local flowerSound = nil
+local function buildPlayerModel(fakeName, spawnCF)
+	local SKIN  = Color3.fromRGB(255, 204, 153)
+	local SHIRT = Color3.fromRGB(math.random(50,200), math.random(50,200), math.random(50,200))
+	local PANTS = Color3.fromRGB(math.random(30,120), math.random(30,120), math.random(30,120))
+	local HAIR  = Color3.fromRGB(math.random(20,180), math.random(20,80), math.random(10,50))
 
-local function playFlowerSound()
-	if flowerSound then flowerSound:Destroy() end
-	local snd = Instance.new("Sound")
-	snd.SoundId       = FLOWER_SOUND_ID
-	snd.Volume        = SOUND_VOLUME
-	snd.PlaybackSpeed = SOUND_PITCH
-	snd.Looped        = true
-	snd.Parent        = SoundService
-	snd:Play()
-	flowerSound = snd
-end
+	local model = Instance.new("Model")
+	model.Name  = fakeName
 
-local function stopFlowerSound()
-	if flowerSound then
-		flowerSound:Stop(); flowerSound:Destroy(); flowerSound = nil
-	end
-end
-
--- ════════════════════════════════════════════
---  BUILD MODEL פרחים (pitch black, tall, jitter)
--- ════════════════════════════════════════════
-local function buildFlowerModel(parent)
-	local BLACK = Color3.fromRGB(5, 5, 5)
-
-	local model    = Instance.new("Model")
-	model.Name     = "פרחים"
-	model.Parent   = parent
-
-	local function part(name, size, cf)
-		local p = Instance.new("Part")
-		p.Name        = name
-		p.Size        = size
-		p.CFrame      = cf
-		p.Color       = BLACK
-		p.Material    = Enum.Material.SmoothPlastic
-		p.CastShadow  = false
-		p.CanCollide  = false
-		p.Anchored    = false
-		p.Parent      = model
-		return p
-	end
-
-	local root  = part("HumanoidRootPart", Vector3.new(2,2,1),     CFrame.new(0,5,0))
+	-- Root (invisible)
+	local root = Instance.new("Part")
+	root.Name        = "HumanoidRootPart"
+	root.Size        = Vector3.new(2, 2, 1)
 	root.Transparency = 1
+	root.CanCollide  = false
+	root.Anchored    = false
+	root.CFrame      = spawnCF
+	root.Parent      = model
+	model.PrimaryPart = root
 
-	-- Tubuh
-	part("UpperTorso",    Vector3.new(2, 3,   1),   CFrame.new(0, 5.5,  0))
-	part("LowerTorso",    Vector3.new(2, 1.5, 1),   CFrame.new(0, 3.5,  0))
-	-- Kepala memanjang (ciri khas)
-	part("Head",          Vector3.new(1.5, 3.5, 1.2), CFrame.new(0, 9.75, 0))
-	-- Lengan panjang
-	part("LeftUpperArm",  Vector3.new(0.9,2.5,0.9), CFrame.new(-1.7, 5.5, 0))
-	part("LeftLowerArm",  Vector3.new(0.8,2.5,0.8), CFrame.new(-1.7, 2.8, 0))
-	part("LeftHand",      Vector3.new(0.8,1.2,0.8), CFrame.new(-1.7, 0.8, 0))
-	part("RightUpperArm", Vector3.new(0.9,2.5,0.9), CFrame.new( 1.7, 5.5, 0))
-	part("RightLowerArm", Vector3.new(0.8,2.5,0.8), CFrame.new( 1.7, 2.8, 0))
-	part("RightHand",     Vector3.new(0.8,1.2,0.8), CFrame.new( 1.7, 0.8, 0))
+	-- Torso
+	makePart(model, root, "Torso",      Vector3.new(2,2,1),     CFrame.new(0,  1,   0), SHIRT)
+	-- Kepala
+	local head = makePart(model, root, "Head", Vector3.new(2,1,1), CFrame.new(0, 2.5, 0), SKIN)
+	-- Rambut (block di atas kepala)
+	makePart(model, root, "Hair",       Vector3.new(2,0.4,1.1), CFrame.new(0, 3.15, 0), HAIR)
+	-- Lengan
+	makePart(model, root, "LeftArm",    Vector3.new(1,2,1),     CFrame.new(-1.5, 1, 0),  SKIN)
+	makePart(model, root, "RightArm",   Vector3.new(1,2,1),     CFrame.new( 1.5, 1, 0),  SKIN)
 	-- Kaki
-	part("LeftUpperLeg",  Vector3.new(0.9,2.5,0.9), CFrame.new(-0.7, 1.5,  0))
-	part("LeftLowerLeg",  Vector3.new(0.8,2.5,0.8), CFrame.new(-0.7,-1.2,  0))
-	part("LeftFoot",      Vector3.new(1.0,0.7,1.3), CFrame.new(-0.7,-2.9,  0))
-	part("RightUpperLeg", Vector3.new(0.9,2.5,0.9), CFrame.new( 0.7, 1.5,  0))
-	part("RightLowerLeg", Vector3.new(0.8,2.5,0.8), CFrame.new( 0.7,-1.2,  0))
-	part("RightFoot",     Vector3.new(1.0,0.7,1.3), CFrame.new( 0.7,-2.9,  0))
+	makePart(model, root, "LeftLeg",    Vector3.new(1,2,1),     CFrame.new(-0.5,-1, 0),  PANTS)
+	makePart(model, root, "RightLeg",   Vector3.new(1,2,1),     CFrame.new( 0.5,-1, 0),  PANTS)
 
-	-- Weld semua ke root
-	for _, p in ipairs(model:GetDescendants()) do
-		if p:IsA("BasePart") and p ~= root then
-			local w = Instance.new("WeldConstraint")
-			w.Part0  = root
-			w.Part1  = p
-			w.Parent = model
-		end
-	end
+	-- Mata (2 Part kecil hitam)
+	makePart(model, root, "LeftEye",    Vector3.new(0.3,0.3,0.1), CFrame.new(-0.35, 2.55, -0.5), Color3.new(0,0,0))
+	makePart(model, root, "RightEye",   Vector3.new(0.3,0.3,0.1), CFrame.new( 0.35, 2.55, -0.5), Color3.new(0,0,0))
 
 	-- Humanoid
-	local hum          = Instance.new("Humanoid")
-	hum.WalkSpeed      = CHASE_SPEED
-	hum.MaxHealth      = math.huge
-	hum.Health         = math.huge
-	hum.DisplayName    = "פרחים"
-	hum.Parent         = model
+	local hum = Instance.new("Humanoid")
+	hum.WalkSpeed   = NORMAL_SPEED
+	hum.DisplayName = fakeName
+	hum.Parent      = model
 
-	model.PrimaryPart  = root
+	-- Billboard nama
+	local bb = Instance.new("BillboardGui")
+	bb.Size          = UDim2.new(0, 120, 0, 30)
+	bb.StudsOffset   = Vector3.new(0, 3.5, 0)
+	bb.AlwaysOnTop   = false
+	bb.Parent        = head
 
-	-- Jitter effect
+	local lbl = Instance.new("TextLabel")
+	lbl.Size            = UDim2.new(1,0,1,0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text            = fakeName
+	lbl.TextColor3      = Color3.new(1,1,1)
+	lbl.TextStrokeColor3 = Color3.new(0,0,0)
+	lbl.TextStrokeTransparency = 0
+	lbl.Font            = Enum.Font.GothamBold
+	lbl.TextScaled      = true
+	lbl.Parent          = bb
+
+	model.Parent = workspace
+	return model, hum, root
+end
+
+-- ════════════════════════════════════════════
+--  BUILD: Model The Flower (פרחים) — pitch black, tall, jitter
+-- ════════════════════════════════════════════
+local function buildFlowerModel(spawnCF)
+	local BLACK = Color3.fromRGB(5, 5, 5)
+
+	local model = Instance.new("Model")
+	model.Name  = "פרחים"
+
+	local root = Instance.new("Part")
+	root.Name        = "HumanoidRootPart"
+	root.Size        = Vector3.new(2, 2, 1)
+	root.Transparency = 1
+	root.CanCollide  = false
+	root.Anchored    = false
+	root.CFrame      = spawnCF
+	root.Parent      = model
+	model.PrimaryPart = root
+
+	-- Tubuh
+	makePart(model, root, "UpperTorso",    Vector3.new(2, 3,   1),   CFrame.new(0,  1.5,  0), BLACK)
+	makePart(model, root, "LowerTorso",    Vector3.new(2, 1.5, 1),   CFrame.new(0, -0.25, 0), BLACK)
+	-- Kepala tinggi (ciri khas פרחים)
+	makePart(model, root, "Head",          Vector3.new(1.5, 3.8, 1.2), CFrame.new(0, 4.9, 0), BLACK)
+	-- Lengan panjang menjuntai
+	makePart(model, root, "LeftUpperArm",  Vector3.new(0.9,2.5,0.9), CFrame.new(-1.7,  1.5,  0), BLACK)
+	makePart(model, root, "LeftLowerArm",  Vector3.new(0.8,2.5,0.8), CFrame.new(-1.7, -1.2,  0), BLACK)
+	makePart(model, root, "LeftHand",      Vector3.new(0.8,1.2,0.8), CFrame.new(-1.7, -3.1,  0), BLACK)
+	makePart(model, root, "RightUpperArm", Vector3.new(0.9,2.5,0.9), CFrame.new( 1.7,  1.5,  0), BLACK)
+	makePart(model, root, "RightLowerArm", Vector3.new(0.8,2.5,0.8), CFrame.new( 1.7, -1.2,  0), BLACK)
+	makePart(model, root, "RightHand",     Vector3.new(0.8,1.2,0.8), CFrame.new( 1.7, -3.1,  0), BLACK)
+	-- Kaki
+	makePart(model, root, "LeftUpperLeg",  Vector3.new(0.9,2.5,0.9), CFrame.new(-0.7, -1.75, 0), BLACK)
+	makePart(model, root, "LeftLowerLeg",  Vector3.new(0.8,2.5,0.8), CFrame.new(-0.7, -4.25, 0), BLACK)
+	makePart(model, root, "LeftFoot",      Vector3.new(1.0,0.7,1.3), CFrame.new(-0.7, -5.95, 0), BLACK)
+	makePart(model, root, "RightUpperLeg", Vector3.new(0.9,2.5,0.9), CFrame.new( 0.7, -1.75, 0), BLACK)
+	makePart(model, root, "RightLowerLeg", Vector3.new(0.8,2.5,0.8), CFrame.new( 0.7, -4.25, 0), BLACK)
+	makePart(model, root, "RightFoot",     Vector3.new(1.0,0.7,1.3), CFrame.new( 0.7, -5.95, 0), BLACK)
+
+	-- Mata putih menyala (2 titik)
+	makePart(model, root, "LeftEye",  Vector3.new(0.3,0.3,0.1), CFrame.new(-0.35, 5.1, -0.62), Color3.new(1,1,1))
+	makePart(model, root, "RightEye", Vector3.new(0.3,0.3,0.1), CFrame.new( 0.35, 5.1, -0.62), Color3.new(1,1,1))
+
+	-- Humanoid
+	local hum = Instance.new("Humanoid")
+	hum.WalkSpeed   = CHASE_SPEED
+	hum.MaxHealth   = math.huge
+	hum.Health      = math.huge
+	hum.DisplayName = "פרחים"
+	hum.Parent      = model
+
+	model.Parent = workspace
+
+	-- Jitter terus-menerus
 	task.spawn(function()
 		while model and model.Parent do
-			if root and root.Parent then
-				local jx = (math.random()-0.5) * 0.12
-				local jy = (math.random()-0.5) * 0.06
-				local jz = (math.random()-0.5) * 0.12
-				root.CFrame = root.CFrame * CFrame.new(jx,jy,jz)
-			end
+			local jx = (math.random() - 0.5) * 0.14
+			local jy = (math.random() - 0.5) * 0.07
+			local jz = (math.random() - 0.5) * 0.14
+			root.CFrame = root.CFrame * CFrame.new(jx, jy, jz)
 			task.wait(0.05)
 		end
 	end)
@@ -231,51 +204,100 @@ local function buildFlowerModel(parent)
 end
 
 -- ════════════════════════════════════════════
---  AVATAR PICKER
+--  SCREEN EFFECT — vignette merah ↔ hitam transparan
+--  (tengah transparan, tepi merah/hitam bergantian)
 -- ════════════════════════════════════════════
-local function pickUserId()
-	local friends, others = {}, {}
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer then
-			local ok, isFriend = pcall(function()
-				return LocalPlayer:IsFriendsWith(p.UserId)
-			end)
-			if ok and isFriend then table.insert(friends, p.UserId)
-			else table.insert(others, p.UserId) end
-		end
+local effectGui = nil
+
+local function createEffect()
+	if effectGui then effectGui:Destroy() end
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name           = "FlowerEffect"
+	gui.ResetOnSpawn   = false
+	gui.IgnoreGuiInset = true
+	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	gui.Parent         = LocalPlayer.PlayerGui
+
+	-- 4 frame tepi: atas, bawah, kiri, kanan
+	-- Masing-masing pakai UIGradient untuk fade ke transparan ke tengah
+	local sides = {
+		{size = UDim2.new(1,0,0.35,0), pos = UDim2.new(0,0,0,0),    rot = 0},   -- atas
+		{size = UDim2.new(1,0,0.35,0), pos = UDim2.new(0,0,0.65,0), rot = 180}, -- bawah
+		{size = UDim2.new(0.3,0,1,0),  pos = UDim2.new(0,0,0,0),    rot = 270}, -- kiri
+		{size = UDim2.new(0.3,0,1,0),  pos = UDim2.new(0.7,0,0,0),  rot = 90},  -- kanan
+	}
+
+	local frames = {}
+	for _, s in ipairs(sides) do
+		local f = Instance.new("Frame")
+		f.Size                   = s.size
+		f.Position               = s.pos
+		f.BackgroundColor3       = Color3.fromRGB(180, 0, 0)
+		f.BackgroundTransparency = 0
+		f.BorderSizePixel        = 0
+		f.ZIndex                 = 10
+		f.Parent                 = gui
+
+		local g = Instance.new("UIGradient")
+		g.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),    -- tepi: opaque
+			NumberSequenceKeypoint.new(1, 1),    -- tengah: transparan
+		})
+		g.Rotation = s.rot
+		g.Parent   = f
+
+		table.insert(frames, f)
 	end
-	if #friends > 0 then return friends[math.random(#friends)]
-	elseif #others > 0 then return others[math.random(#others)]
-	else return 1 end
+
+	effectGui = gui
+
+	-- Loop transisi warna: merah → hitam → merah
+	task.spawn(function()
+		local info = TweenInfo.new(1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+		while effectGui and effectGui.Parent do
+			-- → hitam pekat
+			for _, f in ipairs(frames) do
+				TweenService:Create(f, info, {
+					BackgroundColor3 = Color3.fromRGB(5, 0, 0)
+				}):Play()
+			end
+			task.wait(1.4)
+			if not effectGui or not effectGui.Parent then break end
+			-- → merah
+			for _, f in ipairs(frames) do
+				TweenService:Create(f, info, {
+					BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+				}):Play()
+			end
+			task.wait(1.4)
+		end
+	end)
 end
 
-local function buildPlayerAvatar(userId, name, parent)
-	local model
-	pcall(function()
-		local desc = Players:GetHumanoidDescriptionFromUserId(userId)
-		model = Players:CreateHumanoidModelFromDescription(desc, Enum.HumanoidRigType.R15)
-	end)
+local function removeEffect()
+	if effectGui then effectGui:Destroy(); effectGui = nil end
+end
 
-	if not model then
-		model = Instance.new("Model")
-		local root = Instance.new("Part")
-		root.Name = "HumanoidRootPart"; root.Size = Vector3.new(2,2,1)
-		root.Transparency = 1; root.CanCollide = false; root.Parent = model
-		local t = Instance.new("Part")
-		t.Name = "UpperTorso"; t.Size = Vector3.new(2,2,1); t.Parent = model
-		local w = Instance.new("WeldConstraint")
-		w.Part0 = root; w.Part1 = t; w.Parent = model
-		Instance.new("Humanoid").Parent = model
-		model.PrimaryPart = root
-	end
+-- ════════════════════════════════════════════
+--  SOUND
+-- ════════════════════════════════════════════
+local flowerSound = nil
 
-	model.Name = name
-	model.Parent = parent
+local function playSound()
+	if flowerSound then flowerSound:Destroy() end
+	local s = Instance.new("Sound")
+	s.SoundId       = FLOWER_SOUND_ID
+	s.Volume        = SOUND_VOLUME
+	s.PlaybackSpeed = SOUND_PITCH
+	s.Looped        = true
+	s.Parent        = SoundService
+	s:Play()
+	flowerSound = s
+end
 
-	local hum  = model:FindFirstChildOfClass("Humanoid")
-	local root = model:FindFirstChild("HumanoidRootPart")
-	if hum then hum.WalkSpeed = NORMAL_SPEED; hum.DisplayName = name end
-	return model, hum, root
+local function stopSound()
+	if flowerSound then flowerSound:Stop(); flowerSound:Destroy(); flowerSound = nil end
 end
 
 -- ════════════════════════════════════════════
@@ -291,14 +313,14 @@ end
 -- ════════════════════════════════════════════
 --  STATE
 -- ════════════════════════════════════════════
-local npcModel = nil
-local npcHum   = nil
-local npcRoot  = nil
-local isFlower = false
+local npcModel  = nil
+local npcHum    = nil
+local npcRoot   = nil
+local isFlower  = false
 local triggered = false
 local chatConn  = nil
 local chaseConn = nil
-local lastPos   = Vector3.new(0,5,0)
+local lastPos   = Vector3.new(0, 5, 0)
 
 local function destroyAll()
 	isFlower = false; triggered = false
@@ -306,14 +328,14 @@ local function destroyAll()
 	if chaseConn then chaseConn:Disconnect(); chaseConn = nil end
 	if npcModel and npcModel.Parent then npcModel:Destroy() end
 	npcModel = nil; npcHum = nil; npcRoot = nil
-	removeBloodEffect()
-	stopFlowerSound()
+	removeEffect()
+	stopSound()
 end
 
 local function voidGuard()
-	if npcRoot then
+	if npcRoot and npcRoot.Parent then
 		if npcRoot.Position.Y < -80 then
-			npcRoot.CFrame = CFrame.new(lastPos + Vector3.new(0,5,0))
+			npcRoot.CFrame = CFrame.new(lastPos + Vector3.new(0, 5, 0))
 		else
 			lastPos = npcRoot.Position
 		end
@@ -337,18 +359,17 @@ local function transformToFlower()
 	if npcModel and npcModel.Parent then npcModel:Destroy() end
 	npcModel = nil; npcHum = nil; npcRoot = nil
 
-	local model, hum, root = buildFlowerModel(workspace)
+	local spawnCF = CFrame.new(oldPos + Vector3.new(0, 3, 0))
+	local model, hum, root = buildFlowerModel(spawnCF)
 	npcModel = model; npcHum = hum; npcRoot = root
-	root.CFrame = CFrame.new(oldPos + Vector3.new(0,5,0))
 	lastPos = root.Position
 
-	createBloodEffect()
-	playFlowerSound()
+	createEffect()
+	playSound()
 
-	-- Chase + kill
 	if chaseConn then chaseConn:Disconnect() end
 	chaseConn = RunService.Heartbeat:Connect(function()
-		if not npcHum or not npcRoot then return end
+		if not npcHum or not npcRoot or not npcRoot.Parent then return end
 		local char = LocalPlayer.Character
 		if not char then return end
 		local pr = char:FindFirstChild("HumanoidRootPart")
@@ -364,7 +385,7 @@ local function transformToFlower()
 end
 
 -- ════════════════════════════════════════════
---  NPC CHAT
+--  NPC SAY
 -- ════════════════════════════════════════════
 local function npcSay(text)
 	if npcModel then
@@ -374,7 +395,7 @@ local function npcSay(text)
 end
 
 -- ════════════════════════════════════════════
---  KEYWORD CHECK
+--  TRIGGER CHECK
 -- ════════════════════════════════════════════
 local function hasTrigger(msg)
 	local low = msg:lower()
@@ -389,17 +410,9 @@ end
 -- ════════════════════════════════════════════
 local function startPlayerMode(model, hum, root)
 	npcModel = model; npcHum = hum; npcRoot = root
-
-	local char = LocalPlayer.Character
-	if char then
-		local pr = char:FindFirstChild("HumanoidRootPart")
-		if pr then
-			root.CFrame = pr.CFrame * CFrame.new(math.random(-8,8), 0, math.random(-6,6))
-		end
-	end
 	lastPos = root.Position
 
-	-- Chat loop
+	-- Chat random loop
 	task.spawn(function()
 		task.wait(2)
 		while not isFlower and npcModel and npcModel.Parent do
@@ -408,7 +421,7 @@ local function startPlayerMode(model, hum, root)
 		end
 	end)
 
-	-- Wander
+	-- Wander mendekati player
 	task.spawn(function()
 		while not isFlower and npcModel and npcModel.Parent do
 			local c = LocalPlayer.Character
@@ -423,7 +436,7 @@ local function startPlayerMode(model, hum, root)
 		end
 	end)
 
-	-- Chat listener (hanya player sendiri)
+	-- Listen chat player
 	chatConn = LocalPlayer.Chatted:Connect(function(msg)
 		if triggered then return end
 		if hasTrigger(msg) then
@@ -442,10 +455,20 @@ end
 local function execute()
 	destroyAll()
 	task.wait(SPAWN_DELAY)
-	local uid   = pickUserId()
-	local name  = fakeName()
-	local model, hum, root = buildPlayerAvatar(uid, name, workspace)
-	if not hum or not root then model:Destroy(); return end
+
+	local name = fakeName()
+
+	-- Spawn dekat player
+	local spawnCF = CFrame.new(0, 5, 0)
+	local char = LocalPlayer.Character
+	if char then
+		local pr = char:FindFirstChild("HumanoidRootPart")
+		if pr then
+			spawnCF = pr.CFrame * CFrame.new(math.random(-8,8), 0, math.random(-6,6))
+		end
+	end
+
+	local model, hum, root = buildPlayerModel(name, spawnCF)
 	startPlayerMode(model, hum, root)
 end
 
