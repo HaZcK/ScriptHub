@@ -27,7 +27,7 @@ local ACCOUNTS = {
     ["Agus"]    = "67677",
     ["Yanto"]   = "yanto99",
     ["Admin"]   = "admin123",
-    ["KHAFIDZ"] = "ktp2024",
+    ["KHAFIDZ"] = "301197",
     ["Guest"]   = "guest",
 }
 
