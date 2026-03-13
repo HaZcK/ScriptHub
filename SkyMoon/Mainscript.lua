@@ -116,7 +116,7 @@ local function typeText(output, text, color)
         current = current .. string.format('<font color="#%s">%s</font>', color, char)
         output.Text = current
         playKeySound()
-        task.wait(0.3)
+        task.wait(0.1)
     end
 end
 
@@ -141,18 +141,18 @@ scanBtn.MouseButton1Click:Connect(function()
 
     local cmdFrame, output = createCMD()
 
-    task.wait(0.3)
+    task.wait(0.4)
 
     -- "Cmd" putih dulu lalu clear
     typeText(output, "Cmd", "ffffff")
-    task.wait(0.2)
+    task.wait(0.4)
     output.Text = ""
-    task.wait(0.1)
+    task.wait(0.2)
 
     -- Executor:;
     typeText(output, "Executor:;", "00ff00")
     newLine(output)
-    task.wait(0.2)
+    task.wait(0.5)
 
     local execName = "Unknown"
     pcall(function()
@@ -162,31 +162,31 @@ scanBtn.MouseButton1Click:Connect(function()
     end)
     typeText(output, "Executor." .. execName, "00ff00")
     newLine(output)
-    task.wait(0.3)
+    task.wait(0.6)
 
     -- Fetch PlaceList
     local db = fetchPlaceList()
 
     typeText(output, "CheckList:;", "00ff00")
     newLine(output)
-    task.wait(0.2)
+    task.wait(0.5)
 
     if db then
         for _, entry in pairs(db) do
             typeText(output, "  > " .. entry.name, "00ff00")
             newLine(output)
-            task.wait(0.2)
+            task.wait(0.8)
         end
     else
         typeText(output, "  > Failed to load list!", "ff4444")
         newLine(output)
     end
-    task.wait(0.2)
+    task.wait(0.9)
 
     -- Support check
     typeText(output, "Run _Support_Script_in_This_Game&:;", "00ff00")
     newLine(output)
-    task.wait(0.2)
+    task.wait(0.5)
     typeText(output, "ExecuteScript", "00ff00")
     newLine(output)
     task.wait(1)
@@ -197,7 +197,7 @@ scanBtn.MouseButton1Click:Connect(function()
     if not entry then
         typeText(output, "This.Game.Not.support!", "ff4444")
         newLine(output)
-        task.wait(0.2)
+        task.wait(0.3)
         typeText(output, "Destroyed_Gui", "ff4444")
         task.wait(1)
         cmdFrame:Destroy()
@@ -207,7 +207,7 @@ scanBtn.MouseButton1Click:Connect(function()
         newLine(output)
         task.wait(0.2)
         typeText(output, "Run.The.Script", "00ff00")
-        task.wait(2)
+        task.wait(0.8)
 
         local scriptOk, scriptRes = pcall(function()
             return game:HttpGet(entry.script)
