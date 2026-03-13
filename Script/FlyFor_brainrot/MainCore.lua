@@ -34,84 +34,85 @@ Tab:Select() -- Select Tab
 
 local SelectedIslands = {}
 
--- 1. Inisialisasi Dropdown dengan nilai awal (agar tidak error 'Default')
+-- 1. Dropdown (Kita buat kosong dulu)
 local Dropdown = Tab:Dropdown({
     Title = "Daftar Pulau",
     Desc = "Pilih pulau tujuan",
-    Values = {"None"}, -- Beri isi awal supaya tidak nil
-    Value = {"None"},
+    Values = {"Belum di-scan"},
+    Value = {},
     Multi = true,
-    AllowNone = true,
     Callback = function(option) 
         SelectedIslands = option 
-        print("Pulau dipilih: " .. table.concat(option, ", "))
     end
 })
 
--- 2. Fungsi Refresh yang diperbaiki
+-- 2. Tombol Refresh dengan Fitur Auto-Search
 Tab:Button({
     Title = "Refresh List",
-    Desc = "Cari model di Workspace.Map.Islands",
+    Desc = "Klik ini untuk mencari pulau",
     Callback = function()
         local newList = {}
         
-        -- Cari folder secara lebih aman (pcall)
-        local success, folder = pcall(function()
-            return workspace.Map.Islands
-        end)
+        -- Coba cari di path utama kamu dulu
+        local targetFolder = workspace:FindFirstChild("Map") and workspace.Map:FindFirstChild("Islands")
         
-        if success and folder then
-            local children = folder:GetChildren()
-            print("Isi folder Islands: " .. #children .. " item ditemukan.")
-            
-            for _, item in pairs(children) do
-                -- Masukkan semua nama model/part ke tabel
-                table.insert(newList, item.Name)
+        -- Kalau tidak ketemu, cari folder bernama "Islands" di MANAPUN (Recursive search)
+        if not targetFolder then
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v.Name == "Islands" and (v:IsA("Folder") or v:IsA("Model")) then
+                    targetFolder = v
+                    break
+                end
+            end
+        end
+
+        if targetFolder then
+            for _, item in pairs(targetFolder:GetChildren()) do
+                -- Hanya masukkan yang punya nama (bukan part tanpa nama)
+                if item.Name ~= "" then
+                    table.insert(newList, item.Name)
+                end
             end
             
+            -- Sortir nama pulau A-Z supaya rapi
+            table.sort(newList)
+
             if #newList > 0 then
-                -- Gunakan fungsi Refresh dari WindUI (jika tersedia) atau SetValues
+                -- Update dropdown
                 Dropdown:SetValues(newList)
                 
                 WindUI:Notify({
-                    Title = "Success",
-                    Content = "Berhasil menemukan " .. #newList .. " pulau!",
-                    Duration = 3
+                    Title = "Scan Berhasil",
+                    Content = "Ditemukan " .. #newList .. " lokasi di: " .. targetFolder:GetFullName(),
+                    Duration = 4
                 })
             else
-                warn("Folder ada, tapi kosong!")
-                WindUI:Notify({Title = "Warning", Content = "Folder Islands kosong!", Duration = 3})
+                WindUI:Notify({Title = "Kosong", Content = "Folder ketemu, tapi isinya kosong.", Duration = 3})
             end
         else
-            warn("Path Workspace.Map.Islands TIDAK DITEMUKAN!")
-            WindUI:Notify({Title = "Error", Content = "Folder Map/Islands tidak ada!", Duration = 3})
+            WindUI:Notify({Title = "Error", Content = "Folder 'Islands' tidak ditemukan di Workspace!", Duration = 5})
         end
     end
 })
 
--- 3. Tombol Teleport (Dengan Safe-Offset)
+-- 3. Teleport dengan Jarak Aman
 Tab:Button({
     Title = "Teleport to Island",
-    Desc = "Pindah ke pulau dengan posisi aman",
+    Desc = "Pindah ke atas pulau terpilih",
     Callback = function()
         local char = game.Players.LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         
-        if not root then return end
+        if not root or #SelectedIslands == 0 then return end
 
         for _, name in pairs(SelectedIslands) do
-            if name == "None" then continue end
-            
-            local target = workspace.Map.Islands:FindFirstChild(name)
-            if target then
-                -- Offset 150 ke atas supaya tidak nyangkut (stuck)
-                root.CFrame = target:GetPivot() * CFrame.new(0, 150, 0)
+            -- Kita cari lagi objeknya berdasarkan nama yang dipilih
+            local found = workspace:FindFirstChild(name, true) 
+            if found and (found:IsA("Model") or found:IsA("BasePart")) then
+                -- Teleport 150 stud di atasnya
+                root.CFrame = found:GetPivot() * CFrame.new(0, 150, 0)
                 
-                WindUI:Notify({
-                    Title = "Teleported",
-                    Content = "Sampai di " .. name,
-                    Duration = 2
-                })
+                WindUI:Notify({Title = "Teleported", Content = "Otw ke " .. name, Duration = 2})
                 break
             end
         end
