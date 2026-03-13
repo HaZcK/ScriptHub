@@ -116,7 +116,7 @@ local function typeText(output, text, color)
         current = current .. string.format('<font color="#%s">%s</font>', color, char)
         output.Text = current
         playKeySound()
-        task.wait(0.7)
+        task.wait(0.3)
     end
 end
 
@@ -145,14 +145,14 @@ scanBtn.MouseButton1Click:Connect(function()
 
     -- "Cmd" putih dulu lalu clear
     typeText(output, "Cmd", "ffffff")
-    task.wait(0.4)
+    task.wait(0.2)
     output.Text = ""
     task.wait(0.1)
 
     -- Executor:;
     typeText(output, "Executor:;", "00ff00")
     newLine(output)
-    task.wait(0.3)
+    task.wait(0.2)
 
     local execName = "Unknown"
     pcall(function()
@@ -162,14 +162,14 @@ scanBtn.MouseButton1Click:Connect(function()
     end)
     typeText(output, "Executor." .. execName, "00ff00")
     newLine(output)
-    task.wait(0.5)
+    task.wait(0.3)
 
     -- Fetch PlaceList
     local db = fetchPlaceList()
 
     typeText(output, "CheckList:;", "00ff00")
     newLine(output)
-    task.wait(0.3)
+    task.wait(0.2)
 
     if db then
         for _, entry in pairs(db) do
@@ -181,12 +181,12 @@ scanBtn.MouseButton1Click:Connect(function()
         typeText(output, "  > Failed to load list!", "ff4444")
         newLine(output)
     end
-    task.wait(0.4)
+    task.wait(0.2)
 
     -- Support check
     typeText(output, "Run _Support_Script_in_This_Game&:;", "00ff00")
     newLine(output)
-    task.wait(0.3)
+    task.wait(0.2)
     typeText(output, "ExecuteScript", "00ff00")
     newLine(output)
     task.wait(1)
@@ -197,7 +197,7 @@ scanBtn.MouseButton1Click:Connect(function()
     if not entry then
         typeText(output, "This.Game.Not.support!", "ff4444")
         newLine(output)
-        task.wait(0.5)
+        task.wait(0.2)
         typeText(output, "Destroyed_Gui", "ff4444")
         task.wait(1)
         cmdFrame:Destroy()
@@ -205,7 +205,7 @@ scanBtn.MouseButton1Click:Connect(function()
     else
         typeText(output, "This.Game.support", "00ff00")
         newLine(output)
-        task.wait(0.4)
+        task.wait(0.2)
         typeText(output, "Run.The.Script", "00ff00")
         task.wait(2)
 
