@@ -1,7 +1,7 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
 local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
 
 local Players = game:GetService("Players")
@@ -150,10 +150,23 @@ local function createCMD()
     logoImg.Image = UBUNTU_LOGO_URL
     logoImg.ZIndex = 11
 
-    -- Output area (mulai di bawah logo)
-    output = Instance.new("TextLabel", cmdFrame)
-    output.Size = UDim2.new(1, -20, 1, -130)
-    output.Position = UDim2.new(0, 10, 0, 124)
+    -- ScrollingFrame sebagai container output
+    local scrollFrame = Instance.new("ScrollingFrame", cmdFrame)
+    scrollFrame.Size = UDim2.new(1, -20, 1, -130)
+    scrollFrame.Position = UDim2.new(0, 10, 0, 124)
+    scrollFrame.BackgroundTransparency = 1
+    scrollFrame.BorderSizePixel = 0
+    scrollFrame.ScrollBarThickness = 3
+    scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(80, 100, 200)
+    scrollFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
+    scrollFrame.ZIndex = 11
+
+    -- TextLabel di dalam ScrollingFrame
+    output = Instance.new("TextLabel", scrollFrame)
+    output.Size = UDim2.new(1, -6, 0, 0)
+    output.AutomaticSize = Enum.AutomaticSize.Y
     output.BackgroundTransparency = 1
     output.Font = Enum.Font.Code
     output.TextSize = 13
@@ -161,8 +174,15 @@ local function createCMD()
     output.TextYAlignment = Enum.TextYAlignment.Top
     output.TextWrapped = true
     output.RichText = true
-    output.ZIndex = 11
+    output.ZIndex = 12
     output.Text = ""
+
+    -- Auto scroll ke bawah tiap teks berubah
+    output:GetPropertyChangedSignal("Text"):Connect(function()
+        task.defer(function()
+            scrollFrame.CanvasPosition = Vector2.new(0, scrollFrame.AbsoluteCanvasSize.Y)
+        end)
+    end)
 
     return cmdFrame, output
 end
