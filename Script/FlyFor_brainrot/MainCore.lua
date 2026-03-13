@@ -3,7 +3,7 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Window = WindUI:CreateWindow({
     Title = "Fly Away",
     Icon = "brain", -- lucide icon
-    Author = "by .ftgs and .ftgs",
+    Author = "Khafidz",
     Folder = "Fly Over",
     
     -- ↓ Optional. You can remove it.
@@ -29,6 +29,8 @@ local Tab = Window:Tab({
     Icon = "sticky-note", -- optional
     Locked = false,
 })
+
+Tab:Select() -- Select Tab
 
 -- Variabel untuk menyimpan pilihan saat ini
 local SelectedIslands = {}
