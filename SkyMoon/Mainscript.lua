@@ -1,8 +1,8 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
-local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
+local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -239,14 +239,19 @@ local function newLine(output)
 end
 
 ----------------------------------------------------
--- FETCH PLACELIST
+-- FETCH PLACELIST (retry 3x)
 ----------------------------------------------------
 local function fetchPlaceList()
-    local ok, res = pcall(function() return game:HttpGet(RAW_PLACELIST) end)
-    if not ok or not res then return nil end
-    local db
-    pcall(function() db = HttpService:JSONDecode(res) end)
-    return db
+    for attempt = 1, 3 do
+        local ok, res = pcall(function() return game:HttpGet(RAW_PLACELIST) end)
+        if ok and res and res ~= "" then
+            local db
+            local parseOk = pcall(function() db = HttpService:JSONDecode(res) end)
+            if parseOk and db then return db end
+        end
+        task.wait(1)
+    end
+    return nil
 end
 
 ----------------------------------------------------
@@ -556,13 +561,17 @@ scanBtn.MouseButton1Click:Connect(function()
     end
 
     -- Support check
-    typeTextFast(output, "Run _Support_Script_in_This_Game&:;", "00ff88", 0.05)
+    typeTextFast(output, "Run _Support_Script_in_This_Game:;", "00ff88", 0.05)
     newLine(output)
     typeTextFast(output, "ExecuteScript", "00ff88", 0.06)
     newLine(output)
     task.wait(0.5)
 
     local placeId = tostring(game.PlaceId)
+    typeTextFast(output, "PlaceId: " .. placeId, "aaaaff", 0.03)
+    newLine(output)
+    task.wait(0.2)
+
     local entry = db and db[placeId]
 
     if not entry then
