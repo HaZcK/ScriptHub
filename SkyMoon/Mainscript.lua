@@ -1,7 +1,7 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -71,6 +71,16 @@ scanBtn.MouseLeave:Connect(function()
     TweenService:Create(scanBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(30, 60, 130)}):Play()
 end)
 
+-- Sound player
+local function playKeySound()
+    local sound = Instance.new("Sound")
+    sound.SoundId = "rbxassetid://9113145819"
+    sound.Volume = 1
+    sound.Parent = game:GetService("SoundService")
+    sound:Play()
+    game:GetService("Debris"):AddItem(sound, 2)
+end
+
 -- CMD Fullscreen
 local function createCMD()
     local cmdFrame = Instance.new("Frame", sg)
@@ -97,14 +107,16 @@ local function createCMD()
     return cmdFrame, output
 end
 
-local function typeText(output, text, speed, color)
-    speed = speed or 0.04
+-- Typing per huruf + sound + delay 0.7s
+local function typeText(output, text, color)
     color = color or "ffffff"
     local current = output.Text
     for i = 1, #text do
-        current = current .. string.format('<font color="#%s">%s</font>', color, text:sub(i, i))
+        local char = text:sub(i, i)
+        current = current .. string.format('<font color="#%s">%s</font>', color, char)
         output.Text = current
-        task.wait(speed)
+        playKeySound()
+        task.wait(0.7)
     end
 end
 
@@ -131,14 +143,14 @@ scanBtn.MouseButton1Click:Connect(function()
 
     task.wait(0.3)
 
-    -- "Cmd" putih dulu
-    typeText(output, "Cmd", 0.07, "ffffff")
+    -- "Cmd" putih dulu lalu clear
+    typeText(output, "Cmd", "ffffff")
     task.wait(0.4)
     output.Text = ""
     task.wait(0.1)
 
     -- Executor:;
-    typeText(output, "Executor:;", 0.05, "00ff00")
+    typeText(output, "Executor:;", "00ff00")
     newLine(output)
     task.wait(0.3)
 
@@ -148,34 +160,34 @@ scanBtn.MouseButton1Click:Connect(function()
             execName = identifyexecutor()
         end
     end)
-    typeText(output, "Executor." .. execName, 0.05, "00ff00")
+    typeText(output, "Executor." .. execName, "00ff00")
     newLine(output)
     task.wait(0.5)
 
-    -- Fetch list
+    -- Fetch PlaceList
     local db = fetchPlaceList()
 
-    typeText(output, "CheckList:;", 0.05, "00ff00")
+    typeText(output, "CheckList:;", "00ff00")
     newLine(output)
     task.wait(0.3)
 
     if db then
         for _, entry in pairs(db) do
-            typeText(output, "  > " .. entry.name, 0.04, "00ff00")
+            typeText(output, "  > " .. entry.name, "00ff00")
             newLine(output)
-            task.wait(0.1)
+            task.wait(0.2)
         end
     else
-        typeText(output, "  > Failed to load list!", 0.04, "ff4444")
+        typeText(output, "  > Failed to load list!", "ff4444")
         newLine(output)
     end
     task.wait(0.4)
 
     -- Support check
-    typeText(output, "Run _Support_Script_in_This_Game&:;", 0.04, "00ff00")
+    typeText(output, "Run _Support_Script_in_This_Game&:;", "00ff00")
     newLine(output)
     task.wait(0.3)
-    typeText(output, "ExecuteScript", 0.06, "00ff00")
+    typeText(output, "ExecuteScript", "00ff00")
     newLine(output)
     task.wait(1)
 
@@ -183,18 +195,18 @@ scanBtn.MouseButton1Click:Connect(function()
     local entry = db and db[placeId]
 
     if not entry then
-        typeText(output, "This.Game.Not.support!", 0.05, "ff4444")
+        typeText(output, "This.Game.Not.support!", "ff4444")
         newLine(output)
         task.wait(0.5)
-        typeText(output, "Destroyed_Gui", 0.05, "ff4444")
+        typeText(output, "Destroyed_Gui", "ff4444")
         task.wait(1)
         cmdFrame:Destroy()
         sg:Destroy()
     else
-        typeText(output, "This.Game.support", 0.05, "00ff00")
+        typeText(output, "This.Game.support", "00ff00")
         newLine(output)
         task.wait(0.4)
-        typeText(output, "Run.The.Script", 0.05, "00ff00")
+        typeText(output, "Run.The.Script", "00ff00")
         task.wait(2)
 
         local scriptOk, scriptRes = pcall(function()
