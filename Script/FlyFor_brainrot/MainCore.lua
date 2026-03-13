@@ -108,3 +108,91 @@ Tab:Button({
         end
     end
 })
+
+-- Tambahkan variabel ini di bagian atas (di bawah deklarasi Tab)
+-- Variabel ini berfungsi sebagai "Ingatan" script
+local MyLockedPlot = nil
+
+-- Tombol 1: Untuk mendeteksi dan mengunci base
+Tab:Button({
+    Title = "Lock My Base (Klik saat di base)",
+    Desc = "Mencari base terdekat dan menyimpannya di memori",
+    Callback = function()
+        local lp = game.Players.LocalPlayer
+        local char = lp.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if not root then return end
+        
+        local plotsFolder = workspace:FindFirstChild("Plots")
+        if not plotsFolder then
+            WindUI:Notify({Title = "Error", Content = "Folder Plots tidak ditemukan!", Duration = 3})
+            return
+        end
+        
+        local closestDist = math.huge
+        local closestPlot = nil
+        
+        -- Cari part "Spawn" paling dekat dengan posisi kita sekarang
+        for _, plot in pairs(plotsFolder:GetChildren()) do
+            local spawnPart = plot:FindFirstChild("Spawn")
+            
+            if spawnPart and spawnPart:IsA("BasePart") then
+                local dist = (root.Position - spawnPart.Position).Magnitude
+                
+                if dist < closestDist then
+                    closestDist = dist
+                    closestPlot = plot
+                end
+            end
+        end
+        
+        if closestPlot then
+            MyLockedPlot = closestPlot -- Simpan ke memori script
+            WindUI:Notify({
+                Title = "Base Dikunci!",
+                Content = "Base kamu terdeteksi di: " .. closestPlot.Name,
+                Duration = 4
+            })
+        else
+            WindUI:Notify({Title = "Gagal", Content = "Tidak menemukan part 'Spawn' di dekatmu.", Duration = 3})
+        end
+    end
+})
+
+-- Tombol 2: Untuk Teleport kembali ke base yang sudah dikunci
+Tab:Button({
+    Title = "Teleport to Base",
+    Desc = "Kembali ke base yang sudah di-lock (Anti-Stuck)",
+    Callback = function()
+        local char = game.Players.LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if not root then return end
+        
+        -- Cek apakah kita sudah nge-lock base sebelumnya
+        if MyLockedPlot then
+            local spawnPart = MyLockedPlot:FindFirstChild("Spawn")
+            if spawnPart then
+                -- Teleport ke atas part Spawn dengan tinggi +100 stud agar tidak stuck
+                root.CFrame = spawnPart.CFrame * CFrame.new(0, 100, 0)
+                
+                WindUI:Notify({
+                    Title = "Teleported",
+                    Content = "Berhasil kembali ke " .. MyLockedPlot.Name,
+                    Duration = 2
+                })
+            else
+                WindUI:Notify({Title = "Error", Content = "Part 'Spawn' di base kamu hilang!", Duration = 3})
+            end
+        else
+            -- Kalau belum di-lock, suruh user lock dulu
+            WindUI:Notify({
+                Title = "Perhatian",
+                Content = "Silakan klik 'Lock My Base' saat kamu berada di plotmu terlebih dahulu!",
+                Duration = 4
+            })
+        end
+    end
+})
+
