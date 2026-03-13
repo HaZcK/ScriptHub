@@ -1,8 +1,8 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
-local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
+local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -342,7 +342,7 @@ local function scanWorkspace(output)
 
     local allItems = {}
     local function collectItems(parent, depth)
-        if depth > 3 then return end
+        if depth > 2 then return end -- depth dikurangi biar gak terlalu banyak
         for _, child in ipairs(parent:GetChildren()) do
             table.insert(allItems, {name = child.Name, class = child.ClassName, depth = depth})
             collectItems(child, depth + 1)
@@ -356,20 +356,31 @@ local function scanWorkspace(output)
     local total = #allItems
     if total == 0 then total = 1 end
 
+    local lineCount = 0
     for i, item in ipairs(allItems) do
         local pct = math.floor((i / total) * 100)
         local indent = string.rep("  ", item.depth)
-        typeTextUltra(output,
-            string.format("%s[%s] %s  (%d%%)", indent, item.class, item.name, pct),
-            "00ff44"
-        )
-        newLine(output)
-        if i % 15 == 0 then task.wait(0.01) end
+        local line = string.format('%s[%s] %s  (%d%%)', indent, item.class, item.name, pct)
+
+        -- Append langsung tanpa loop per huruf, jauh lebih cepat
+        output.Text = output.Text .. string.format('<font color="#00ff44">%s</font>\n', escapeRich(line))
+        lineCount = lineCount + 1
+
+        -- Clear tiap 25 baris supaya gak overflow TextLabel limit
+        if lineCount >= 25 then
+            output.Text = ""
+            lineCount = 0
+        end
+
+        -- Yield setiap 10 item supaya Roblox gak freeze
+        if i % 10 == 0 then
+            task.wait()
+        end
     end
 
-    -- Force 100%
-    typeTextUltra(output, "Check_This_Game... 100%", "00ffaa")
-    newLine(output)
+    -- Tampil 100% di akhir
+    output.Text = ""
+    output.Text = '<font color="#00ffaa">Check_This_Game... 100%</font>\n'
     task.wait(0.3)
 end
 
