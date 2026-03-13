@@ -1,7 +1,7 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
 local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
 
 local Players = game:GetService("Players")
@@ -170,13 +170,23 @@ end
 ----------------------------------------------------
 -- TYPING HELPERS
 ----------------------------------------------------
--- Lambat (user style)
+-- Escape karakter berbahaya untuk RichText
+local function escapeRich(str)
+    str = str:gsub("&", "and")
+    str = str:gsub("<", "[")
+    str = str:gsub(">", "]")
+    str = str:gsub('"', "'")
+    return str
+end
+
+-- Lambat (user style) + sound
 local function typeText(output, text, color, speed)
     speed = speed or 0.5
     color = color or "ffffff"
     local current = output.Text
     for i = 1, #text do
-        current = current .. string.format('<font color="#%s">%s</font>', color, text:sub(i, i))
+        local safeChar = escapeRich(text:sub(i, i))
+        current = current .. string.format('<font color="#%s">%s</font>', color, safeChar)
         output.Text = current
         playKeySound()
         task.wait(speed)
@@ -189,21 +199,19 @@ local function typeTextFast(output, text, color, speed)
     color = color or "00ff88"
     local current = output.Text
     for i = 1, #text do
-        current = current .. string.format('<font color="#%s">%s</font>', color, text:sub(i, i))
+        local safeChar = escapeRich(text:sub(i, i))
+        current = current .. string.format('<font color="#%s">%s</font>', color, safeChar)
         output.Text = current
         task.wait(speed)
     end
 end
 
--- Ultra cepat (scan style)
+-- Ultra cepat (scan style) - per baris langsung, bukan per huruf
 local function typeTextUltra(output, text, color)
     color = color or "00ff44"
-    local current = output.Text
-    for i = 1, #text do
-        current = current .. string.format('<font color="#%s">%s</font>', color, text:sub(i, i))
-        output.Text = current
-        task.wait(0.01)
-    end
+    text = escapeRich(text)
+    output.Text = output.Text .. string.format('<font color="#%s">%s</font>', color, text)
+    task.wait(0.01)
 end
 
 local function newLine(output)
@@ -397,15 +405,13 @@ end
 -- HACKER MODE INSTALL SEQUENCE
 ----------------------------------------------------
 local function hackerInstallSequence(output)
-    -- Ubuntu ASCII logo
+    -- Ubuntu header (aman, tanpa karakter berbahaya untuk RichText)
     local ubuntuAscii = {
-        "          _   _                 _         ",
-        "         | | | |__  _   _ _ __ | |_ _   _ ",
-        "         | | | '_ \\| | | | '_ \\| __| | | |",
-        "         | |_| |_) | |_| | | | | |_| |_| |",
-        "          \\___/_.___/\\__,_|_| |_|\\__|\\__,_|",
-        "                                            ",
-        "         Ubuntu 22.04.3 LTS  [SkyMoon Build]",
+        "  ================================",
+        "   UBUNTU 22.04.3 LTS",
+        "   SkyMoon Build - Administrator",
+        "  ================================",
+        "",
     }
 
     for _, line in ipairs(ubuntuAscii) do
