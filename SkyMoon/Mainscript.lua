@@ -150,7 +150,7 @@ local function createCMD()
     prefix.Size = UDim2.new(0, 120, 0, 20)
     prefix.Position = UDim2.new(0, 10, 0, 34)
     prefix.BackgroundTransparency = 1
-    prefix.Text = "C:\\SkyMoon>"
+    prefix.Text = "<;SkyMoon:>"
     prefix.TextColor3 = Color3.fromRGB(80, 180, 255)
     prefix.Font = Enum.Font.Code
     prefix.TextSize = 13
@@ -184,7 +184,7 @@ local function typeText(output, text, color)
         current = current .. string.format('<font color="#%s">%s</font>', color, char)
         output.Text = current
         playKeySound()
-        task.wait(0.5)
+        task.wait(0.2)
     end
 end
 
@@ -266,7 +266,7 @@ local function showCodeBox(cmdFrame, db)
     -- Auto close after 4 seconds
     task.delay(4, function()
         TweenService:Create(box, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
-        task.wait(0.4)
+        task.wait(0.3)
         pcall(function() box:Destroy() end)
     end)
 end
