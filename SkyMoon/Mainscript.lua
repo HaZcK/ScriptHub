@@ -1,8 +1,8 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
-local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
+local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -333,10 +333,9 @@ local function showCodeBox(db)
 end
 
 ----------------------------------------------------
--- DUPLICATE GUI DIALOG
+-- DUPLICATE GUI DIALOG (pause scan, lanjut setelah pilih)
 ----------------------------------------------------
-local function showDuplicateDialog(guiName, entry, onFinish)
-    -- Overlay gelap
+local function showDuplicateDialog(guiName, onDone)
     local overlay = Instance.new("Frame", cmdFrame)
     overlay.Size = UDim2.new(1, 0, 1, 0)
     overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -344,7 +343,6 @@ local function showDuplicateDialog(guiName, entry, onFinish)
     overlay.BorderSizePixel = 0
     overlay.ZIndex = 40
 
-    -- Dialog box
     local dialog = Instance.new("Frame", overlay)
     dialog.Size = UDim2.new(0, 360, 0, 160)
     dialog.Position = UDim2.new(0.5, -180, 0.5, -80)
@@ -356,32 +354,16 @@ local function showDuplicateDialog(guiName, entry, onFinish)
     ds.Color = Color3.fromRGB(40, 60, 180)
     ds.Thickness = 1.5
 
-    local function makeDialog(questionText, onYes, onNo)
-        -- Clear dialog isi lama
-        for _, c in ipairs(dialog:GetChildren()) do
-            if c:IsA("TextLabel") or c:IsA("TextButton") or c:IsA("Frame") then
-                c:Destroy()
-            end
-        end
+    local function clearDialog()
+        for _, c in ipairs(dialog:GetChildren()) do c:Destroy() end
+    end
 
-        local q = Instance.new("TextLabel", dialog)
-        q.Size = UDim2.new(1, -20, 0, 80)
-        q.Position = UDim2.new(0, 10, 0, 10)
-        q.BackgroundTransparency = 1
-        q.Text = questionText
-        q.TextColor3 = Color3.fromRGB(180, 200, 255)
-        q.Font = Enum.Font.GothamBold
-        q.TextSize = 13
-        q.TextWrapped = true
-        q.RichText = true
-        q.ZIndex = 42
-
-        -- YES button
+    local function makeButtons(yesText, noText, onYes, onNo)
         local yesBtn = Instance.new("TextButton", dialog)
         yesBtn.Size = UDim2.new(0, 120, 0, 36)
-        yesBtn.Position = UDim2.new(0.5, -130, 0, 100)
+        yesBtn.Position = UDim2.new(0.5, -130, 0, 108)
         yesBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
-        yesBtn.Text = "Yes"
+        yesBtn.Text = yesText
         yesBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
         yesBtn.Font = Enum.Font.GothamBold
         yesBtn.TextSize = 13
@@ -389,12 +371,11 @@ local function showDuplicateDialog(guiName, entry, onFinish)
         yesBtn.ZIndex = 42
         Instance.new("UICorner", yesBtn).CornerRadius = UDim.new(0, 6)
 
-        -- NO button
         local noBtn = Instance.new("TextButton", dialog)
         noBtn.Size = UDim2.new(0, 120, 0, 36)
-        noBtn.Position = UDim2.new(0.5, 10, 0, 100)
+        noBtn.Position = UDim2.new(0.5, 10, 0, 108)
         noBtn.BackgroundColor3 = Color3.fromRGB(60, 20, 20)
-        noBtn.Text = "No"
+        noBtn.Text = noText
         noBtn.TextColor3 = Color3.fromRGB(255, 180, 180)
         noBtn.Font = Enum.Font.GothamBold
         noBtn.TextSize = 13
@@ -402,68 +383,80 @@ local function showDuplicateDialog(guiName, entry, onFinish)
         noBtn.ZIndex = 42
         Instance.new("UICorner", noBtn).CornerRadius = UDim.new(0, 6)
 
-        yesBtn.MouseButton1Click:Connect(onYes)
-        noBtn.MouseButton1Click:Connect(onNo)
+        yesBtn.MouseButton1Click:Connect(function() yesBtn.Active = false noBtn.Active = false onYes() end)
+        noBtn.MouseButton1Click:Connect(function() yesBtn.Active = false noBtn.Active = false onNo() end)
     end
 
-    -- Step 1: Do you want to duplicate?
-    makeDialog(
-        string.format('<font color="#4466ff">There.Are.Two.Same.Gui</font>\n"%s" already exists!\n\nDo.You.Want.To.Duplicate.This.Gui?', guiName),
+    local function makeLabel(txt)
+        local q = Instance.new("TextLabel", dialog)
+        q.Size = UDim2.new(1, -20, 0, 100)
+        q.Position = UDim2.new(0, 10, 0, 8)
+        q.BackgroundTransparency = 1
+        q.Text = txt
+        q.TextColor3 = Color3.fromRGB(180, 200, 255)
+        q.Font = Enum.Font.GothamBold
+        q.TextSize = 13
+        q.TextWrapped = true
+        q.RichText = true
+        q.ZIndex = 42
+    end
+
+    -- Step 1: Duplicate detected
+    clearDialog()
+    makeLabel(string.format(
+        '<font color="#4466ff">There.Are.Two.Same.Gui</font>\n\n"%s" sudah ada di PlayerGui!\n\nDo.You.Want.To.Duplicate.This.Gui?',
+        guiName
+    ))
+    makeButtons("Yes", "No",
         function()
-            -- YES → jalankan script dulu (duplicate)
-            makeDialog(
-                '<font color="#4466ff">Do.You.Want.Delete.Gui.Old?</font>\n\nDelete the old GUI and keep the new one?',
+            -- YES → Step 2: delete old?
+            clearDialog()
+            makeLabel('<font color="#4466ff">Do.You.Want.Delete.Gui.Old?</font>\n\nHapus GUI lama dan pakai yang baru?')
+            makeButtons("Yes", "No",
                 function()
-                    -- YES → hapus gui lama, run script baru
+                    -- YES → hapus GUI lama
                     pcall(function()
-                        local playerGui = game.Players.LocalPlayer.PlayerGui
-                        local old = playerGui:FindFirstChild(guiName)
+                        local pg = game.Players.LocalPlayer.PlayerGui
+                        local old = pg:FindFirstChild(guiName)
                         if old then old:Destroy() end
                     end)
                     overlay:Destroy()
-                    -- Run script baru
-                    local scriptOk, scriptRes = pcall(function()
-                        return game:HttpGet(entry.script)
-                    end)
-                    if scriptOk and scriptRes then
-                        pcall(loadstring(scriptRes))
-                    end
-                    onFinish("run_done")
+                    onDone() -- lanjut scan
                 end,
                 function()
-                    -- NO → hapus gui baru (gak jadi duplicate), close skymoon
+                    -- NO → biarkan dua-duanya, lanjut scan
                     overlay:Destroy()
-                    onFinish("cancel")
+                    onDone()
                 end
             )
         end,
         function()
-            -- NO → tutup semua
+            -- NO di step 1 → lanjut scan tanpa ubah apapun
             overlay:Destroy()
-            onFinish("cancel")
+            onDone()
         end
     )
 end
 
 ----------------------------------------------------
--- WORKSPACE SCAN (dengan duplicate GUI detection)
+-- WORKSPACE SCAN (dengan duplicate detection, lanjut terus)
 ----------------------------------------------------
 local function scanWorkspace(output, entry)
-    local LocalPlayer = game:GetService("Players").LocalPlayer
+    local LP = game:GetService("Players").LocalPlayer
 
     local services = {
-        {svc = game:GetService("Workspace"),         label = "Workspace"},
-        {svc = game:GetService("ReplicatedStorage"),  label = "ReplicatedStorage"},
-        {svc = game:GetService("ReplicatedFirst"),    label = "ReplicatedFirst"},
-        {svc = game:GetService("StarterGui"),         label = "StarterGui"},
-        {svc = game:GetService("StarterPack"),        label = "StarterPack"},
-        {svc = game:GetService("StarterPlayer"),      label = "StarterPlayer"},
-        {svc = game:GetService("Lighting"),           label = "Lighting"},
-        {svc = LocalPlayer,                           label = "LocalPlayer"},
+        {svc = game:GetService("Workspace"),        label = "Workspace"},
+        {svc = game:GetService("ReplicatedStorage"), label = "ReplicatedStorage"},
+        {svc = game:GetService("ReplicatedFirst"),   label = "ReplicatedFirst"},
+        {svc = game:GetService("StarterGui"),        label = "StarterGui"},
+        {svc = game:GetService("StarterPack"),       label = "StarterPack"},
+        {svc = game:GetService("StarterPlayer"),     label = "StarterPlayer"},
+        {svc = game:GetService("Lighting"),          label = "Lighting"},
+        {svc = LP,                                   label = "LocalPlayer"},
     }
     pcall(function()
-        table.insert(services, {svc = LocalPlayer:WaitForChild("PlayerGui", 1), label = "PlayerGui"})
-        table.insert(services, {svc = LocalPlayer:WaitForChild("Backpack", 1),  label = "Backpack"})
+        table.insert(services, {svc = LP:WaitForChild("PlayerGui", 1), label = "PlayerGui"})
+        table.insert(services, {svc = LP:WaitForChild("Backpack", 1),  label = "Backpack"})
     end)
 
     local allItems = {}
@@ -475,12 +468,10 @@ local function scanWorkspace(output, entry)
                 class = child.ClassName,
                 depth = depth,
                 label = parentLabel,
-                instance = child,
             })
             collectItems(child, depth + 1, parentLabel)
         end
     end
-
     for _, s in ipairs(services) do
         pcall(function() collectItems(s.svc, 0, s.label) end)
     end
@@ -489,12 +480,42 @@ local function scanWorkspace(output, entry)
     if total == 0 then total = 1 end
 
     local lineCount = 0
-    local duplicateFound = nil
+    local i = 0
 
-    for i, item in ipairs(allItems) do
+    local function processNext()
+        i = i + 1
+        if i > total then return end
+
+        local item = allItems[i]
         local pct = math.floor((i / total) * 100)
         local indent = string.rep("  ", item.depth)
         local line = string.format('%s[KHAFIDZKTP, %s] %s  (%d%%)', indent, item.label, item.name, pct)
+
+        -- Cek duplicate dulu sebelum tampil
+        if entry and item.label == "PlayerGui" and item.class == "ScreenGui" then
+            local pg = LP.PlayerGui
+            if pg:FindFirstChild(item.name) then
+                -- Tampil deteksi
+                output.Text = output.Text .. string.format(
+                    '<font color="#4466ff">[KHAFIDZKTP, PlayerGui] %s  (%d%%) -- DUPLICATE!</font>\n',
+                    escapeRich(item.name), pct
+                )
+                lineCount = lineCount + 1
+
+                -- Pause scan, tunggu user pilih
+                local resumed = false
+                showDuplicateDialog(item.name, function()
+                    resumed = true
+                end)
+
+                -- Tunggu dialog selesai
+                while not resumed do task.wait(0.05) end
+
+                -- Lanjut item berikutnya
+                if i % 10 == 0 then task.wait() end
+                return
+            end
+        end
 
         output.Text = output.Text .. string.format('<font color="#00ff44">%s</font>\n', escapeRich(line))
         lineCount = lineCount + 1
@@ -504,32 +525,17 @@ local function scanWorkspace(output, entry)
             lineCount = 0
         end
 
-        -- Cek duplicate GUI di PlayerGui
-        if entry and item.label == "PlayerGui" and item.class == "ScreenGui" then
-            -- Cek apakah ada ScreenGui dengan nama yang sama di PlayerGui
-            local playerGui = game:GetService("Players").LocalPlayer.PlayerGui
-            local existing = playerGui:FindFirstChild(item.name)
-            if existing then
-                -- Teks deteksi berhenti
-                output.Text = output.Text .. string.format(
-                    '<font color="#4466ff">[KHAFIDZKTP, PlayerGui] %s  -- DUPLICATE DETECTED!</font>\n',
-                    escapeRich(item.name)
-                )
-                duplicateFound = item.name
-                break
-            end
-        end
-
         if i % 10 == 0 then task.wait() end
     end
 
-    if not duplicateFound then
-        output.Text = ""
-        output.Text = '<font color="#00ffaa">Check_This_Game... 100%</font>\n'
-        task.wait(0.3)
+    -- Run semua item
+    for _ = 1, total do
+        processNext()
     end
 
-    return duplicateFound
+    output.Text = ""
+    output.Text = '<font color="#00ffaa">Check_This_Game... 100%</font>\n'
+    task.wait(0.3)
 end
 
 ----------------------------------------------------
@@ -686,38 +692,11 @@ scanBtn.MouseButton1Click:Connect(function()
     local placeId = tostring(game.PlaceId)
     local entry = db and db[placeId]
 
-    -- Workspace scan (pass entry supaya bisa detect duplicate)
+    -- Workspace scan
     typeTextFast(output, "Check_This_Game:;", "00ff88", 0.06)
     newLine(output)
     task.wait(0.2)
-    local duplicateGui = scanWorkspace(output, entry)
-
-    -- Kalau duplicate ditemukan → tampil dialog
-    if duplicateGui then
-        typeTextFast(output, "There.Are.Two.Same.Gui", "4466ff", 0.05)
-        newLine(output)
-        task.wait(0.5)
-
-        local finished = false
-        local finishResult = nil
-
-        showDuplicateDialog(duplicateGui, entry, function(result)
-            finishResult = result
-            finished = true
-        end)
-
-        -- Tunggu user pilih
-        while not finished do task.wait(0.1) end
-
-        if finishResult == "cancel" then
-            pcall(function() sg:Destroy() end)
-            return
-        elseif finishResult == "run_done" then
-            pcall(function() sg:Destroy() end)
-            return
-        end
-        return
-    end
+    scanWorkspace(output, entry)
 
     -- CheckList
     typeTextFast(output, "CheckList:;", "00ff88", 0.07)
@@ -739,7 +718,7 @@ scanBtn.MouseButton1Click:Connect(function()
     newLine(output)
     task.wait(0.5)
 
-    local entry2 = db and db[placeId]
+    local entry2 = entry
 
     if not entry2 then
         typeTextFast(output, "This.Game.Not.support!", "ff4444", 0.08)
