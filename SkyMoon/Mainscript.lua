@@ -1098,10 +1098,65 @@ local function openMiniCmd()
 end
 
 ----------------------------------------------------
--- CHAT COMMAND /Open_Cmd
+-- NOTIF HELPER (reusable)
+----------------------------------------------------
+local function showNotifSimple(msg, color)
+    local nSg = Instance.new("ScreenGui")
+    nSg.Name = "SkyMoon_Notif_Simple"
+    nSg.ResetOnSpawn = false
+    pcall(function() nSg.Parent = game.CoreGui end)
+    if not nSg.Parent then nSg.Parent = game.Players.LocalPlayer.PlayerGui end
+
+    local frame = Instance.new("Frame", nSg)
+    frame.Size = UDim2.new(0, 320, 0, 52)
+    frame.Position = UDim2.new(0.5, -160, 0, 20)
+    frame.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+    local fs = Instance.new("UIStroke", frame)
+    fs.Color = color or Color3.fromRGB(100, 180, 255)
+    fs.Thickness = 1.5
+
+    local accent = Instance.new("Frame", frame)
+    accent.Size = UDim2.new(0, 4, 0.7, 0)
+    accent.Position = UDim2.new(0, 8, 0.15, 0)
+    accent.BackgroundColor3 = color or Color3.fromRGB(100, 180, 255)
+    accent.BorderSizePixel = 0
+    Instance.new("UICorner", accent).CornerRadius = UDim.new(1, 0)
+
+    local lbl = Instance.new("TextLabel", frame)
+    lbl.Size = UDim2.new(1, -22, 1, 0)
+    lbl.Position = UDim2.new(0, 18, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = msg
+    lbl.TextColor3 = Color3.fromRGB(230, 230, 230)
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextSize = 13
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.TextWrapped = true
+
+    task.delay(3, function()
+        TweenService:Create(frame, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(lbl, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+        task.wait(0.5)
+        pcall(function() nSg:Destroy() end)
+    end)
+end
+
+----------------------------------------------------
+-- CHAT COMMANDS
 ----------------------------------------------------
 game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
-    if msg:lower() == "/open_cmd" then
+    local lower = msg:lower()
+
+    if lower == "/open_cmd" then
         task.spawn(openMiniCmd)
+
+    elseif lower == "/reset_skymoon" then
+        pcall(function()
+            if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+            writefile("SkyMoon/memory.json", '{"log":[],"executeCount":0}')
+        end)
+        showNotifSimple("✅ SkyMoon Folder Reset successfully!", Color3.fromRGB(80, 220, 120))
     end
 end)
