@@ -1,14 +1,14 @@
 {
   "1": {
-    "name": "Fly Away",
+    "name": "FlyAway",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/Flygui.lua"
   },
   "2": {
-    "name": "Speed Hack",
+    "name": "SpeedHack",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/Speedhack.lua"
   },
   "3": {
-    "name": "Infinite Jump",
+    "name": "InfiniteJump",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/INFJUMP.lua"
   }
 }
