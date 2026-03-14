@@ -6,5 +6,9 @@
   "15784744207": {
     "name": "Valley-Prison",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Games/Valley-Prison.lua"
-  }
+  },
+  "10449761463": {
+    "name": "The-Strongest-Battlegrounds",
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Games/Tsb.lua"
+    }
 }
