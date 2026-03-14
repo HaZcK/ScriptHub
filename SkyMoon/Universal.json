@@ -1,0 +1,15 @@
+{
+  "1": {
+    "name": "Fly Away",
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/FlyFor_brainrot/MainCore.lua"
+  },
+  "2": {
+    "name": "Speed Hack",
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal/SpeedHack.lua"
+  },
+  "3": {
+    "name": "Infinite Jump",
+    "script": ""
+  }
+}
+
