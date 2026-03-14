@@ -4,6 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html" -- ganti URL ini
 
 -- Forward declarations
 local openScriptList
@@ -11,6 +12,8 @@ local openMiniCmd
 local showNotifSimple
 local openAdminAuth
 local openAdminPanel
+local openGetKeyFrame
+local openMainHub
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -38,6 +41,7 @@ mainFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.Active = true
 mainFrame.Draggable = true
+mainFrame.Visible = false -- hidden until key verified
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
 
 local grad = Instance.new("UIGradient", mainFrame)
@@ -2127,6 +2131,398 @@ openAdminAuth = function()
     enterBtn.MouseButton1Click:Connect(tryAuth)
     inputBox.FocusLost:Connect(function(enter) if enter then tryAuth() end end)
 end
+
+----------------------------------------------------
+-- KEY MEMORY SYSTEM
+----------------------------------------------------
+local KEY_MEMORY_FILE = "SkyMoon/KeyMemory.json"
+
+local function loadKeyMemory()
+    local default = {
+        Key = "Null",
+        Expired = false,
+        SaveKey = true,
+        CompletedAt = 0,
+        DayNum = 0
+    }
+    pcall(function()
+        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+        if isfile(KEY_MEMORY_FILE) then
+            local raw = readfile(KEY_MEMORY_FILE)
+            if raw and raw ~= "" then
+                local parsed = HttpService:JSONDecode(raw)
+                for k, v in pairs(parsed) do default[k] = v end
+            end
+        end
+    end)
+    return default
+end
+
+local function saveKeyMemory(km)
+    pcall(function()
+        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+        writefile(KEY_MEMORY_FILE, HttpService:JSONEncode(km))
+    end)
+end
+
+-- Daily key algo (sama dengan HTML)
+local function getDailyKey()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local dayNum = math.floor(os.time() / 86400)
+    local state = (dayNum * 2654435761) % 4294967296
+    local function lcg()
+        state = (state * 1664525 + 1013904223) % 4294967296
+        return state
+    end
+    local p1, p2 = "", ""
+    for _ = 1, 4 do local idx=(lcg()%36)+1; p1=p1..chars:sub(idx,idx) end
+    for _ = 1, 4 do local idx=(lcg()%36)+1; p2=p2..chars:sub(idx,idx) end
+    return "SKY-"..p1.."-"..p2, math.floor(os.time()/86400)
+end
+
+-- openMainHub: tampilkan main GUI
+openMainHub = function()
+    mainFrame.Visible = true
+    TweenService:Create(mainFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back), {
+        Size = UDim2.new(0, 280, 0, 140)
+    }):Play()
+end
+
+----------------------------------------------------
+-- STATUS CHECK FRAME
+----------------------------------------------------
+local function showStatusCheck(onSuccess, onFail)
+    local sSg = Instance.new("ScreenGui")
+    sSg.Name = "SkyMoon_StatusCheck"
+    sSg.ResetOnSpawn = false
+    pcall(function() sSg.Parent = game.CoreGui end)
+    if not sSg.Parent then sSg.Parent = LocalPlayer.PlayerGui end
+
+    local frame = Instance.new("Frame", sSg)
+    frame.Size = UDim2.new(0, 320, 0, 100)
+    frame.Position = UDim2.new(0.5, -160, 0.5, -50)
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    local fs = Instance.new("UIStroke", frame)
+    fs.Color = Color3.fromRGB(60, 80, 220)
+    fs.Thickness = 1.5
+
+    local icon = Instance.new("TextLabel", frame)
+    icon.Size = UDim2.new(1, 0, 0, 30)
+    icon.Position = UDim2.new(0, 0, 0, 10)
+    icon.BackgroundTransparency = 1
+    icon.Text = "🔑 SkyMoon Key Verification"
+    icon.TextColor3 = Color3.fromRGB(180, 190, 255)
+    icon.Font = Enum.Font.GothamBold
+    icon.TextSize = 13
+
+    local statusLbl = Instance.new("TextLabel", frame)
+    statusLbl.Size = UDim2.new(1, -20, 0, 24)
+    statusLbl.Position = UDim2.new(0, 10, 0, 44)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = "Status: Checking the Key..."
+    statusLbl.TextColor3 = Color3.fromRGB(255, 200, 80)
+    statusLbl.Font = Enum.Font.Code
+    statusLbl.TextSize = 12
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local bar = Instance.new("Frame", frame)
+    bar.Size = UDim2.new(0, 0, 0, 3)
+    bar.Position = UDim2.new(0, 0, 1, -3)
+    bar.BackgroundColor3 = Color3.fromRGB(60, 80, 220)
+    bar.BorderSizePixel = 0
+    TweenService:Create(bar, TweenInfo.new(1.5), {Size = UDim2.new(1, 0, 0, 3)}):Play()
+
+    task.spawn(function()
+        task.wait(1.2)
+
+        local km = loadKeyMemory()
+        local todayKey, todayDay = getDailyKey()
+
+        -- Cek apakah key masih valid (hari sama)
+        if km.Key == todayKey and km.DayNum == todayDay and not km.Expired then
+            statusLbl.Text = "Status: Verifying the key has been completed!"
+            statusLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
+            fs.Color = Color3.fromRGB(80, 220, 120)
+            task.wait(1.2)
+            sSg:Destroy()
+            onSuccess()
+        else
+            -- Key expired atau berbeda hari
+            if km.Key ~= "Null" then
+                km.Expired = true
+                saveKeyMemory(km)
+                statusLbl.Text = "Status: Key expired! Get a new key."
+                statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+                fs.Color = Color3.fromRGB(255, 80, 80)
+                task.wait(1.5)
+            end
+            sSg:Destroy()
+            onFail()
+        end
+    end)
+end
+
+----------------------------------------------------
+-- GET KEY FRAME
+----------------------------------------------------
+openGetKeyFrame = function()
+    local gSg = Instance.new("ScreenGui")
+    gSg.Name = "SkyMoon_GetKey"
+    gSg.ResetOnSpawn = false
+    pcall(function() gSg.Parent = game.CoreGui end)
+    if not gSg.Parent then gSg.Parent = LocalPlayer.PlayerGui end
+
+    local win = Instance.new("Frame", gSg)
+    win.Size = UDim2.new(0, 340, 0, 260)
+    win.Position = UDim2.new(0.5, -170, 0.5, -130)
+    win.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    win.BorderSizePixel = 0
+    win.Active = true
+    win.Draggable = true
+    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 14)
+    local ws = Instance.new("UIStroke", win)
+    ws.Color = Color3.fromRGB(60, 80, 220)
+    ws.Thickness = 1.5
+
+    -- Gradient
+    local wg = Instance.new("UIGradient", win)
+    wg.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(14, 14, 26)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(8, 8, 16)),
+    })
+    wg.Rotation = 135
+
+    -- Title
+    local tbar = Instance.new("Frame", win)
+    tbar.Size = UDim2.new(1, 0, 0, 36)
+    tbar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tbar.BorderSizePixel = 0
+    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 14)
+    local tfix = Instance.new("Frame", tbar)
+    tfix.Size = UDim2.new(1, 0, 0.5, 0)
+    tfix.Position = UDim2.new(0, 0, 0.5, 0)
+    tfix.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tfix.BorderSizePixel = 0
+    local tlbl = Instance.new("TextLabel", tbar)
+    tlbl.Size = UDim2.new(1, 0, 1, 0)
+    tlbl.BackgroundTransparency = 1
+    tlbl.Text = "🌙  SkyMoon — Get Your Key"
+    tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
+    tlbl.Font = Enum.Font.GothamBold
+    tlbl.TextSize = 13
+
+    -- Step 1: Get Key URL
+    local step1Lbl = Instance.new("TextLabel", win)
+    step1Lbl.Size = UDim2.new(1, -20, 0, 16)
+    step1Lbl.Position = UDim2.new(0, 10, 0, 44)
+    step1Lbl.BackgroundTransparency = 1
+    step1Lbl.Text = "STEP 1 — Complete the puzzle to get your key:"
+    step1Lbl.TextColor3 = Color3.fromRGB(100, 110, 160)
+    step1Lbl.Font = Enum.Font.Code
+    step1Lbl.TextSize = 11
+    step1Lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- URL bar
+    local urlBar = Instance.new("Frame", win)
+    urlBar.Size = UDim2.new(1, -16, 0, 32)
+    urlBar.Position = UDim2.new(0, 8, 0, 64)
+    urlBar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    urlBar.BorderSizePixel = 0
+    Instance.new("UICorner", urlBar).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", urlBar).Color = Color3.fromRGB(50, 60, 160)
+
+    local urlLbl = Instance.new("TextLabel", urlBar)
+    urlLbl.Size = UDim2.new(1, -90, 1, 0)
+    urlLbl.Position = UDim2.new(0, 8, 0, 0)
+    urlLbl.BackgroundTransparency = 1
+    urlLbl.Text = GETKEY_URL
+    urlLbl.TextColor3 = Color3.fromRGB(120, 140, 220)
+    urlLbl.Font = Enum.Font.Code
+    urlLbl.TextSize = 11
+    urlLbl.TextXAlignment = Enum.TextXAlignment.Left
+    urlLbl.TextTruncate = Enum.TextTruncate.AtEnd
+
+    local copyUrlBtn = Instance.new("TextButton", urlBar)
+    copyUrlBtn.Size = UDim2.new(0, 80, 0, 24)
+    copyUrlBtn.Position = UDim2.new(1, -84, 0.5, -12)
+    copyUrlBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 180)
+    copyUrlBtn.Text = "Copy URL"
+    copyUrlBtn.TextColor3 = Color3.fromRGB(200, 210, 255)
+    copyUrlBtn.Font = Enum.Font.GothamBold
+    copyUrlBtn.TextSize = 11
+    copyUrlBtn.BorderSizePixel = 0
+    Instance.new("UICorner", copyUrlBtn).CornerRadius = UDim.new(0, 5)
+
+    copyUrlBtn.MouseButton1Click:Connect(function()
+        -- Copy ke clipboard executor
+        pcall(function() setclipboard(GETKEY_URL) end)
+        copyUrlBtn.Text = "Copied!"
+        copyUrlBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 60)
+        task.wait(2)
+        copyUrlBtn.Text = "Copy URL"
+        copyUrlBtn.BackgroundColor3 = Color3.fromRGB(40, 60, 180)
+    end)
+
+    -- Step 2: Enter Key
+    local step2Lbl = Instance.new("TextLabel", win)
+    step2Lbl.Size = UDim2.new(1, -20, 0, 16)
+    step2Lbl.Position = UDim2.new(0, 10, 0, 106)
+    step2Lbl.BackgroundTransparency = 1
+    step2Lbl.Text = "STEP 2 — Paste your key below:"
+    step2Lbl.TextColor3 = Color3.fromRGB(100, 110, 160)
+    step2Lbl.Font = Enum.Font.Code
+    step2Lbl.TextSize = 11
+    step2Lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Key input
+    local inputBar = Instance.new("Frame", win)
+    inputBar.Size = UDim2.new(1, -16, 0, 34)
+    inputBar.Position = UDim2.new(0, 8, 0, 126)
+    inputBar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    inputBar.BorderSizePixel = 0
+    Instance.new("UICorner", inputBar).CornerRadius = UDim.new(0, 6)
+    local ibs = Instance.new("UIStroke", inputBar)
+    ibs.Color = Color3.fromRGB(60, 80, 180)
+    ibs.Thickness = 1
+
+    local inputBox = Instance.new("TextBox", inputBar)
+    inputBox.Size = UDim2.new(1, -12, 1, 0)
+    inputBox.Position = UDim2.new(0, 8, 0, 0)
+    inputBox.BackgroundTransparency = 1
+    inputBox.Text = ""
+    inputBox.PlaceholderText = "SKY-XXXX-XXXX"
+    inputBox.PlaceholderColor3 = Color3.fromRGB(60, 60, 90)
+    inputBox.TextColor3 = Color3.fromRGB(200, 210, 255)
+    inputBox.Font = Enum.Font.Code
+    inputBox.TextSize = 14
+    inputBox.ClearTextOnFocus = false
+    inputBox.TextXAlignment = Enum.TextXAlignment.Center
+
+    -- Status
+    local statusLbl = Instance.new("TextLabel", win)
+    statusLbl.Size = UDim2.new(1, -20, 0, 18)
+    statusLbl.Position = UDim2.new(0, 10, 0, 168)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = ""
+    statusLbl.Font = Enum.Font.Code
+    statusLbl.TextSize = 11
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- SaveKey toggle
+    local saveFrame = Instance.new("Frame", win)
+    saveFrame.Size = UDim2.new(1, -16, 0, 24)
+    saveFrame.Position = UDim2.new(0, 8, 0, 190)
+    saveFrame.BackgroundTransparency = 1
+    saveFrame.BorderSizePixel = 0
+
+    local saveCheck = Instance.new("TextButton", saveFrame)
+    saveCheck.Size = UDim2.new(0, 20, 0, 20)
+    saveCheck.Position = UDim2.new(0, 0, 0, 2)
+    saveCheck.BackgroundColor3 = Color3.fromRGB(40, 60, 180)
+    saveCheck.Text = "✓"
+    saveCheck.TextColor3 = Color3.fromRGB(255, 255, 255)
+    saveCheck.Font = Enum.Font.GothamBold
+    saveCheck.TextSize = 12
+    saveCheck.BorderSizePixel = 0
+    Instance.new("UICorner", saveCheck).CornerRadius = UDim.new(0, 4)
+
+    local saveVal = true
+    local saveLbl = Instance.new("TextLabel", saveFrame)
+    saveLbl.Size = UDim2.new(1, -28, 1, 0)
+    saveLbl.Position = UDim2.new(0, 26, 0, 0)
+    saveLbl.BackgroundTransparency = 1
+    saveLbl.Text = "SaveKey — Remember key, skip next time"
+    saveLbl.TextColor3 = Color3.fromRGB(120, 130, 180)
+    saveLbl.Font = Enum.Font.Code
+    saveLbl.TextSize = 11
+    saveLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    saveCheck.MouseButton1Click:Connect(function()
+        saveVal = not saveVal
+        saveCheck.Text = saveVal and "✓" or ""
+        saveCheck.BackgroundColor3 = saveVal and Color3.fromRGB(40,60,180) or Color3.fromRGB(30,30,40)
+    end)
+
+    -- Verify button
+    local verifyBtn = Instance.new("TextButton", win)
+    verifyBtn.Size = UDim2.new(1, -16, 0, 34)
+    verifyBtn.Position = UDim2.new(0, 8, 1, -42)
+    verifyBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
+    verifyBtn.Text = "🔑  Verify Key"
+    verifyBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+    verifyBtn.Font = Enum.Font.GothamBold
+    verifyBtn.TextSize = 14
+    verifyBtn.BorderSizePixel = 0
+    Instance.new("UICorner", verifyBtn).CornerRadius = UDim.new(0, 8)
+    local vs = Instance.new("UIStroke", verifyBtn)
+    vs.Color = Color3.fromRGB(80, 120, 255)
+    vs.Thickness = 1
+
+    local function tryVerify()
+        local typed = inputBox.Text:match("^%s*(.-)%s*$")
+        local todayKey, todayDay = getDailyKey()
+
+        if typed == todayKey then
+            -- ✅ Correct
+            statusLbl.Text = "✅ Key verified!"
+            statusLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
+            ibs.Color = Color3.fromRGB(80, 220, 120)
+            verifyBtn.BackgroundColor3 = Color3.fromRGB(30, 120, 60)
+
+            -- Save to KeyMemory.json
+            local km = loadKeyMemory()
+            km.Key = todayKey
+            km.Expired = false
+            km.SaveKey = saveVal
+            km.CompletedAt = os.time()
+            km.DayNum = todayDay
+            saveKeyMemory(km)
+
+            task.wait(1)
+            gSg:Destroy()
+            openMainHub()
+        else
+            -- ❌ Wrong
+            statusLbl.Text = "❌ Wrong key! Complete the puzzle at the URL above."
+            statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+            ibs.Color = Color3.fromRGB(255, 80, 80)
+            -- Shake
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-165,0.5,-130)}):Play()
+            task.wait(0.05)
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-175,0.5,-130)}):Play()
+            task.wait(0.05)
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-170,0.5,-130)}):Play()
+            task.wait(1)
+            ibs.Color = Color3.fromRGB(60, 80, 180)
+        end
+    end
+
+    verifyBtn.MouseButton1Click:Connect(tryVerify)
+    inputBox.FocusLost:Connect(function(enter) if enter then tryVerify() end end)
+end
+
+----------------------------------------------------
+-- STARTUP FLOW
+----------------------------------------------------
+task.spawn(function()
+    task.wait(0.3) -- tunggu sebentar biar game load
+
+    local km = loadKeyMemory()
+    local todayKey, todayDay = getDailyKey()
+
+    if km.SaveKey and km.Key ~= "Null" and km.DayNum == todayDay and not km.Expired then
+        -- Key tersimpan dan masih valid → status check
+        showStatusCheck(
+            function() openMainHub() end,   -- success
+            function() openGetKeyFrame() end -- fail/expired
+        )
+    else
+        -- Belum punya key / expired → GetKey frame
+        openGetKeyFrame()
+    end
+end)
 
 ----------------------------------------------------
 -- CHAT COMMANDS
