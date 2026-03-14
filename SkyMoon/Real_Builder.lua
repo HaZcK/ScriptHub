@@ -378,69 +378,115 @@ function updateHandles()
 end
 
 ----------------------------------------------------
--- FREE CAM
+-- FREE CAM (Studio-style: RMB hold to look, WASD/QE move)
 ----------------------------------------------------
+local camYaw   = 0
+local camPitch = 0
+local rmhHeld  = false
+local rmhConn  = nil
+
 local function startFreeCam()
     if freeCamActive then return end
     freeCamActive = true
 
-    -- Teleport to Y:999
-    savedCharCF = nil
+    -- Teleport char to Y:999
     pcall(function()
         local char = LocalPlayer.Character
         if char and char:FindFirstChild("HumanoidRootPart") then
             savedCharCF = char.HumanoidRootPart.CFrame
             char.HumanoidRootPart.CFrame = CFrame.new(0, 999, 0)
         end
-        -- Freeze humanoid
         if char and char:FindFirstChild("Humanoid") then
             char.Humanoid.WalkSpeed = 0
             char.Humanoid.JumpPower = 0
+            char.Humanoid.AutoRotate = false
         end
     end)
 
-    -- NoCl ip
+    -- NoClip
     noClipConn = RunService.Stepped:Connect(function()
         pcall(function()
-            local char = LocalPlayer.Character
-            if char then
-                for _, p in ipairs(char:GetDescendants()) do
-                    if p:IsA("BasePart") then p.CanCollide = false end
-                end
+            for _, p in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CanCollide = false end
             end
         end)
     end)
 
-    -- Free camera
     local cam = workspace.CurrentCamera
     cam.CameraType = Enum.CameraType.Scriptable
 
-    local camCF = CFrame.new(0, 999, 20)
-    cam.CFrame = camCF
+    -- Init camera at Y:999 looking forward
+    local startPos = Vector3.new(0, 1005, 30)
+    camYaw   = 180
+    camPitch = -20
+    cam.CFrame = CFrame.new(startPos)
+        * CFrame.Angles(0, math.rad(camYaw), 0)
+        * CFrame.Angles(math.rad(camPitch), 0, 0)
 
-    local moveSpeed = 30
+    -- RMB press/release
+    local rmbDownConn = UIS.InputBegan:Connect(function(inp, gp)
+        if gp then return end
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            rmhHeld = true
+            UIS.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+        end
+    end)
+    local rmbUpConn = UIS.InputEnded:Connect(function(inp)
+        if inp.UserInputType == Enum.UserInputType.MouseButton2 then
+            rmhHeld = false
+            UIS.MouseBehavior = Enum.MouseBehavior.Default
+        end
+    end)
+
+    local moveSpeed = 40
+
     freeCamConn = RunService.RenderStepped:Connect(function(dt)
+        -- Mouse rotation (only when RMB held)
+        if rmhHeld then
+            local delta = UIS:GetMouseDelta()
+            camYaw   = camYaw   - delta.X * 0.3
+            camPitch = math.clamp(camPitch - delta.Y * 0.3, -89, 89)
+        end
+
+        -- Build camera CFrame from yaw+pitch
+        local rotCF = CFrame.new(cam.CFrame.Position)
+            * CFrame.Angles(0, math.rad(camYaw), 0)
+            * CFrame.Angles(math.rad(camPitch), 0, 0)
+
+        -- Keyboard movement
         local vel = Vector3.new(0,0,0)
-        if UIS:IsKeyDown(Enum.KeyCode.W) then vel = vel + cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then vel = vel - cam.CFrame.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then vel = vel - cam.CFrame.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then vel = vel + cam.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.W) then vel = vel + rotCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then vel = vel - rotCF.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then vel = vel - rotCF.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then vel = vel + rotCF.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.E) then vel = vel + Vector3.new(0,1,0) end
         if UIS:IsKeyDown(Enum.KeyCode.Q) then vel = vel - Vector3.new(0,1,0) end
 
-        local spd = UIS:IsKeyDown(Enum.KeyCode.LeftShift) and moveSpeed*3 or moveSpeed
-        cam.CFrame = cam.CFrame + vel * spd * dt
+        local spd = UIS:IsKeyDown(Enum.KeyCode.LeftShift) and moveSpeed*4 or moveSpeed
+        local newPos = cam.CFrame.Position + vel * spd * dt
+
+        cam.CFrame = CFrame.new(newPos)
+            * CFrame.Angles(0, math.rad(camYaw), 0)
+            * CFrame.Angles(math.rad(camPitch), 0, 0)
     end)
 
-    statusLbl.Text = "FreeCam ON — WASD/QE to move, Shift=fast"
+    -- Store conns for cleanup
+    rmhConn = {rmbDownConn, rmbUpConn}
+    statusLbl.Text = "FreeCam ON  |  Hold RMB + drag to look  |  WASD/QE move  |  Shift=fast"
 end
 
 local function stopFreeCam()
     if not freeCamActive then return end
     freeCamActive = false
+    rmhHeld = false
+    UIS.MouseBehavior = Enum.MouseBehavior.Default
 
     if freeCamConn then freeCamConn:Disconnect() freeCamConn = nil end
-    if noClipConn then noClipConn:Disconnect() noClipConn = nil end
+    if noClipConn  then noClipConn:Disconnect()  noClipConn  = nil end
+    if rmhConn then
+        for _, c in ipairs(rmhConn) do pcall(function() c:Disconnect() end) end
+        rmhConn = nil
+    end
 
     workspace.CurrentCamera.CameraType = Enum.CameraType.Custom
 
@@ -449,6 +495,7 @@ local function stopFreeCam()
         if char and char:FindFirstChild("Humanoid") then
             char.Humanoid.WalkSpeed = 16
             char.Humanoid.JumpPower = 50
+            char.Humanoid.AutoRotate = true
         end
     end)
 end
@@ -831,21 +878,94 @@ end
 ----------------------------------------------------
 -- EXPLORER
 ----------------------------------------------------
+-- Icon + color per class
+local CLASS_INFO = {
+    -- Parts
+    Part            = {icon="🟦", color=Color3.fromRGB(100,160,255)},
+    WedgePart       = {icon="🔺", color=Color3.fromRGB(100,160,255)},
+    CornerWedgePart = {icon="🔷", color=Color3.fromRGB(100,160,255)},
+    TrussPart       = {icon="🧱", color=Color3.fromRGB(100,160,255)},
+    UnionOperation  = {icon="⬡",  color=Color3.fromRGB(120,180,255)},
+    MeshPart        = {icon="🌐", color=Color3.fromRGB(120,180,255)},
+    SpecialMesh     = {icon="🌀", color=Color3.fromRGB(140,180,220)},
+    -- Models/Folders
+    Model           = {icon="📁", color=Color3.fromRGB(220,170,80)},
+    Folder          = {icon="📂", color=Color3.fromRGB(200,200,100)},
+    -- Scripts
+    Script          = {icon="📜", color=Color3.fromRGB(100,220,100)},
+    LocalScript     = {icon="📄", color=Color3.fromRGB(80,200,80)},
+    ModuleScript    = {icon="📦", color=Color3.fromRGB(60,180,140)},
+    -- GUI
+    ScreenGui       = {icon="🖼", color=Color3.fromRGB(200,120,220)},
+    Frame           = {icon="▭",  color=Color3.fromRGB(180,100,200)},
+    TextLabel       = {icon="🔤", color=Color3.fromRGB(180,100,200)},
+    TextButton      = {icon="🔘", color=Color3.fromRGB(160,80,200)},
+    TextBox         = {icon="✏️", color=Color3.fromRGB(160,80,200)},
+    ImageLabel      = {icon="🖼", color=Color3.fromRGB(200,100,180)},
+    ImageButton     = {icon="🖱", color=Color3.fromRGB(200,100,180)},
+    ScrollingFrame  = {icon="📜", color=Color3.fromRGB(180,80,180)},
+    BillboardGui    = {icon="📌", color=Color3.fromRGB(200,120,200)},
+    SurfaceGui      = {icon="📌", color=Color3.fromRGB(200,120,200)},
+    -- Lighting
+    PointLight      = {icon="💡", color=Color3.fromRGB(255,240,100)},
+    SpotLight       = {icon="🔦", color=Color3.fromRGB(255,220,80)},
+    SurfaceLight    = {icon="☀️", color=Color3.fromRGB(255,200,60)},
+    Sky             = {icon="🌌", color=Color3.fromRGB(100,150,255)},
+    Atmosphere      = {icon="🌫", color=Color3.fromRGB(140,180,200)},
+    -- Effects
+    ParticleEmitter = {icon="✨", color=Color3.fromRGB(255,180,80)},
+    Fire            = {icon="🔥", color=Color3.fromRGB(255,120,60)},
+    Smoke           = {icon="💨", color=Color3.fromRGB(180,180,180)},
+    Sparkles        = {icon="⚡", color=Color3.fromRGB(255,255,100)},
+    Explosion       = {icon="💥", color=Color3.fromRGB(255,100,50)},
+    -- Physics
+    BodyVelocity    = {icon="🧲", color=Color3.fromRGB(100,200,255)},
+    BodyPosition    = {icon="📌", color=Color3.fromRGB(100,200,255)},
+    WeldConstraint  = {icon="🔒", color=Color3.fromRGB(150,150,200)},
+    HingeConstraint = {icon="🔧", color=Color3.fromRGB(150,150,200)},
+    BallSocketConstraint = {icon="🔗", color=Color3.fromRGB(150,150,200)},
+    Attachment      = {icon="💫", color=Color3.fromRGB(180,200,255)},
+    -- Network
+    RemoteEvent     = {icon="📡", color=Color3.fromRGB(255,150,100)},
+    RemoteFunction  = {icon="📡", color=Color3.fromRGB(255,150,100)},
+    BindableEvent   = {icon="🔗", color=Color3.fromRGB(200,150,100)},
+    -- Audio
+    Sound           = {icon="🎵", color=Color3.fromRGB(100,255,180)},
+    SoundGroup      = {icon="🎶", color=Color3.fromRGB(80,220,160)},
+    -- Other
+    Camera          = {icon="📷", color=Color3.fromRGB(180,220,255)},
+    Humanoid        = {icon="🤖", color=Color3.fromRGB(255,200,200)},
+    AnimationController = {icon="🎬",color=Color3.fromRGB(200,200,255)},
+    Animation       = {icon="▶",  color=Color3.fromRGB(180,180,255)},
+    Decal           = {icon="🎨", color=Color3.fromRGB(220,180,140)},
+    Texture         = {icon="🖌", color=Color3.fromRGB(220,180,140)},
+    SelectionBox    = {icon="🔲", color=Color3.fromRGB(0,162,255)},
+    SurfaceAppearance={icon="🌐",color=Color3.fromRGB(140,200,180)},
+    -- Services
+    Workspace       = {icon="🌍", color=Color3.fromRGB(100,200,100)},
+    ReplicatedStorage={icon="📦",color=Color3.fromRGB(200,180,100)},
+    ReplicatedFirst = {icon="⚡", color=Color3.fromRGB(255,200,50)},
+    StarterGui      = {icon="🖥", color=Color3.fromRGB(180,120,220)},
+    StarterPack     = {icon="🎒", color=Color3.fromRGB(200,150,80)},
+    StarterPlayer   = {icon="👤", color=Color3.fromRGB(200,200,255)},
+    Lighting        = {icon="💡", color=Color3.fromRGB(255,240,100)},
+    Player          = {icon="👤", color=Color3.fromRGB(100,200,255)},
+}
+
+local function getClassInfo(obj)
+    local info = CLASS_INFO[obj.ClassName]
+    if info then return info.icon, info.color end
+    if obj:IsA("BasePart") then return "🟦", Color3.fromRGB(100,160,255) end
+    if obj:IsA("Model")    then return "📁", Color3.fromRGB(220,170,80) end
+    if obj:IsA("GuiObject") then return "🔲", Color3.fromRGB(180,100,200) end
+    if obj:IsA("Script")   then return "📜", Color3.fromRGB(100,220,100) end
+    if obj:IsA("Light")    then return "💡", Color3.fromRGB(255,240,100) end
+    return "📄", Color3.fromRGB(160,160,160)
+end
+
 local function getIcon(obj)
-    if obj:IsA("BasePart") then return "🟦"
-    elseif obj:IsA("Model") then return "📁"
-    elseif obj:IsA("Folder") then return "📂"
-    elseif obj:IsA("LocalScript") then return "📄"
-    elseif obj:IsA("Script") then return "📜"
-    elseif obj:IsA("ModuleScript") then return "📦"
-    elseif obj:IsA("Light") then return "💡"
-    elseif obj:IsA("ParticleEmitter") then return "✨"
-    elseif obj:IsA("Sound") then return "🎵"
-    elseif obj:IsA("ScreenGui") then return "🖼"
-    elseif obj:IsA("GuiObject") then return "🔲"
-    elseif obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then return "📡"
-    elseif obj:IsA("Camera") then return "📷"
-    else return "📄" end
+    local icon, _ = getClassInfo(obj)
+    return icon
 end
 
 function refreshExplorer()
@@ -869,11 +989,12 @@ function refreshExplorer()
         local hasChildren = #children > 0
         local isExpanded = expanded[obj]
         local isSelected = (obj == selectedObj)
+        local icon, classColor = getClassInfo(obj)
 
         local row = Instance.new("TextButton", explorerScroll)
         row.Size = UDim2.new(1,0,0,20)
-        row.BackgroundColor3 = isSelected and T.sel or T.panel
-        row.BackgroundTransparency = isSelected and 0 or PANEL_ALPHA
+        row.BackgroundColor3 = isSelected and T.sel or Color3.fromRGB(38,38,38)
+        row.BackgroundTransparency = isSelected and 0 or 0
         row.BorderSizePixel = 0
         row.Text = ""
         row.AutoButtonColor = false
@@ -881,11 +1002,24 @@ function refreshExplorer()
         local pad = Instance.new("UIPadding", row)
         pad.PaddingLeft = UDim.new(0, 4 + depth*14)
 
+        -- Color accent bar on left
+        local accent = Instance.new("Frame", row)
+        accent.Size = UDim2.new(0, 2, 1, 0)
+        accent.BackgroundColor3 = classColor
+        accent.BorderSizePixel = 0
+        accent.BackgroundTransparency = isSelected and 0 or 0.5
+
         -- Arrow toggle
         if hasChildren then
-            local arrowBtn = mkBtn(row, isExpanded and "▾" or "▸",
-                UDim2.new(0,16,1,0), UDim2.new(0,0,0,0), Color3.new(0,0,0), T.dimText)
+            local arrowBtn = Instance.new("TextButton", row)
+            arrowBtn.Size = UDim2.new(0,16,1,0)
+            arrowBtn.Position = UDim2.new(0,2,0,0)
             arrowBtn.BackgroundTransparency = 1
+            arrowBtn.Text = isExpanded and "▾" or "▸"
+            arrowBtn.TextColor3 = T.dimText
+            arrowBtn.Font = Enum.Font.GothamBold
+            arrowBtn.TextSize = 11
+            arrowBtn.BorderSizePixel = 0
             arrowBtn.ZIndex = row.ZIndex + 1
             arrowBtn.MouseButton1Click:Connect(function()
                 expanded[obj] = not expanded[obj]
@@ -893,27 +1027,48 @@ function refreshExplorer()
             end)
         end
 
-        local icon = getIcon(obj)
-        local nameLabel = mkLabel(row,
-            (hasChildren and "  " or "  ") .. icon .. " " .. obj.Name,
-            UDim2.new(1,-20,1,0), UDim2.new(0,16,0,0), 11,
-            isSelected and Color3.new(1,1,1) or T.text
-        )
+        -- Icon label
+        local iconLbl = Instance.new("TextLabel", row)
+        iconLbl.Size = UDim2.new(0,18,1,0)
+        iconLbl.Position = UDim2.new(0,18,0,0)
+        iconLbl.BackgroundTransparency = 1
+        iconLbl.Text = icon
+        iconLbl.TextSize = 12
+        iconLbl.Font = Enum.Font.Code
+        iconLbl.TextColor3 = classColor
+        iconLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        -- Name label
+        local nameLabel = Instance.new("TextLabel", row)
+        nameLabel.Size = UDim2.new(1,-40,1,0)
+        nameLabel.Position = UDim2.new(0,36,0,0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = obj.Name
+        nameLabel.Font = Enum.Font.Code
+        nameLabel.TextSize = 11
+        nameLabel.TextColor3 = isSelected and Color3.new(1,1,1) or T.text
+        nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+
+        -- Bottom divider
+        local div = Instance.new("Frame", row)
+        div.Size = UDim2.new(1,0,0,1)
+        div.Position = UDim2.new(0,0,1,-1)
+        div.BackgroundColor3 = Color3.fromRGB(50,50,50)
+        div.BorderSizePixel = 0
+        div.BackgroundTransparency = 0.7
 
         row.MouseButton1Click:Connect(function()
             selectObject(obj)
         end)
-
         row.MouseEnter:Connect(function()
             if obj ~= selectedObj then
-                row.BackgroundColor3 = T.hover or T.sel
-                row.BackgroundTransparency = 0.5
+                row.BackgroundColor3 = Color3.fromRGB(55,55,55)
             end
         end)
         row.MouseLeave:Connect(function()
             if obj ~= selectedObj then
-                row.BackgroundColor3 = T.panel
-                row.BackgroundTransparency = PANEL_ALPHA
+                row.BackgroundColor3 = Color3.fromRGB(38,38,38)
             end
         end)
 
@@ -929,8 +1084,9 @@ function refreshExplorer()
     end
 end
 
+
 ----------------------------------------------------
--- PROPERTIES
+-- PROPERTIES (Roblox Studio style dengan kategori)
 ----------------------------------------------------
 function refreshProperties()
     for _, c in ipairs(propsScroll:GetChildren()) do
@@ -939,7 +1095,7 @@ function refreshProperties()
 
     if not selectedObj then
         local row = Instance.new("Frame", propsScroll)
-        row.Size = UDim2.new(1,0,0,30)
+        row.Size = UDim2.new(1,0,0,40)
         row.BackgroundTransparency = 1
         row.BorderSizePixel = 0
         mkLabel(row,"  No selection.",UDim2.new(1,0,1,0),nil,11,T.dimText)
@@ -948,185 +1104,340 @@ function refreshProperties()
 
     -- Class header
     local hRow = Instance.new("Frame", propsScroll)
-    hRow.Size = UDim2.new(1,0,0,26)
-    hRow.BackgroundColor3 = T.dark
+    hRow.Size = UDim2.new(1,0,0,36)
+    hRow.BackgroundColor3 = Color3.fromRGB(55,55,60)
     hRow.BackgroundTransparency = 0
     hRow.BorderSizePixel = 0
-    mkLabel(hRow,"  "..selectedObj.ClassName,UDim2.new(0.6,0,1,0),nil,11,T.accent)
-    mkLabel(hRow,selectedObj.Name,UDim2.new(0.4,-4,1,0),UDim2.new(0.6,2,0,0),10,T.text,Enum.TextXAlignment.Right)
 
-    local function addPropRow(propName)
-        local ok, val = pcall(function() return selectedObj[propName] end)
+    local hIcon, hColor = getClassInfo(selectedObj)
+    local iconLbl = Instance.new("TextLabel", hRow)
+    iconLbl.Size = UDim2.new(0,22,1,0)
+    iconLbl.Position = UDim2.new(0,4,0,0)
+    iconLbl.BackgroundTransparency = 1
+    iconLbl.Text = hIcon
+    iconLbl.TextSize = 16
+    iconLbl.Font = Enum.Font.Code
+    iconLbl.TextColor3 = hColor
+    local classLbl = Instance.new("TextLabel", hRow)
+    classLbl.Size = UDim2.new(1,-30,0,18)
+    classLbl.Position = UDim2.new(0,28,0,2)
+    classLbl.BackgroundTransparency = 1
+    classLbl.Text = selectedObj.ClassName
+    classLbl.Font = Enum.Font.GothamBold
+    classLbl.TextSize = 12
+    classLbl.TextColor3 = hColor
+    classLbl.TextXAlignment = Enum.TextXAlignment.Left
+    local nameLbl2 = Instance.new("TextLabel", hRow)
+    nameLbl2.Size = UDim2.new(1,-30,0,14)
+    nameLbl2.Position = UDim2.new(0,28,0,20)
+    nameLbl2.BackgroundTransparency = 1
+    nameLbl2.Text = selectedObj.Name
+    nameLbl2.Font = Enum.Font.Code
+    nameLbl2.TextSize = 10
+    nameLbl2.TextColor3 = T.dimText
+    nameLbl2.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Column headers
+    local colHeader = Instance.new("Frame", propsScroll)
+    colHeader.Size = UDim2.new(1,0,0,18)
+    colHeader.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    colHeader.BackgroundTransparency = 0
+    colHeader.BorderSizePixel = 0
+    local colProp = Instance.new("TextLabel", colHeader)
+    colProp.Size = UDim2.new(0.46,0,1,0)
+    colProp.Position = UDim2.new(0,6,0,0)
+    colProp.BackgroundTransparency = 1
+    colProp.Text = "Property"
+    colProp.Font = Enum.Font.GothamBold
+    colProp.TextSize = 9
+    colProp.TextColor3 = Color3.fromRGB(130,130,130)
+    colProp.TextXAlignment = Enum.TextXAlignment.Left
+    local colVal = Instance.new("TextLabel", colHeader)
+    colVal.Size = UDim2.new(0.54,0,1,0)
+    colVal.Position = UDim2.new(0.46,4,0,0)
+    colVal.BackgroundTransparency = 1
+    colVal.Text = "Value"
+    colVal.Font = Enum.Font.GothamBold
+    colVal.TextSize = 9
+    colVal.TextColor3 = Color3.fromRGB(130,130,130)
+    colVal.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Category header
+    local function addCatHeader(label, bgColor)
+        local cat = Instance.new("Frame", propsScroll)
+        cat.Size = UDim2.new(1,0,0,18)
+        cat.BackgroundColor3 = bgColor or Color3.fromRGB(50,50,50)
+        cat.BackgroundTransparency = 0
+        cat.BorderSizePixel = 0
+        local lbl = Instance.new("TextLabel", cat)
+        lbl.Size = UDim2.new(1,-8,1,0)
+        lbl.Position = UDim2.new(0,8,0,0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = label
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 10
+        lbl.TextColor3 = Color3.fromRGB(200,200,200)
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+    end
+
+    local rowAlt = false
+    local function addPropRow(propName, override, readOnly)
+        local ok, val = pcall(function()
+            if override ~= nil then return override end
+            return selectedObj[propName]
+        end)
         if not ok then return end
-
+        rowAlt = not rowAlt
         local row = Instance.new("Frame", propsScroll)
-        row.Size = UDim2.new(1,0,0,26)
-        row.BackgroundColor3 = T.panel
-        row.BackgroundTransparency = PANEL_ALPHA
+        row.Size = UDim2.new(1,0,0,22)
+        row.BackgroundColor3 = rowAlt and Color3.fromRGB(42,42,42) or Color3.fromRGB(38,38,38)
+        row.BackgroundTransparency = 0
         row.BorderSizePixel = 0
 
-        mkLabel(row,propName,UDim2.new(0.44,-2,1,0),UDim2.new(0,6,0,0),10,T.dimText)
+        local nLbl = Instance.new("TextLabel", row)
+        nLbl.Size = UDim2.new(0.46,-1,1,0)
+        nLbl.Position = UDim2.new(0,4,0,0)
+        nLbl.BackgroundTransparency = 1
+        nLbl.Text = propName
+        nLbl.Font = Enum.Font.Code
+        nLbl.TextSize = 11
+        nLbl.TextColor3 = Color3.fromRGB(180,180,180)
+        nLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-        local div = Instance.new("Frame",row)
-        div.Size=UDim2.new(0,1,0.6,0) div.Position=UDim2.new(0.44,-1,0.2,0)
-        div.BackgroundColor3=T.border div.BorderSizePixel=0
+        local mid = Instance.new("Frame", row)
+        mid.Size = UDim2.new(0,1,0.7,0)
+        mid.Position = UDim2.new(0.46,0,0.15,0)
+        mid.BackgroundColor3 = Color3.fromRGB(70,70,70)
+        mid.BorderSizePixel = 0
 
         local vt = typeof(val)
+        if readOnly then
+            local l = Instance.new("TextLabel", row)
+            l.Size = UDim2.new(0.54,-4,1,0)
+            l.Position = UDim2.new(0.46,4,0,0)
+            l.BackgroundTransparency = 1
+            l.Text = tostring(val):sub(1,28)
+            l.Font = Enum.Font.Code
+            l.TextSize = 11
+            l.TextColor3 = T.dimText
+            l.TextXAlignment = Enum.TextXAlignment.Left
+            return
+        end
 
         if vt == "boolean" then
-            local tb = mkBtn(row, val and "✓ true" or "✗ false",
-                UDim2.new(0.55,-4,0,20), UDim2.new(0.45,2,0,3),
-                val and T.green or T.red, Color3.new(1,1,1))
-            tb.BackgroundTransparency = 0
-            tb.TextSize = 10
-            tb.MouseButton1Click:Connect(function()
-                pcall(function()
-                    selectedObj[propName] = not selectedObj[propName]
-                    refreshProperties()
-                end)
+            local check = Instance.new("TextButton", row)
+            check.Size = UDim2.new(0,14,0,14)
+            check.Position = UDim2.new(0.46,6,0.5,-7)
+            check.BackgroundColor3 = val and Color3.fromRGB(0,120,215) or Color3.fromRGB(50,50,50)
+            check.Text = val and "✓" or ""
+            check.TextColor3 = Color3.new(1,1,1)
+            check.Font = Enum.Font.GothamBold
+            check.TextSize = 9
+            check.BorderSizePixel = 0
+            mkCorner(3,check)
+            local vl = Instance.new("TextLabel", row)
+            vl.Size = UDim2.new(0.35,0,1,0)
+            vl.Position = UDim2.new(0.46,24,0,0)
+            vl.BackgroundTransparency = 1
+            vl.Text = tostring(val)
+            vl.Font = Enum.Font.Code
+            vl.TextSize = 11
+            vl.TextColor3 = val and Color3.fromRGB(100,220,100) or T.dimText
+            vl.TextXAlignment = Enum.TextXAlignment.Left
+            check.MouseButton1Click:Connect(function()
+                pcall(function() selectedObj[propName]=not selectedObj[propName] refreshProperties() end)
             end)
-
         elseif vt == "number" then
-            local inp = mkInput(row, UDim2.new(0.55,-4,0,20), UDim2.new(0.45,2,0,3),
-                "", tostring(math.floor(val*100)/100))
+            local inp = Instance.new("TextBox", row)
+            inp.Size = UDim2.new(0.54,-4,0,18)
+            inp.Position = UDim2.new(0.46,2,0.5,-9)
+            inp.BackgroundColor3 = Color3.fromRGB(30,30,30)
+            inp.Text = tostring(math.floor(val*100)/100)
+            inp.TextColor3 = Color3.fromRGB(200,230,255)
+            inp.Font = Enum.Font.Code
+            inp.TextSize = 11
+            inp.BorderSizePixel = 0
+            inp.ClearTextOnFocus = false
+            mkCorner(2,inp)
             inp.FocusLost:Connect(function()
                 local n = tonumber(inp.Text)
-                if n then pcall(function() selectedObj[propName]=n end) end
+                if n then pcall(function() selectedObj[propName]=n end) updateHandles() end
             end)
-
         elseif vt == "string" then
-            local inp = mkInput(row, UDim2.new(0.55,-4,0,20), UDim2.new(0.45,2,0,3), "", val:sub(1,40))
+            local inp = Instance.new("TextBox", row)
+            inp.Size = UDim2.new(0.54,-4,0,18)
+            inp.Position = UDim2.new(0.46,2,0.5,-9)
+            inp.BackgroundColor3 = Color3.fromRGB(30,30,30)
+            inp.Text = val:sub(1,50)
+            inp.TextColor3 = Color3.fromRGB(255,220,150)
+            inp.Font = Enum.Font.Code
+            inp.TextSize = 11
+            inp.BorderSizePixel = 0
+            inp.ClearTextOnFocus = false
+            mkCorner(2,inp)
             inp.FocusLost:Connect(function()
                 pcall(function() selectedObj[propName]=inp.Text end)
                 task.defer(refreshExplorer)
             end)
-
         elseif vt == "Vector3" then
-            local vRow = Instance.new("Frame", propsScroll)
-            vRow.Size = UDim2.new(1,0,0,26)
-            vRow.BackgroundColor3 = T.panel
-            vRow.BackgroundTransparency = PANEL_ALPHA
-            vRow.BorderSizePixel = 0
-            row.Size = UDim2.new(1,0,0,26)
-            local xI = mkInput(vRow,UDim2.new(0.33,-2,0,20),UDim2.new(0,2,0,3),"X",tostring(math.floor(val.X*10)/10))
-            local yI = mkInput(vRow,UDim2.new(0.33,-2,0,20),UDim2.new(0.33,0,0,3),"Y",tostring(math.floor(val.Y*10)/10))
-            local zI = mkInput(vRow,UDim2.new(0.33,-2,0,20),UDim2.new(0.66,0,0,3),"Z",tostring(math.floor(val.Z*10)/10))
-            local function applyV3()
-                local x,y,z = tonumber(xI.Text), tonumber(yI.Text), tonumber(zI.Text)
-                if x and y and z then
-                    pcall(function() selectedObj[propName]=Vector3.new(x,y,z) end)
-                    updateHandles()
-                end
+            local axes = {"X","Y","Z"}
+            local vals3 = {val.X,val.Y,val.Z}
+            local inps = {}
+            for i,ax in ipairs(axes) do
+                local al = Instance.new("TextLabel",row)
+                al.Size=UDim2.new(0,10,0,18) al.Position=UDim2.new(0.46,2+(i-1)*58,0.5,-9)
+                al.BackgroundTransparency=1 al.Text=ax al.Font=Enum.Font.GothamBold al.TextSize=9
+                al.TextColor3=i==1 and T.handle_x or(i==2 and T.handle_y or T.handle_z)
+                al.TextXAlignment=Enum.TextXAlignment.Center
+                local inp=Instance.new("TextBox",row)
+                inp.Size=UDim2.new(0,42,0,18) inp.Position=UDim2.new(0.46,12+(i-1)*58,0.5,-9)
+                inp.BackgroundColor3=Color3.fromRGB(30,30,30) inp.Text=tostring(math.floor(vals3[i]*10)/10)
+                inp.TextColor3=i==1 and T.handle_x or(i==2 and T.handle_y or T.handle_z)
+                inp.Font=Enum.Font.Code inp.TextSize=10 inp.BorderSizePixel=0 inp.ClearTextOnFocus=false
+                mkCorner(2,inp) table.insert(inps,inp)
             end
-            xI.FocusLost:Connect(applyV3) yI.FocusLost:Connect(applyV3) zI.FocusLost:Connect(applyV3)
-
+            local function applyV3()
+                local x,y,z=tonumber(inps[1].Text),tonumber(inps[2].Text),tonumber(inps[3].Text)
+                if x and y and z then pcall(function() selectedObj[propName]=Vector3.new(x,y,z) end) updateHandles() end
+            end
+            for _,inp in ipairs(inps) do inp.FocusLost:Connect(applyV3) end
         elseif vt == "Color3" then
-            local swatch = Instance.new("TextButton", row)
-            swatch.Size = UDim2.new(0,40,0,18)
-            swatch.Position = UDim2.new(0.45,2,0,4)
-            swatch.BackgroundColor3 = val
-            swatch.BackgroundTransparency = 0
-            swatch.Text = ""
-            swatch.BorderSizePixel = 0
-            mkCorner(3,swatch)
-            mkLabel(row,string.format("%.0f,%.0f,%.0f",val.R*255,val.G*255,val.B*255),
-                UDim2.new(0.3,0,1,0),UDim2.new(0.6,2,0,0),9,T.dimText)
-            swatch.MouseButton1Click:Connect(function()
-                colorTarget = propName
-                -- Set picker to current color
-                local h,s,v = Color3.toHSV(val)
-                currentH,currentS,currentV = h,s,v
-                updateColorUI()
-                colorPicker.Visible = true
-                applyColorBtn.MouseButton1Click:Connect(function()
-                    local c = Color3.fromHSV(currentH,currentS,currentV)
-                    pcall(function() selectedObj[propName]=c end)
-                    refreshProperties()
-                end)
+            local sw = Instance.new("TextButton",row)
+            sw.Size=UDim2.new(0,34,0,16) sw.Position=UDim2.new(0.46,4,0.5,-8)
+            sw.BackgroundColor3=val sw.Text="" sw.BorderSizePixel=0
+            mkCorner(3,sw) mkStroke(Color3.fromRGB(80,80,80),1,sw)
+            local rl=Instance.new("TextLabel",row)
+            rl.Size=UDim2.new(0.3,0,1,0) rl.Position=UDim2.new(0.46,42,0,0)
+            rl.BackgroundTransparency=1
+            rl.Text=string.format("%d,%d,%d",math.round(val.R*255),math.round(val.G*255),math.round(val.B*255))
+            rl.Font=Enum.Font.Code rl.TextSize=10 rl.TextColor3=T.dimText rl.TextXAlignment=Enum.TextXAlignment.Left
+            sw.MouseButton1Click:Connect(function()
+                local h,s,v2=Color3.toHSV(val) currentH,currentS,currentV=h,s,v2
+                updateColorUI() colorPicker.Visible=true
             end)
-
         elseif vt == "BrickColor" then
-            mkLabel(row,tostring(val),UDim2.new(0.55,-4,1,0),UDim2.new(0.45,2,0,0),10,Color3.fromRGB(255,180,100))
-
+            local l=Instance.new("TextLabel",row)
+            l.Size=UDim2.new(0.54,-4,1,0) l.Position=UDim2.new(0.46,4,0,0)
+            l.BackgroundTransparency=1 l.Text=tostring(val)
+            l.Font=Enum.Font.Code l.TextSize=11 l.TextColor3=Color3.fromRGB(255,180,100) l.TextXAlignment=Enum.TextXAlignment.Left
         elseif vt == "EnumItem" then
-            mkLabel(row,tostring(val),UDim2.new(0.55,-4,1,0),UDim2.new(0.45,2,0,0),10,Color3.fromRGB(180,255,180))
-
+            local l=Instance.new("TextLabel",row)
+            l.Size=UDim2.new(0.54,-4,1,0) l.Position=UDim2.new(0.46,4,0,0)
+            l.BackgroundTransparency=1 l.Text=tostring(val):gsub("Enum%.%w+%.","")
+            l.Font=Enum.Font.Code l.TextSize=11 l.TextColor3=Color3.fromRGB(150,255,150) l.TextXAlignment=Enum.TextXAlignment.Left
         elseif vt == "CFrame" then
-            mkLabel(row,string.format("%.0f,%.0f,%.0f",val.X,val.Y,val.Z),
-                UDim2.new(0.55,-4,1,0),UDim2.new(0.45,2,0,0),10,Color3.fromRGB(255,200,100))
+            local l=Instance.new("TextLabel",row)
+            l.Size=UDim2.new(0.54,-4,1,0) l.Position=UDim2.new(0.46,4,0,0)
+            l.BackgroundTransparency=1 l.Text=string.format("%.1f, %.1f, %.1f",val.X,val.Y,val.Z)
+            l.Font=Enum.Font.Code l.TextSize=11 l.TextColor3=Color3.fromRGB(255,200,100) l.TextXAlignment=Enum.TextXAlignment.Left
         else
-            mkLabel(row,tostring(val):sub(1,24),UDim2.new(0.55,-4,1,0),UDim2.new(0.45,2,0,0),10,T.dimText)
-        end
-
-        -- Bottom divider
-        local bdiv = Instance.new("Frame",row)
-        bdiv.Size=UDim2.new(1,0,0,1) bdiv.Position=UDim2.new(0,0,1,-1)
-        bdiv.BackgroundColor3=T.border bdiv.BorderSizePixel=0 bdiv.BackgroundTransparency=0.5
-    end
-
-    -- Properties per class
-    local PROPS = {
-        BasePart = {"Name","Anchored","CanCollide","CastShadow","Locked","Transparency","Reflectance",
-                    "Color","BrickColor","Material","Size","Position","Rotation"},
-        Model    = {"Name"},
-        Folder   = {"Name"},
-        Script   = {"Name","Disabled"},
-        LocalScript = {"Name","Disabled"},
-        ModuleScript = {"Name"},
-        Sound    = {"Name","SoundId","Volume","Looped","Playing","RollOffMaxDistance"},
-        Light    = {"Name","Brightness","Color","Range","Enabled"},
-        ParticleEmitter = {"Name","Rate","Lifetime","Speed","Rotation","RotSpeed","Enabled"},
-        GuiObject = {"Name","Visible","BackgroundColor3","BackgroundTransparency","ZIndex","Size","Position"},
-        TextLabel = {"Name","Text","TextColor3","TextSize","Font","Visible","BackgroundColor3","BackgroundTransparency"},
-        TextButton = {"Name","Text","TextColor3","TextSize","Font","Visible","BackgroundColor3"},
-        TextBox   = {"Name","Text","PlaceholderText","TextColor3","TextSize","Visible"},
-        ImageLabel = {"Name","Image","ImageColor3","ImageTransparency","Visible"},
-        ScreenGui  = {"Name","Enabled","ResetOnSpawn","IgnoreGuiInset"},
-        Camera     = {"Name","FieldOfView","CameraType"},
-    }
-
-    local seen = {}
-    local function addProps(class, list)
-        if not selectedObj:IsA(class) then return end
-        for _, p in ipairs(list) do
-            if not seen[p] then seen[p]=true addPropRow(p) end
+            local l=Instance.new("TextLabel",row)
+            l.Size=UDim2.new(0.54,-4,1,0) l.Position=UDim2.new(0.46,4,0,0)
+            l.BackgroundTransparency=1 l.Text=tostring(val):sub(1,26)
+            l.Font=Enum.Font.Code l.TextSize=11 l.TextColor3=T.dimText l.TextXAlignment=Enum.TextXAlignment.Left
         end
     end
 
-    for class, list in pairs(PROPS) do addProps(class, list) end
-    if not next(seen) then addPropRow("Name") end
+    -- DATA
+    addCatHeader("▸ Data", Color3.fromRGB(45,45,55))
+    addPropRow("Name")
+    pcall(function() addPropRow("ClassName", selectedObj.ClassName, true) end)
+    pcall(function() addPropRow("Parent", selectedObj.Parent and selectedObj.Parent.Name or "nil", true) end)
 
-    -- Action buttons
+    -- BEHAVIOR
+    if selectedObj:IsA("BasePart") or selectedObj:IsA("Script") or selectedObj:IsA("LocalScript") or selectedObj:IsA("GuiObject") then
+        addCatHeader("▸ Behavior", Color3.fromRGB(45,55,45))
+        if selectedObj:IsA("BasePart") then
+            addPropRow("Anchored") addPropRow("CanCollide") addPropRow("CastShadow") addPropRow("Locked")
+        end
+        if selectedObj:IsA("Script") or selectedObj:IsA("LocalScript") then addPropRow("Disabled") end
+        if selectedObj:IsA("GuiObject") then addPropRow("Visible") addPropRow("Active") end
+    end
+
+    -- APPEARANCE
+    addCatHeader("▸ Appearance", Color3.fromRGB(55,45,45))
+    if selectedObj:IsA("BasePart") then
+        addPropRow("Color") addPropRow("BrickColor") addPropRow("Material")
+        addPropRow("Transparency") addPropRow("Reflectance")
+    end
+    if selectedObj:IsA("GuiObject") then
+        addPropRow("BackgroundColor3") addPropRow("BackgroundTransparency") addPropRow("ZIndex")
+    end
+    if selectedObj:IsA("TextLabel") or selectedObj:IsA("TextButton") or selectedObj:IsA("TextBox") then
+        addPropRow("Text") addPropRow("TextColor3") addPropRow("TextSize") addPropRow("Font")
+    end
+    if selectedObj:IsA("ImageLabel") or selectedObj:IsA("ImageButton") then
+        addPropRow("Image") addPropRow("ImageColor3") addPropRow("ImageTransparency")
+    end
+    if selectedObj:IsA("ScreenGui") then
+        addPropRow("Enabled") addPropRow("ResetOnSpawn") addPropRow("DisplayOrder")
+    end
+
+    -- TRANSFORM
+    if selectedObj:IsA("BasePart") then
+        addCatHeader("▸ Transform", Color3.fromRGB(45,45,65))
+        addPropRow("Size") addPropRow("Position") addPropRow("Rotation") addPropRow("CFrame")
+    end
+    if selectedObj:IsA("GuiObject") then
+        addCatHeader("▸ Transform", Color3.fromRGB(45,45,65))
+        addPropRow("Size") addPropRow("Position") addPropRow("Rotation")
+    end
+
+    -- SURFACE
+    if selectedObj:IsA("BasePart") then
+        addCatHeader("▸ Surface", Color3.fromRGB(55,50,40))
+        addPropRow("TopSurface") addPropRow("BottomSurface")
+        addPropRow("FrontSurface") addPropRow("BackSurface")
+        addPropRow("LeftSurface") addPropRow("RightSurface")
+    end
+
+    -- SOUND / LIGHT / PARTICLE
+    if selectedObj:IsA("Sound") then
+        addCatHeader("▸ Sound", Color3.fromRGB(40,55,55))
+        addPropRow("SoundId") addPropRow("Volume") addPropRow("Looped")
+        addPropRow("Playing") addPropRow("RollOffMaxDistance")
+    end
+    if selectedObj:IsA("Light") then
+        addCatHeader("▸ Light", Color3.fromRGB(55,55,35))
+        addPropRow("Brightness") addPropRow("Color") addPropRow("Range") addPropRow("Enabled")
+    end
+    if selectedObj:IsA("ParticleEmitter") then
+        addCatHeader("▸ Particle", Color3.fromRGB(55,45,55))
+        addPropRow("Rate") addPropRow("Lifetime") addPropRow("Speed")
+        addPropRow("Rotation") addPropRow("RotSpeed") addPropRow("Enabled")
+    end
+
+    -- ACTIONS
+    local spacer = Instance.new("Frame", propsScroll)
+    spacer.Size=UDim2.new(1,0,0,4) spacer.BackgroundTransparency=1 spacer.BorderSizePixel=0
+
     local actRow = Instance.new("Frame", propsScroll)
-    actRow.Size = UDim2.new(1,0,0,30)
-    actRow.BackgroundTransparency = 1
-    actRow.BorderSizePixel = 0
+    actRow.Size=UDim2.new(1,0,0,28) actRow.BackgroundTransparency=1 actRow.BorderSizePixel=0
 
-    local delBtn = mkBtn(actRow,"🗑 Delete",UDim2.new(0.5,-3,0,24),UDim2.new(0,2,0,3),T.red,Color3.new(1,1,1))
-    delBtn.BackgroundTransparency = 0
+    local delBtn = mkBtn(actRow,"🗑 Delete",UDim2.new(0.5,-3,0,26),UDim2.new(0,2,0,1),T.red,Color3.new(1,1,1))
+    delBtn.BackgroundTransparency=0
     delBtn.MouseButton1Click:Connect(function()
         clearHandles()
         pcall(function() selectedObj:Destroy() end)
-        selectedObj = nil
-        refreshProperties()
-        task.defer(refreshExplorer)
+        selectedObj=nil refreshProperties() task.defer(refreshExplorer)
     end)
 
     if selectedObj and selectedObj:IsA("BasePart") then
-        local dupBtn = mkBtn(actRow,"⎘ Duplicate",UDim2.new(0.5,-3,0,24),UDim2.new(0.5,1,0,3),T.accentDim or T.sel,Color3.new(1,1,1))
-        dupBtn.BackgroundTransparency = 0
+        local dupBtn=mkBtn(actRow,"⎘ Dup",UDim2.new(0.5,-3,0,26),UDim2.new(0.5,1,0,1),T.sel,Color3.new(1,1,1))
+        dupBtn.BackgroundTransparency=0
         dupBtn.MouseButton1Click:Connect(function()
             pcall(function()
-                local clone = selectedObj:Clone()
-                clone.CFrame = clone.CFrame + Vector3.new(4,0,0)
-                clone.Parent = selectedObj.Parent
-                table.insert(spawnedObjs, clone)
-                selectObject(clone)
-                task.defer(refreshExplorer)
+                local clone=selectedObj:Clone()
+                clone.CFrame=clone.CFrame+Vector3.new(4,0,0)
+                clone.Parent=selectedObj.Parent
+                table.insert(spawnedObjs,clone)
+                selectObject(clone) task.defer(refreshExplorer)
             end)
         end)
     end
 end
+
 
 ----------------------------------------------------
 -- MOUSE DRAG TO MOVE/SCALE/ROTATE
