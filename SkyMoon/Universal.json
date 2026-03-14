@@ -1,15 +1,15 @@
 {
   "1": {
     "name": "Fly Away",
-    "script": "loadstring(game:HttpGet("https://raw.githubusercontent.com/XNEOFF/FlyGuiV3/main/FlyGuiV3.txt"))()"
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/Flygui.lua"
   },
   "2": {
     "name": "Speed Hack",
-    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal/SpeedHack.lua"
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/Speedhack.lua"
   },
   "3": {
     "name": "Infinite Jump",
-    "script": ""
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Scripts/INFJUMP.lua"
   }
 }
 
