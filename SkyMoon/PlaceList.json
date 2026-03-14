@@ -1,6 +1,6 @@
 {
   "74277864669743": {
-    "name": "Fly For Brainrots",
+    "name": "Fly-For-Brainrots",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Games/Fly_For_brainrot.lua"
   },
   "15784744207": {
@@ -10,5 +10,9 @@
   "10449761463": {
     "name": "The-Strongest-Battlegrounds",
     "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Games/Tsb.lua"
-    }
+    },
+  "124473577469410": {
+    "name": "Be-a-Lucky-Block",
+    "script": "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Games/Be-A-lucky-block.lua"
+  }
 }
