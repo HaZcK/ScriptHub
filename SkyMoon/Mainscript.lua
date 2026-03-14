@@ -4,7 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
-local GETKEY_URL = "https://hazck.github.io/ScriptHub/" -- ganti URL ini
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html" -- ganti URL ini
 
 -- Forward declarations
 local openScriptList
@@ -14,6 +14,7 @@ local openAdminAuth
 local openAdminPanel
 local openGetKeyFrame
 local openMainHub
+local openConsole
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -1115,7 +1116,12 @@ openMiniCmd = function()
         if cmd == "" then return end
         appendOut("> " .. cmd, "cccccc")
         inputBox.Text = ""
-        task.spawn(processCheckIn, cmd)
+
+        if cmd:lower() == "runconsole" then
+            task.spawn(openConsole)
+        else
+            task.spawn(processCheckIn, cmd)
+        end
     end)
 end
 
@@ -2525,6 +2531,210 @@ task.spawn(function()
 end)
 
 ----------------------------------------------------
+-- CONSOLE (RunConsole / /console)
+----------------------------------------------------
+local consoleOpen = false
+
+openConsole = function()
+    if consoleOpen then return end
+    consoleOpen = true
+
+    local cSg = Instance.new("ScreenGui")
+    cSg.Name = "SkyMoon_Console"
+    cSg.ResetOnSpawn = false
+    pcall(function() cSg.Parent = game.CoreGui end)
+    if not cSg.Parent then cSg.Parent = LocalPlayer.PlayerGui end
+
+    -- Window
+    local win = Instance.new("Frame", cSg)
+    win.Size = UDim2.new(0, 500, 0, 320)
+    win.Position = UDim2.new(0.5, -250, 0.5, -160)
+    win.BackgroundColor3 = Color3.fromRGB(6, 6, 10)
+    win.BorderSizePixel = 0
+    win.Active = true
+    win.Draggable = true
+    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 10)
+    local ws = Instance.new("UIStroke", win)
+    ws.Color = Color3.fromRGB(50, 70, 180)
+    ws.Thickness = 1.5
+
+    -- Title bar
+    local tbar = Instance.new("Frame", win)
+    tbar.Size = UDim2.new(1, 0, 0, 30)
+    tbar.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+    tbar.BorderSizePixel = 0
+    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 10)
+    local tfix = Instance.new("Frame", tbar)
+    tfix.Size = UDim2.new(1, 0, 0.5, 0)
+    tfix.Position = UDim2.new(0, 0, 0.5, 0)
+    tfix.BackgroundColor3 = Color3.fromRGB(14, 14, 24)
+    tfix.BorderSizePixel = 0
+
+    local tlbl = Instance.new("TextLabel", tbar)
+    tlbl.Size = UDim2.new(1, -110, 1, 0)
+    tlbl.Position = UDim2.new(0, 10, 0, 0)
+    tlbl.BackgroundTransparency = 1
+    tlbl.Text = "🖥️  SkyMoon Console"
+    tlbl.TextColor3 = Color3.fromRGB(160, 170, 255)
+    tlbl.Font = Enum.Font.GothamBold
+    tlbl.TextSize = 12
+    tlbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Clear button
+    local clearBtn = Instance.new("TextButton", tbar)
+    clearBtn.Size = UDim2.new(0, 52, 0, 20)
+    clearBtn.Position = UDim2.new(1, -82, 0, 5)
+    clearBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+    clearBtn.Text = "Clear"
+    clearBtn.TextColor3 = Color3.fromRGB(180, 180, 220)
+    clearBtn.Font = Enum.Font.GothamBold
+    clearBtn.TextSize = 11
+    clearBtn.BorderSizePixel = 0
+    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 4)
+
+    -- Close button
+    local closeBtn = Instance.new("TextButton", tbar)
+    closeBtn.Size = UDim2.new(0, 24, 0, 20)
+    closeBtn.Position = UDim2.new(1, -28, 0, 5)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 11
+    closeBtn.BorderSizePixel = 0
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    closeBtn.MouseButton1Click:Connect(function()
+        consoleOpen = false
+        cSg:Destroy()
+    end)
+
+    -- Stats bar
+    local statsBar = Instance.new("Frame", win)
+    statsBar.Size = UDim2.new(1, 0, 0, 22)
+    statsBar.Position = UDim2.new(0, 0, 0, 30)
+    statsBar.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    statsBar.BorderSizePixel = 0
+
+    local statsLbl = Instance.new("TextLabel", statsBar)
+    statsLbl.Size = UDim2.new(1, -10, 1, 0)
+    statsLbl.Position = UDim2.new(0, 8, 0, 0)
+    statsLbl.BackgroundTransparency = 1
+    statsLbl.Font = Enum.Font.Code
+    statsLbl.TextSize = 10
+    statsLbl.TextColor3 = Color3.fromRGB(80, 90, 130)
+    statsLbl.TextXAlignment = Enum.TextXAlignment.Left
+    statsLbl.RichText = true
+
+    -- Output scroll
+    local scroll = Instance.new("ScrollingFrame", win)
+    scroll.Size = UDim2.new(1, -8, 1, -56)
+    scroll.Position = UDim2.new(0, 4, 0, 54)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 80, 180)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+
+    local outLabel = Instance.new("TextLabel", scroll)
+    outLabel.Size = UDim2.new(1, -6, 0, 0)
+    outLabel.AutomaticSize = Enum.AutomaticSize.Y
+    outLabel.BackgroundTransparency = 1
+    outLabel.Font = Enum.Font.Code
+    outLabel.TextSize = 11
+    outLabel.TextXAlignment = Enum.TextXAlignment.Left
+    outLabel.TextYAlignment = Enum.TextYAlignment.Top
+    outLabel.TextWrapped = true
+    outLabel.RichText = true
+    outLabel.Text = '<font color="#333355">-- SkyMoon Console ready --\n</font>'
+
+    outLabel:GetPropertyChangedSignal("Text"):Connect(function()
+        task.defer(function()
+            scroll.CanvasPosition = Vector2.new(0, scroll.AbsoluteCanvasSize.Y)
+        end)
+    end)
+
+    -- Log counts
+    local logCount = 0
+    local warnCount = 0
+    local errCount = 0
+
+    local function updateStats()
+        statsLbl.Text = string.format(
+            '<font color="#aaaaff">Logs: %d</font>  <font color="#ffcc44">Warns: %d</font>  <font color="#ff5555">Errors: %d</font>',
+            logCount, warnCount, errCount
+        )
+    end
+    updateStats()
+
+    local function appendLog(msg, logType)
+        -- Escape rich text
+        msg = msg:gsub("&","and"):gsub("<","["):gsub(">","]")
+        local color, prefix
+        if logType == "warn" then
+            color = "ffcc44"
+            prefix = "⚠ "
+            warnCount = warnCount + 1
+        elseif logType == "error" then
+            color = "ff5555"
+            prefix = "✗ "
+            errCount = errCount + 1
+        else
+            color = "ccddff"
+            prefix = "  "
+            logCount = logCount + 1
+        end
+
+        -- Limit teks (clear tiap 200 baris biar gak overflow)
+        local lineCount = select(2, outLabel.Text:gsub("\n", "\n"))
+        if lineCount > 200 then
+            outLabel.Text = '<font color="#333355">-- [console cleared: too many logs] --\n</font>'
+        end
+
+        outLabel.Text = outLabel.Text ..
+            string.format('<font color="#%s">%s%s</font>\n', color, prefix, msg)
+        updateStats()
+    end
+
+    -- Clear button
+    clearBtn.MouseButton1Click:Connect(function()
+        outLabel.Text = '<font color="#333355">-- [cleared] --\n</font>'
+        logCount = 0
+        warnCount = 0
+        errCount = 0
+        updateStats()
+    end)
+
+    -- Hook print / warn via LogService
+    local LogService = game:GetService("LogService")
+    local logConn = LogService.MessageOut:Connect(function(msg, msgType)
+        if not consoleOpen then return end
+        if msgType == Enum.MessageType.MessageWarning then
+            appendLog(msg, "warn")
+        elseif msgType == Enum.MessageType.MessageError then
+            appendLog(msg, "error")
+        else
+            appendLog(msg, "log")
+        end
+    end)
+
+    -- Cleanup on close
+    closeBtn.MouseButton1Click:Connect(function()
+        logConn:Disconnect()
+        consoleOpen = false
+        cSg:Destroy()
+    end)
+
+    clearBtn.MouseButton1Click:Connect(function()
+        -- sudah di-handle di atas
+    end)
+
+    appendLog("Console connected to Roblox LogService.", "log")
+    appendLog("All game print/warn/error will appear here.", "log")
+end
+
+----------------------------------------------------
 -- CHAT COMMANDS
 ----------------------------------------------------
 game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
@@ -2532,6 +2742,9 @@ game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
 
     if lower == "/open_cmd" then
         task.spawn(openMiniCmd)
+
+    elseif lower == "/console" then
+        task.spawn(openConsole)
 
     elseif lower == "/reset_skymoon" then
         pcall(function()
