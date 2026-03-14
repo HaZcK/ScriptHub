@@ -1,8 +1,8 @@
 -- 🌙 SkyMoon ScriptHub | Mainscript.lua
 -- by KHAFIDZKTP | github.com/HaZcK/ScriptHub
 
-local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/main/SkyMoon/PlaceList.json"
-local UBUNTU_LOGO_URL = "https://fs.buttercms.com/resize=width:885/QFGDOkGGTeSUMSRKOjOQ"
+local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
+local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
