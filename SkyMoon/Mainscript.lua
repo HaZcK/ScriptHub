@@ -5,6 +5,13 @@ local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/he
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
 
+-- Forward declarations
+local openScriptList
+local openMiniCmd
+local showNotifSimple
+local openAdminAuth
+local openAdminPanel
+
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
@@ -797,7 +804,7 @@ end)
 ----------------------------------------------------
 local miniCmdOpen = false
 
-local function openMiniCmd()
+openMiniCmd = function()
     if miniCmdOpen then return end
     miniCmdOpen = true
 
@@ -1111,7 +1118,7 @@ end
 ----------------------------------------------------
 -- NOTIF HELPER (reusable)
 ----------------------------------------------------
-local function showNotifSimple(msg, color)
+showNotifSimple = function(msg, color)
     local nSg = Instance.new("ScreenGui")
     nSg.Name = "SkyMoon_Notif_Simple"
     nSg.ResetOnSpawn = false
@@ -1159,7 +1166,7 @@ end
 ----------------------------------------------------
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 
-local function openScriptList()
+openScriptList = function()
     -- Fetch Universal.json
     local uDb = nil
     pcall(function()
@@ -1363,7 +1370,7 @@ end)
 ----------------------------------------------------
 local adminOpen = false
 
-local function openAdminPanel()
+openAdminPanel = function()
     if adminOpen then return end
     adminOpen = true
 
@@ -1764,7 +1771,7 @@ local function openAdminPanel()
 end
 
 -- Key auth prompt for /Open_Admin
-local function openAdminAuth()
+openAdminAuth = function()
     local authSg = Instance.new("ScreenGui")
     authSg.Name = "SkyMoon_Auth"
     authSg.ResetOnSpawn = false
