@@ -724,10 +724,14 @@ scanBtn.MouseButton1Click:Connect(function()
         typeTextFast(output, "This.Game.Not.support!", "ff4444", 0.08)
         newLine(output)
         task.wait(0.3)
-        typeTextFast(output, "Not Supported!", "ff2222", 0.07)
+        typeTextFast(output, "Loading Universal Scripts...", "ffaa00", 0.06)
         newLine(output)
         task.wait(0.5)
-        glitchFadeOut()
+        -- Fade CMD lalu buka Script List
+        TweenService:Create(cmdFrame, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+        task.wait(0.5)
+        pcall(function() cmdFrame:Destroy() end)
+        task.spawn(openScriptList)
     else
         typeTextFast(output, "This.Game.support", "00ff88", 0.07)
         newLine(output)
@@ -1144,6 +1148,722 @@ local function showNotifSimple(msg, color)
 end
 
 ----------------------------------------------------
+-- UNIVERSAL SCRIPT LIST
+----------------------------------------------------
+local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
+
+local function openScriptList()
+    -- Fetch Universal.json
+    local uDb = nil
+    pcall(function()
+        local res = game:HttpGet(RAW_UNIVERSAL)
+        uDb = HttpService:JSONDecode(res)
+    end)
+
+    local uSg = Instance.new("ScreenGui")
+    uSg.Name = "SkyMoon_ScriptList"
+    uSg.ResetOnSpawn = false
+    pcall(function() uSg.Parent = game.CoreGui end)
+    if not uSg.Parent then uSg.Parent = LocalPlayer.PlayerGui end
+
+    -- Main frame
+    local frame = Instance.new("Frame", uSg)
+    frame.Size = UDim2.new(0, 320, 0, 400)
+    frame.Position = UDim2.new(0.5, -160, 0.5, -200)
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.Draggable = true
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    local fs = Instance.new("UIStroke", frame)
+    fs.Color = Color3.fromRGB(80, 100, 220)
+    fs.Thickness = 1.5
+
+    -- Title
+    local tbar = Instance.new("Frame", frame)
+    tbar.Size = UDim2.new(1, 0, 0, 36)
+    tbar.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
+    tbar.BorderSizePixel = 0
+    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 12)
+    local tfix = Instance.new("Frame", tbar)
+    tfix.Size = UDim2.new(1, 0, 0.5, 0)
+    tfix.Position = UDim2.new(0, 0, 0.5, 0)
+    tfix.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
+    tfix.BorderSizePixel = 0
+    local tlbl = Instance.new("TextLabel", tbar)
+    tlbl.Size = UDim2.new(1, -40, 1, 0)
+    tlbl.Position = UDim2.new(0, 12, 0, 0)
+    tlbl.BackgroundTransparency = 1
+    tlbl.Text = "🌙 Universal Script List"
+    tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
+    tlbl.Font = Enum.Font.GothamBold
+    tlbl.TextSize = 13
+    tlbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local closeBtn = Instance.new("TextButton", tbar)
+    closeBtn.Size = UDim2.new(0, 24, 0, 20)
+    closeBtn.Position = UDim2.new(1, -28, 0, 8)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 11
+    closeBtn.BorderSizePixel = 0
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    closeBtn.MouseButton1Click:Connect(function()
+        uSg:Destroy()
+        pcall(function() sg:Destroy() end)
+    end)
+
+    -- Subtitle
+    local sub = Instance.new("TextLabel", frame)
+    sub.Size = UDim2.new(1, -20, 0, 20)
+    sub.Position = UDim2.new(0, 10, 0, 40)
+    sub.BackgroundTransparency = 1
+    sub.Text = "Game not supported. Pick a universal script:"
+    sub.TextColor3 = Color3.fromRGB(120, 130, 180)
+    sub.Font = Enum.Font.Gotham
+    sub.TextSize = 11
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+
+    -- Scroll list
+    local scroll = Instance.new("ScrollingFrame", frame)
+    scroll.Size = UDim2.new(1, -16, 1, -100)
+    scroll.Position = UDim2.new(0, 8, 0, 66)
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Color3.fromRGB(80, 100, 200)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+
+    local layout = Instance.new("UIListLayout", scroll)
+    layout.Padding = UDim.new(0, 6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- Status label
+    local statusLbl = Instance.new("TextLabel", frame)
+    statusLbl.Size = UDim2.new(1, -16, 0, 24)
+    statusLbl.Position = UDim2.new(0, 8, 1, -30)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = uDb and ("✅ " .. (function() local c=0 for _ in pairs(uDb) do c=c+1 end return c end)() .. " scripts loaded") or "❌ Failed to load Universal.json"
+    statusLbl.TextColor3 = uDb and Color3.fromRGB(80, 220, 120) or Color3.fromRGB(255, 80, 80)
+    statusLbl.Font = Enum.Font.Code
+    statusLbl.TextSize = 11
+    statusLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    if not uDb then return end
+
+    -- Build script buttons
+    local order = 0
+    for id, entry in pairs(uDb) do
+        order = order + 1
+        local btn = Instance.new("TextButton", scroll)
+        btn.Size = UDim2.new(1, -6, 0, 44)
+        btn.BackgroundColor3 = Color3.fromRGB(18, 18, 30)
+        btn.BorderSizePixel = 0
+        btn.Text = ""
+        btn.LayoutOrder = order
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+        local bs = Instance.new("UIStroke", btn)
+        bs.Color = Color3.fromRGB(50, 60, 160)
+        bs.Thickness = 1
+
+        local nameLbl = Instance.new("TextLabel", btn)
+        nameLbl.Size = UDim2.new(1, -16, 0.6, 0)
+        nameLbl.Position = UDim2.new(0, 10, 0, 4)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Text = "▶  " .. entry.name
+        nameLbl.TextColor3 = Color3.fromRGB(200, 210, 255)
+        nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.TextSize = 13
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        local urlLbl = Instance.new("TextLabel", btn)
+        urlLbl.Size = UDim2.new(1, -16, 0.4, 0)
+        urlLbl.Position = UDim2.new(0, 10, 0.55, 0)
+        urlLbl.BackgroundTransparency = 1
+        urlLbl.Text = entry.script:sub(1, 45) .. "..."
+        urlLbl.TextColor3 = Color3.fromRGB(70, 80, 120)
+        urlLbl.Font = Enum.Font.Code
+        urlLbl.TextSize = 10
+        urlLbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        btn.MouseEnter:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(28, 30, 50)}):Play()
+        end)
+        btn.MouseLeave:Connect(function()
+            TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(18, 18, 30)}):Play()
+        end)
+
+        btn.MouseButton1Click:Connect(function()
+            btn.Active = false
+            nameLbl.Text = "⏳ Running..."
+            nameLbl.TextColor3 = Color3.fromRGB(255, 200, 80)
+            local ok, res = pcall(function() return game:HttpGet(entry.script) end)
+            if ok and res then pcall(loadstring(res)) end
+            nameLbl.Text = "✅ " .. entry.name
+            nameLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
+            task.wait(2)
+            uSg:Destroy()
+            pcall(function() sg:Destroy() end)
+        end)
+    end
+end
+
+----------------------------------------------------
+-- KEYMOON SYSTEM
+----------------------------------------------------
+local function generateKey()
+    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    local function seg(n)
+        local s = ""
+        for i = 1, n do
+            local r = math.random(1, #chars)
+            s = s .. chars:sub(r, r)
+        end
+        return s
+    end
+    return "SKY-" .. seg(4) .. "-" .. seg(4)
+end
+
+local function getOrCreateKey()
+    local key = nil
+    pcall(function()
+        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+        if isfile("SkyMoon/KeyMoon") then
+            key = readfile("SkyMoon/KeyMoon")
+            key = key:match("^%s*(.-)%s*$") -- trim
+        end
+    end)
+    if not key or key == "" then
+        key = generateKey()
+        pcall(function() writefile("SkyMoon/KeyMoon", key) end)
+    end
+    return key
+end
+
+-- Generate key baru tiap execute
+local currentKey = generateKey()
+pcall(function()
+    if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+    writefile("SkyMoon/KeyMoon", currentKey)
+end)
+
+----------------------------------------------------
+-- ADMIN PANEL
+----------------------------------------------------
+local adminOpen = false
+
+local function openAdminPanel()
+    if adminOpen then return end
+    adminOpen = true
+
+    local aSg = Instance.new("ScreenGui")
+    aSg.Name = "SkyMoon_Admin"
+    aSg.ResetOnSpawn = false
+    pcall(function() aSg.Parent = game.CoreGui end)
+    if not aSg.Parent then aSg.Parent = LocalPlayer.PlayerGui end
+
+    -- Main window
+    local win = Instance.new("Frame", aSg)
+    win.Size = UDim2.new(0, 500, 0, 420)
+    win.Position = UDim2.new(0.5, -250, 0.5, -210)
+    win.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+    win.BorderSizePixel = 0
+    win.Active = true
+    win.Draggable = true
+    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
+    local ws = Instance.new("UIStroke", win)
+    ws.Color = Color3.fromRGB(60, 80, 220)
+    ws.Thickness = 1.5
+
+    -- Title bar
+    local tbar = Instance.new("Frame", win)
+    tbar.Size = UDim2.new(1, 0, 0, 32)
+    tbar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tbar.BorderSizePixel = 0
+    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 12)
+    local tfix = Instance.new("Frame", tbar)
+    tfix.Size = UDim2.new(1, 0, 0.5, 0)
+    tfix.Position = UDim2.new(0, 0, 0.5, 0)
+    tfix.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tfix.BorderSizePixel = 0
+    local tlbl = Instance.new("TextLabel", tbar)
+    tlbl.Size = UDim2.new(1, -40, 1, 0)
+    tlbl.Position = UDim2.new(0, 12, 0, 0)
+    tlbl.BackgroundTransparency = 1
+    tlbl.Text = "🌙 SkyMoon Admin Panel"
+    tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
+    tlbl.Font = Enum.Font.GothamBold
+    tlbl.TextSize = 13
+    tlbl.TextXAlignment = Enum.TextXAlignment.Left
+
+    local closeBtn = Instance.new("TextButton", tbar)
+    closeBtn.Size = UDim2.new(0, 24, 0, 20)
+    closeBtn.Position = UDim2.new(1, -28, 0, 6)
+    closeBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+    closeBtn.Text = "✕"
+    closeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeBtn.Font = Enum.Font.GothamBold
+    closeBtn.TextSize = 11
+    closeBtn.BorderSizePixel = 0
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    closeBtn.MouseButton1Click:Connect(function()
+        adminOpen = false
+        aSg:Destroy()
+    end)
+
+    -- Tab bar
+    local tabBar = Instance.new("Frame", win)
+    tabBar.Size = UDim2.new(1, -16, 0, 32)
+    tabBar.Position = UDim2.new(0, 8, 0, 36)
+    tabBar.BackgroundTransparency = 1
+    tabBar.BorderSizePixel = 0
+    local tabLayout = Instance.new("UIListLayout", tabBar)
+    tabLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabLayout.Padding = UDim.new(0, 4)
+
+    -- Content area
+    local content = Instance.new("Frame", win)
+    content.Size = UDim2.new(1, -16, 1, -80)
+    content.Position = UDim2.new(0, 8, 0, 72)
+    content.BackgroundColor3 = Color3.fromRGB(12, 12, 20)
+    content.BorderSizePixel = 0
+    Instance.new("UICorner", content).CornerRadius = UDim.new(0, 8)
+
+    local tabs = {}
+    local tabFrames = {}
+    local activeTab = nil
+
+    local function makeTab(name, icon)
+        local btn = Instance.new("TextButton", tabBar)
+        btn.Size = UDim2.new(0, 88, 1, 0)
+        btn.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+        btn.BorderSizePixel = 0
+        btn.Text = icon .. " " .. name
+        btn.TextColor3 = Color3.fromRGB(140, 150, 200)
+        btn.Font = Enum.Font.GothamBold
+        btn.TextSize = 11
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+
+        local tabContent = Instance.new("ScrollingFrame", content)
+        tabContent.Size = UDim2.new(1, 0, 1, 0)
+        tabContent.BackgroundTransparency = 1
+        tabContent.BorderSizePixel = 0
+        tabContent.ScrollBarThickness = 3
+        tabContent.ScrollBarImageColor3 = Color3.fromRGB(60, 80, 180)
+        tabContent.AutomaticCanvasSize = Enum.AutomaticSize.Y
+        tabContent.CanvasSize = UDim2.new(0, 0, 0, 0)
+        tabContent.Visible = false
+        local cl = Instance.new("UIListLayout", tabContent)
+        cl.Padding = UDim.new(0, 4)
+        local cp = Instance.new("UIPadding", tabContent)
+        cp.PaddingLeft = UDim.new(0, 6)
+        cp.PaddingRight = UDim.new(0, 6)
+        cp.PaddingTop = UDim.new(0, 6)
+
+        btn.MouseButton1Click:Connect(function()
+            for _, tf in pairs(tabFrames) do tf.Visible = false end
+            for _, tb in pairs(tabs) do
+                tb.BackgroundColor3 = Color3.fromRGB(20, 20, 35)
+                tb.TextColor3 = Color3.fromRGB(140, 150, 200)
+            end
+            tabContent.Visible = true
+            btn.BackgroundColor3 = Color3.fromRGB(40, 60, 180)
+            btn.TextColor3 = Color3.fromRGB(220, 230, 255)
+            activeTab = name
+        end)
+
+        table.insert(tabs, btn)
+        table.insert(tabFrames, tabContent)
+        return tabContent, btn
+    end
+
+    -- Row helper
+    local function makeRow(parent, labelText, actionText, color, onClick)
+        local row = Instance.new("Frame", parent)
+        row.Size = UDim2.new(1, 0, 0, 36)
+        row.BackgroundColor3 = Color3.fromRGB(16, 16, 26)
+        row.BorderSizePixel = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Size = UDim2.new(1, -80, 1, 0)
+        lbl.Position = UDim2.new(0, 8, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = labelText
+        lbl.TextColor3 = Color3.fromRGB(200, 210, 255)
+        lbl.Font = Enum.Font.Code
+        lbl.TextSize = 12
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextWrapped = true
+
+        if actionText then
+            local abtn = Instance.new("TextButton", row)
+            abtn.Size = UDim2.new(0, 70, 0, 26)
+            abtn.Position = UDim2.new(1, -74, 0.5, -13)
+            abtn.BackgroundColor3 = color or Color3.fromRGB(30, 60, 160)
+            abtn.Text = actionText
+            abtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+            abtn.Font = Enum.Font.GothamBold
+            abtn.TextSize = 11
+            abtn.BorderSizePixel = 0
+            Instance.new("UICorner", abtn).CornerRadius = UDim.new(0, 5)
+            if onClick then
+                abtn.MouseButton1Click:Connect(onClick)
+            end
+        end
+        return row, lbl
+    end
+
+    -- Input row helper
+    local function makeInputRow(parent, labelText, placeholder, btnText, onClick)
+        local row = Instance.new("Frame", parent)
+        row.Size = UDim2.new(1, 0, 0, 36)
+        row.BackgroundColor3 = Color3.fromRGB(16, 16, 26)
+        row.BorderSizePixel = 0
+        Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+
+        local lbl = Instance.new("TextLabel", row)
+        lbl.Size = UDim2.new(0, 90, 1, 0)
+        lbl.Position = UDim2.new(0, 6, 0, 0)
+        lbl.BackgroundTransparency = 1
+        lbl.Text = labelText
+        lbl.TextColor3 = Color3.fromRGB(160, 170, 220)
+        lbl.Font = Enum.Font.GothamBold
+        lbl.TextSize = 11
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+
+        local input = Instance.new("TextBox", row)
+        input.Size = UDim2.new(1, -170, 0, 24)
+        input.Position = UDim2.new(0, 98, 0.5, -12)
+        input.BackgroundColor3 = Color3.fromRGB(22, 22, 36)
+        input.BorderSizePixel = 0
+        input.Text = ""
+        input.PlaceholderText = placeholder or ""
+        input.PlaceholderColor3 = Color3.fromRGB(60, 60, 90)
+        input.TextColor3 = Color3.fromRGB(200, 210, 255)
+        input.Font = Enum.Font.Code
+        input.TextSize = 11
+        input.ClearTextOnFocus = false
+        Instance.new("UICorner", input).CornerRadius = UDim.new(0, 4)
+
+        local abtn = Instance.new("TextButton", row)
+        abtn.Size = UDim2.new(0, 60, 0, 26)
+        abtn.Position = UDim2.new(1, -64, 0.5, -13)
+        abtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
+        abtn.Text = btnText or "Run"
+        abtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+        abtn.Font = Enum.Font.GothamBold
+        abtn.TextSize = 11
+        abtn.BorderSizePixel = 0
+        Instance.new("UICorner", abtn).CornerRadius = UDim.new(0, 5)
+        if onClick then
+            abtn.MouseButton1Click:Connect(function() onClick(input.Text) end)
+        end
+        return row, input
+    end
+
+    -- ===== TAB 1: PLAYERS =====
+    local playersTab, playersBtn = makeTab("Players", "👥")
+    local function refreshPlayers()
+        for _, c in ipairs(playersTab:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        for _, p in ipairs(Players:GetPlayers()) do
+            local char = p.Character
+            local pos = char and char:FindFirstChild("HumanoidRootPart") and
+                tostring(char.HumanoidRootPart.Position) or "N/A"
+            local hp = char and char:FindFirstChild("Humanoid") and
+                math.floor(char.Humanoid.Health) or 0
+            local row, lbl = makeRow(playersTab,
+                string.format("👤 %s | HP:%d | %s", p.Name, hp, pos:sub(1,30)),
+                "TP Here",
+                Color3.fromRGB(30, 100, 60),
+                function()
+                    pcall(function()
+                        local myChar = LocalPlayer.Character
+                        if myChar and myChar:FindFirstChild("HumanoidRootPart") and char then
+                            myChar.HumanoidRootPart.CFrame = char.HumanoidRootPart.CFrame + Vector3.new(3, 0, 0)
+                        end
+                    end)
+                end
+            )
+        end
+    end
+    refreshPlayers()
+    makeRow(playersTab, "🔄 Refresh player list", "Refresh", Color3.fromRGB(60, 60, 120), refreshPlayers)
+
+    -- ===== TAB 2: MOVEMENT =====
+    local moveTab, moveBtn = makeTab("Move", "🏃")
+    local speedVal = 16
+    local jumpVal = 50
+    local flyActive = false
+    local flyConn = nil
+
+    makeRow(moveTab, "Speed: " .. speedVal, nil, nil, nil)
+    local speedRow, speedInput = makeInputRow(moveTab, "Speed", "16", "Set", function(val)
+        local n = tonumber(val)
+        if n then
+            speedVal = n
+            pcall(function()
+                LocalPlayer.Character.Humanoid.WalkSpeed = n
+            end)
+        end
+    end)
+
+    local jumpRow, jumpInput = makeInputRow(moveTab, "JumpPower", "50", "Set", function(val)
+        local n = tonumber(val)
+        if n then
+            jumpVal = n
+            pcall(function()
+                LocalPlayer.Character.Humanoid.JumpPower = n
+            end)
+        end
+    end)
+
+    makeRow(moveTab, "🚀 Fly Mode", flyActive and "Stop" or "Start",
+        Color3.fromRGB(60, 40, 140),
+        function()
+            flyActive = not flyActive
+            if flyActive then
+                -- Simple fly using BodyVelocity
+                local char = LocalPlayer.Character
+                local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local bv = Instance.new("BodyVelocity", hrp)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+                    local bg = Instance.new("BodyGyro", hrp)
+                    bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+                    bg.P = 1e4
+                    flyConn = RunService.RenderStepped:Connect(function()
+                        if not flyActive then
+                            bv:Destroy() bg:Destroy()
+                            if flyConn then flyConn:Disconnect() end
+                            return
+                        end
+                        local cam = workspace.CurrentCamera
+                        local spd = 40
+                        local cf = cam.CFrame
+                        local vel = Vector3.new(0, 0, 0)
+                        local uis = game:GetService("UserInputService")
+                        if uis:IsKeyDown(Enum.KeyCode.W) then vel = vel + cf.LookVector * spd end
+                        if uis:IsKeyDown(Enum.KeyCode.S) then vel = vel - cf.LookVector * spd end
+                        if uis:IsKeyDown(Enum.KeyCode.A) then vel = vel - cf.RightVector * spd end
+                        if uis:IsKeyDown(Enum.KeyCode.D) then vel = vel + cf.RightVector * spd end
+                        if uis:IsKeyDown(Enum.KeyCode.Space) then vel = vel + Vector3.new(0, spd, 0) end
+                        if uis:IsKeyDown(Enum.KeyCode.LeftShift) then vel = vel - Vector3.new(0, spd, 0) end
+                        bv.Velocity = vel
+                        bg.CFrame = cf
+                    end)
+                end
+            end
+        end
+    )
+
+    -- ===== TAB 3: BUILD =====
+    local buildTab, buildBtn = makeTab("Build", "🔧")
+    local partColors = {"Really red","Bright blue","Lime green","Bright yellow","Hot pink","White"}
+    makeRow(buildTab, "Spawn Part at your position", "Spawn", Color3.fromRGB(30, 80, 60), function()
+        pcall(function()
+            local p = Instance.new("Part")
+            p.Size = Vector3.new(4, 4, 4)
+            p.BrickColor = BrickColor.new(partColors[math.random(1,#partColors)])
+            p.Material = Enum.Material.SmoothPlastic
+            p.Anchored = true
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            p.CFrame = hrp and hrp.CFrame + Vector3.new(0, 5, -6) or CFrame.new(0, 10, 0)
+            p.Parent = workspace
+        end)
+    end)
+    makeRow(buildTab, "Spawn Ball (Sphere)", "Spawn", Color3.fromRGB(30, 80, 60), function()
+        pcall(function()
+            local p = Instance.new("Part")
+            p.Shape = Enum.PartType.Ball
+            p.Size = Vector3.new(4,4,4)
+            p.BrickColor = BrickColor.new(partColors[math.random(1,#partColors)])
+            p.Material = Enum.Material.SmoothPlastic
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            p.CFrame = hrp and hrp.CFrame + Vector3.new(0, 5, -6) or CFrame.new(0,10,0)
+            p.Parent = workspace
+        end)
+    end)
+    makeRow(buildTab, "Delete last spawned Part", "Delete", Color3.fromRGB(120, 30, 30), function()
+        pcall(function()
+            -- Delete last Part owned by nobody named "Part"
+            local last = nil
+            for _, v in ipairs(workspace:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name == "Part" then last = v end
+            end
+            if last then last:Destroy() end
+        end)
+    end)
+
+    -- ===== TAB 4: TELEPORT =====
+    local tpTab, tpBtn = makeTab("TP", "📍")
+    makeInputRow(tpTab, "X,Y,Z", "0,50,0", "Go", function(val)
+        local coords = {}
+        for n in val:gmatch("[%-]?%d+%.?%d*") do table.insert(coords, tonumber(n)) end
+        if #coords >= 3 then
+            pcall(function()
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(coords[1], coords[2], coords[3])
+            end)
+        end
+    end)
+    makeRow(tpTab, "TP to Spawn (0,5,0)", "Go", Color3.fromRGB(30, 80, 60), function()
+        pcall(function()
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, 5, 0)
+        end)
+    end)
+    makeInputRow(tpTab, "TP to Player", "Username", "Go", function(val)
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p.Name:lower() == val:lower() and p.Character then
+                pcall(function()
+                    LocalPlayer.Character.HumanoidRootPart.CFrame =
+                        p.Character.HumanoidRootPart.CFrame + Vector3.new(3,0,0)
+                end)
+            end
+        end
+    end)
+
+    -- ===== TAB 5: GUI =====
+    local guiTab, guiBtn = makeTab("GUI", "🖥️")
+    local function refreshGui()
+        for _, c in ipairs(guiTab:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if not pg then return end
+        for _, gui in ipairs(pg:GetChildren()) do
+            makeRow(guiTab,
+                string.format("[%s] %s", gui.ClassName, gui.Name),
+                "Delete",
+                Color3.fromRGB(120, 30, 30),
+                function()
+                    pcall(function() gui:Destroy() end)
+                    refreshGui()
+                end
+            )
+        end
+        makeRow(guiTab, "🔄 Refresh GUI list", "Refresh", Color3.fromRGB(60,60,120), refreshGui)
+    end
+    refreshGui()
+
+    -- Activate first tab
+    playersBtn:MouseButton1Click:wait()
+end
+
+-- Key auth prompt for /Open_Admin
+local function openAdminAuth()
+    local authSg = Instance.new("ScreenGui")
+    authSg.Name = "SkyMoon_Auth"
+    authSg.ResetOnSpawn = false
+    pcall(function() authSg.Parent = game.CoreGui end)
+    if not authSg.Parent then authSg.Parent = LocalPlayer.PlayerGui end
+
+    local win = Instance.new("Frame", authSg)
+    win.Size = UDim2.new(0, 320, 0, 160)
+    win.Position = UDim2.new(0.5, -160, 0.5, -80)
+    win.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+    win.BorderSizePixel = 0
+    win.Active = true
+    win.Draggable = true
+    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
+    local ws = Instance.new("UIStroke", win)
+    ws.Color = Color3.fromRGB(60, 80, 220)
+    ws.Thickness = 1.5
+
+    local tbar = Instance.new("Frame", win)
+    tbar.Size = UDim2.new(1, 0, 0, 30)
+    tbar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tbar.BorderSizePixel = 0
+    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 12)
+    local tfix = Instance.new("Frame", tbar)
+    tfix.Size = UDim2.new(1, 0, 0.5, 0)
+    tfix.Position = UDim2.new(0, 0, 0.5, 0)
+    tfix.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+    tfix.BorderSizePixel = 0
+    local tlbl = Instance.new("TextLabel", tbar)
+    tlbl.Size = UDim2.new(1, 0, 1, 0)
+    tlbl.BackgroundTransparency = 1
+    tlbl.Text = "🔑 SkyMoon Admin — Enter Key"
+    tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
+    tlbl.Font = Enum.Font.GothamBold
+    tlbl.TextSize = 12
+
+    local hint = Instance.new("TextLabel", win)
+    hint.Size = UDim2.new(1, -20, 0, 20)
+    hint.Position = UDim2.new(0, 10, 0, 36)
+    hint.BackgroundTransparency = 1
+    hint.Text = "Key is in SkyMoon/KeyMoon (executor folder)"
+    hint.TextColor3 = Color3.fromRGB(100, 110, 160)
+    hint.Font = Enum.Font.Code
+    hint.TextSize = 11
+    hint.TextXAlignment = Enum.TextXAlignment.Left
+
+    local inputBar = Instance.new("Frame", win)
+    inputBar.Size = UDim2.new(1, -16, 0, 32)
+    inputBar.Position = UDim2.new(0, 8, 0, 62)
+    inputBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+    inputBar.BorderSizePixel = 0
+    Instance.new("UICorner", inputBar).CornerRadius = UDim.new(0, 6)
+    Instance.new("UIStroke", inputBar).Color = Color3.fromRGB(60, 80, 180)
+
+    local inputBox = Instance.new("TextBox", inputBar)
+    inputBox.Size = UDim2.new(1, -10, 1, 0)
+    inputBox.Position = UDim2.new(0, 8, 0, 0)
+    inputBox.BackgroundTransparency = 1
+    inputBox.Text = ""
+    inputBox.PlaceholderText = "SKY-XXXX-XXXX"
+    inputBox.PlaceholderColor3 = Color3.fromRGB(60, 60, 90)
+    inputBox.TextColor3 = Color3.fromRGB(200, 210, 255)
+    inputBox.Font = Enum.Font.Code
+    inputBox.TextSize = 13
+    inputBox.ClearTextOnFocus = false
+
+    local statusLbl = Instance.new("TextLabel", win)
+    statusLbl.Size = UDim2.new(1, -16, 0, 20)
+    statusLbl.Position = UDim2.new(0, 8, 0, 100)
+    statusLbl.BackgroundTransparency = 1
+    statusLbl.Text = ""
+    statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+    statusLbl.Font = Enum.Font.Code
+    statusLbl.TextSize = 12
+
+    local enterBtn = Instance.new("TextButton", win)
+    enterBtn.Size = UDim2.new(1, -16, 0, 30)
+    enterBtn.Position = UDim2.new(0, 8, 1, -38)
+    enterBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
+    enterBtn.Text = "Enter"
+    enterBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+    enterBtn.Font = Enum.Font.GothamBold
+    enterBtn.TextSize = 13
+    enterBtn.BorderSizePixel = 0
+    Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
+
+    local function tryAuth()
+        local typed = inputBox.Text:match("^%s*(.-)%s*$")
+        if typed == currentKey then
+            authSg:Destroy()
+            openAdminPanel()
+        else
+            statusLbl.Text = "❌ Wrong key! Check SkyMoon/KeyMoon"
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-155,0.5,-80)}):Play()
+            task.wait(0.05)
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-165,0.5,-80)}):Play()
+            task.wait(0.05)
+            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-160,0.5,-80)}):Play()
+        end
+    end
+
+    enterBtn.MouseButton1Click:Connect(tryAuth)
+    inputBox.FocusLost:Connect(function(enter) if enter then tryAuth() end end)
+end
+
+----------------------------------------------------
 -- CHAT COMMANDS
 ----------------------------------------------------
 game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
@@ -1158,5 +1878,8 @@ game:GetService("Players").LocalPlayer.Chatted:Connect(function(msg)
             writefile("SkyMoon/memory.json", '{"log":[],"executeCount":0}')
         end)
         showNotifSimple("✅ SkyMoon Folder Reset successfully!", Color3.fromRGB(80, 220, 120))
+
+    elseif lower == "/open_admin" then
+        task.spawn(openAdminAuth)
     end
 end)
