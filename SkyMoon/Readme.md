@@ -33,6 +33,7 @@ SkyMoon/
 | Game Name | PlaceId | Script |
 |-----------|---------|--------|
 | Fly For Brainrot | *(see PlaceList.json)* | Games/Fly_For_brainrot.lua |
+| Valley Prison | *(see PlaceList.json)* | Games/Valley-Prison.lua |
 
 > More games will be added over time.
 
