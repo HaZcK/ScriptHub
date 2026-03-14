@@ -4,7 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
-local GETKEY_URL = "https://hazck.github.io/ScriptHub/" -- ganti URL ini
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html" -- ganti URL ini
 
 -- Forward declarations
 local openScriptList
