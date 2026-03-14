@@ -4,7 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
-local GETKEY_URL = "https://hazck.github.io/ScriptHub/" -- ganti URL ini
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html" -- ganti URL ini
 
 -- Forward declarations
 local openScriptList
@@ -1339,7 +1339,41 @@ end
 ----------------------------------------------------
 -- KEYMOON SYSTEM
 ----------------------------------------------------
--- Daily key (sama persis dengan HTML KeyMoon.html)
+
+----------------------------------------------------
+-- KEY MEMORY SYSTEM
+----------------------------------------------------
+local KEY_MEMORY_FILE = "SkyMoon/KeyMemory.json"
+
+local function loadKeyMemory()
+    local default = {
+        Key = "Null",
+        Expired = false,
+        SaveKey = true,
+        CompletedAt = 0,
+        DayNum = 0
+    }
+    pcall(function()
+        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+        if isfile(KEY_MEMORY_FILE) then
+            local raw = readfile(KEY_MEMORY_FILE)
+            if raw and raw ~= "" then
+                local parsed = HttpService:JSONDecode(raw)
+                for k, v in pairs(parsed) do default[k] = v end
+            end
+        end
+    end)
+    return default
+end
+
+local function saveKeyMemory(km)
+    pcall(function()
+        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
+        writefile(KEY_MEMORY_FILE, HttpService:JSONEncode(km))
+    end)
+end
+
+-- Daily key algo (sama dengan HTML)
 local function getDailyKey()
     local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
     local dayNum = math.floor(os.time() / 86400)
@@ -1349,22 +1383,10 @@ local function getDailyKey()
         return state
     end
     local p1, p2 = "", ""
-    for i = 1, 4 do
-        local idx = (lcg() % 36) + 1
-        p1 = p1 .. chars:sub(idx, idx)
-    end
-    for i = 1, 4 do
-        local idx = (lcg() % 36) + 1
-        p2 = p2 .. chars:sub(idx, idx)
-    end
-    return "SKY-" .. p1 .. "-" .. p2
+    for _ = 1, 4 do local idx=(lcg()%36)+1; p1=p1..chars:sub(idx,idx) end
+    for _ = 1, 4 do local idx=(lcg()%36)+1; p2=p2..chars:sub(idx,idx) end
+    return "SKY-"..p1.."-"..p2, math.floor(os.time()/86400)
 end
-
-local currentKey = getDailyKey()
-pcall(function()
-    if not isfolder("SkyMoon") then makefolder("SkyMoon") end
-    writefile("SkyMoon/KeyMoon", currentKey)
-end)
 
 ----------------------------------------------------
 -- ADMIN PANEL
@@ -2211,54 +2233,6 @@ openAdminAuth = function()
 
     enterBtn.MouseButton1Click:Connect(tryAuth)
     inputBox.FocusLost:Connect(function(enter) if enter then tryAuth() end end)
-end
-
-----------------------------------------------------
--- KEY MEMORY SYSTEM
-----------------------------------------------------
-local KEY_MEMORY_FILE = "SkyMoon/KeyMemory.json"
-
-local function loadKeyMemory()
-    local default = {
-        Key = "Null",
-        Expired = false,
-        SaveKey = true,
-        CompletedAt = 0,
-        DayNum = 0
-    }
-    pcall(function()
-        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
-        if isfile(KEY_MEMORY_FILE) then
-            local raw = readfile(KEY_MEMORY_FILE)
-            if raw and raw ~= "" then
-                local parsed = HttpService:JSONDecode(raw)
-                for k, v in pairs(parsed) do default[k] = v end
-            end
-        end
-    end)
-    return default
-end
-
-local function saveKeyMemory(km)
-    pcall(function()
-        if not isfolder("SkyMoon") then makefolder("SkyMoon") end
-        writefile(KEY_MEMORY_FILE, HttpService:JSONEncode(km))
-    end)
-end
-
--- Daily key algo (sama dengan HTML)
-local function getDailyKey()
-    local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local dayNum = math.floor(os.time() / 86400)
-    local state = (dayNum * 2654435761) % 4294967296
-    local function lcg()
-        state = (state * 1664525 + 1013904223) % 4294967296
-        return state
-    end
-    local p1, p2 = "", ""
-    for _ = 1, 4 do local idx=(lcg()%36)+1; p1=p1..chars:sub(idx,idx) end
-    for _ = 1, 4 do local idx=(lcg()%36)+1; p2=p2..chars:sub(idx,idx) end
-    return "SKY-"..p1.."-"..p2, math.floor(os.time()/86400)
 end
 
 -- openMainHub: tampilkan main GUI
