@@ -4,7 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
-local GETKEY_URL = "https://hazck.github.io/ScriptHub/" -- ganti URL ini
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html" -- ganti URL ini
 
 -- Forward declarations
 local openScriptList
@@ -2055,184 +2055,186 @@ end
 
 -- Key auth prompt for /Open_Admin (terkoneksi ke KeyMemory.json)
 openAdminAuth = function()
-    local km = loadKeyMemory()
-    local todayKey, todayDay = getDailyKey()
+    local ok, err = pcall(function()
+        local km = loadKeyMemory()
+        local todayKey, todayDay = getDailyKey()
 
-    -- Cek KeyMemory dulu
-    if km.Key ~= "Null" and km.Key == todayKey and km.DayNum == todayDay and not km.Expired then
-        -- Key valid → status check lalu langsung buka admin
-        local sSg = Instance.new("ScreenGui")
-        sSg.Name = "SkyMoon_AdminCheck"
-        sSg.ResetOnSpawn = false
-        pcall(function() sSg.Parent = game.CoreGui end)
-        if not sSg.Parent then sSg.Parent = LocalPlayer.PlayerGui end
+        if km.Key ~= "Null" and km.Key == todayKey and km.DayNum == todayDay and not km.Expired then
+            local sSg = Instance.new("ScreenGui")
+            sSg.Name = "SkyMoon_AdminCheck"
+            sSg.ResetOnSpawn = false
+            pcall(function() sSg.Parent = game.CoreGui end)
+            if not sSg.Parent then sSg.Parent = LocalPlayer.PlayerGui end
 
-        local frame = Instance.new("Frame", sSg)
-        frame.Size = UDim2.new(0, 320, 0, 80)
-        frame.Position = UDim2.new(0.5, -160, 0.5, -40)
-        frame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
-        frame.BorderSizePixel = 0
-        Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
-        local fs = Instance.new("UIStroke", frame)
-        fs.Color = Color3.fromRGB(60, 80, 220)
-        fs.Thickness = 1.5
+            local frame = Instance.new("Frame", sSg)
+            frame.Size = UDim2.new(0, 320, 0, 80)
+            frame.Position = UDim2.new(0.5, -160, 0.5, -40)
+            frame.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+            frame.BorderSizePixel = 0
+            Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 10)
+            local fs = Instance.new("UIStroke", frame)
+            fs.Color = Color3.fromRGB(60, 80, 220)
+            fs.Thickness = 1.5
 
-        local lbl = Instance.new("TextLabel", frame)
-        lbl.Size = UDim2.new(1, -20, 1, 0)
-        lbl.Position = UDim2.new(0, 10, 0, 0)
-        lbl.BackgroundTransparency = 1
-        lbl.Text = "🔑 Status: Checking the Key..."
-        lbl.TextColor3 = Color3.fromRGB(255, 200, 80)
-        lbl.Font = Enum.Font.GothamBold
-        lbl.TextSize = 13
-        lbl.TextXAlignment = Enum.TextXAlignment.Left
+            local lbl = Instance.new("TextLabel", frame)
+            lbl.Size = UDim2.new(1, -20, 1, 0)
+            lbl.Position = UDim2.new(0, 10, 0, 0)
+            lbl.BackgroundTransparency = 1
+            lbl.Text = "🔑 Status: Checking the Key..."
+            lbl.TextColor3 = Color3.fromRGB(255, 200, 80)
+            lbl.Font = Enum.Font.GothamBold
+            lbl.TextSize = 13
+            lbl.TextXAlignment = Enum.TextXAlignment.Left
 
-        local bar = Instance.new("Frame", frame)
-        bar.Size = UDim2.new(0, 0, 0, 3)
-        bar.Position = UDim2.new(0, 0, 1, -3)
-        bar.BackgroundColor3 = Color3.fromRGB(60, 80, 220)
-        bar.BorderSizePixel = 0
-        TweenService:Create(bar, TweenInfo.new(1.2), {Size = UDim2.new(1, 0, 0, 3)}):Play()
+            local bar = Instance.new("Frame", frame)
+            bar.Size = UDim2.new(0, 0, 0, 3)
+            bar.Position = UDim2.new(0, 0, 1, -3)
+            bar.BackgroundColor3 = Color3.fromRGB(60, 80, 220)
+            bar.BorderSizePixel = 0
+            TweenService:Create(bar, TweenInfo.new(1.2), {Size = UDim2.new(1, 0, 0, 3)}):Play()
 
-        task.spawn(function()
-            task.wait(1.2)
-            lbl.Text = "✅ Status: Verifying the key has been completed!"
-            lbl.TextColor3 = Color3.fromRGB(80, 220, 120)
-            fs.Color = Color3.fromRGB(80, 220, 120)
-            task.wait(1)
-            sSg:Destroy()
-            openAdminPanel()
-        end)
-        return
-    end
-
-    -- Key expired / null → minta input manual
-    if km.Key ~= "Null" and km.Expired then
-        showNotifSimple("🔑 Key expired! Get a new key at KeyMoon.", Color3.fromRGB(255, 80, 80))
-    end
-
-    local authSg = Instance.new("ScreenGui")
-    authSg.Name = "SkyMoon_Auth"
-    authSg.ResetOnSpawn = false
-    pcall(function() authSg.Parent = game.CoreGui end)
-    if not authSg.Parent then authSg.Parent = LocalPlayer.PlayerGui end
-
-    local win = Instance.new("Frame", authSg)
-    win.Size = UDim2.new(0, 320, 0, 160)
-    win.Position = UDim2.new(0.5, -160, 0.5, -80)
-    win.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
-    win.BorderSizePixel = 0
-    win.Active = true
-    win.Draggable = true
-    Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
-    local ws = Instance.new("UIStroke", win)
-    ws.Color = Color3.fromRGB(60, 80, 220)
-    ws.Thickness = 1.5
-
-    local tbar = Instance.new("Frame", win)
-    tbar.Size = UDim2.new(1, 0, 0, 30)
-    tbar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
-    tbar.BorderSizePixel = 0
-    Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 12)
-    local tfix = Instance.new("Frame", tbar)
-    tfix.Size = UDim2.new(1, 0, 0.5, 0)
-    tfix.Position = UDim2.new(0, 0, 0.5, 0)
-    tfix.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
-    tfix.BorderSizePixel = 0
-    local tlbl = Instance.new("TextLabel", tbar)
-    tlbl.Size = UDim2.new(1, 0, 1, 0)
-    tlbl.BackgroundTransparency = 1
-    tlbl.Text = "🔑 SkyMoon Admin — Enter Key"
-    tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
-    tlbl.Font = Enum.Font.GothamBold
-    tlbl.TextSize = 12
-
-    local hint = Instance.new("TextLabel", win)
-    hint.Size = UDim2.new(1, -20, 0, 20)
-    hint.Position = UDim2.new(0, 10, 0, 36)
-    hint.BackgroundTransparency = 1
-    hint.Text = "Get key at: hazck.github.io/ScriptHub/KeyMoon.html"
-    hint.TextColor3 = Color3.fromRGB(100, 110, 160)
-    hint.Font = Enum.Font.Code
-    hint.TextSize = 10
-    hint.TextXAlignment = Enum.TextXAlignment.Left
-
-    local inputBar = Instance.new("Frame", win)
-    inputBar.Size = UDim2.new(1, -16, 0, 32)
-    inputBar.Position = UDim2.new(0, 8, 0, 62)
-    inputBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
-    inputBar.BorderSizePixel = 0
-    Instance.new("UICorner", inputBar).CornerRadius = UDim.new(0, 6)
-    local ibs = Instance.new("UIStroke", inputBar)
-    ibs.Color = Color3.fromRGB(60, 80, 180)
-    ibs.Thickness = 1
-
-    local inputBox = Instance.new("TextBox", inputBar)
-    inputBox.Size = UDim2.new(1, -10, 1, 0)
-    inputBox.Position = UDim2.new(0, 8, 0, 0)
-    inputBox.BackgroundTransparency = 1
-    inputBox.Text = ""
-    inputBox.PlaceholderText = "SKY-XXXX-XXXX"
-    inputBox.PlaceholderColor3 = Color3.fromRGB(60, 60, 90)
-    inputBox.TextColor3 = Color3.fromRGB(200, 210, 255)
-    inputBox.Font = Enum.Font.Code
-    inputBox.TextSize = 13
-    inputBox.ClearTextOnFocus = false
-
-    local statusLbl = Instance.new("TextLabel", win)
-    statusLbl.Size = UDim2.new(1, -16, 0, 20)
-    statusLbl.Position = UDim2.new(0, 8, 0, 100)
-    statusLbl.BackgroundTransparency = 1
-    statusLbl.Text = ""
-    statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
-    statusLbl.Font = Enum.Font.Code
-    statusLbl.TextSize = 12
-
-    local enterBtn = Instance.new("TextButton", win)
-    enterBtn.Size = UDim2.new(1, -16, 0, 30)
-    enterBtn.Position = UDim2.new(0, 8, 1, -38)
-    enterBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
-    enterBtn.Text = "Enter"
-    enterBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
-    enterBtn.Font = Enum.Font.GothamBold
-    enterBtn.TextSize = 13
-    enterBtn.BorderSizePixel = 0
-    Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
-
-    local function tryAuth()
-        local typed = inputBox.Text:match("^%s*(.-)%s*$")
-        local validKey, validDay = getDailyKey()
-
-        if typed == validKey then
-            -- Update KeyMemory
-            local kmNew = loadKeyMemory()
-            kmNew.Key = validKey
-            kmNew.Expired = false
-            kmNew.DayNum = validDay
-            kmNew.CompletedAt = os.time()
-            saveKeyMemory(kmNew)
-
-            statusLbl.Text = "✅ Verified!"
-            statusLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
-            ibs.Color = Color3.fromRGB(80, 220, 120)
-            task.wait(0.8)
-            authSg:Destroy()
-            openAdminPanel()
-        else
-            statusLbl.Text = "❌ Wrong key! Get it from KeyMoon.html"
-            ibs.Color = Color3.fromRGB(255, 80, 80)
-            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-155,0.5,-80)}):Play()
-            task.wait(0.05)
-            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-165,0.5,-80)}):Play()
-            task.wait(0.05)
-            TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-160,0.5,-80)}):Play()
-            task.wait(1)
-            ibs.Color = Color3.fromRGB(60, 80, 180)
+            task.spawn(function()
+                task.wait(1.2)
+                lbl.Text = "✅ Status: Verifying the key has been completed!"
+                lbl.TextColor3 = Color3.fromRGB(80, 220, 120)
+                fs.Color = Color3.fromRGB(80, 220, 120)
+                task.wait(1)
+                sSg:Destroy()
+                pcall(openAdminPanel)
+            end)
+            return
         end
-    end
 
-    enterBtn.MouseButton1Click:Connect(tryAuth)
-    inputBox.FocusLost:Connect(function(enter) if enter then tryAuth() end end)
+        if km.Key ~= "Null" and km.Expired then
+            showNotifSimple("🔑 Key expired! Get a new key at KeyMoon.", Color3.fromRGB(255, 80, 80))
+        end
+
+        -- Manual key input
+        local authSg = Instance.new("ScreenGui")
+        authSg.Name = "SkyMoon_Auth"
+        authSg.ResetOnSpawn = false
+        pcall(function() authSg.Parent = game.CoreGui end)
+        if not authSg.Parent then authSg.Parent = LocalPlayer.PlayerGui end
+
+        local win = Instance.new("Frame", authSg)
+        win.Size = UDim2.new(0, 320, 0, 160)
+        win.Position = UDim2.new(0.5, -160, 0.5, -80)
+        win.BackgroundColor3 = Color3.fromRGB(10, 10, 18)
+        win.BorderSizePixel = 0
+        win.Active = true
+        win.Draggable = true
+        Instance.new("UICorner", win).CornerRadius = UDim.new(0, 12)
+        local ws = Instance.new("UIStroke", win)
+        ws.Color = Color3.fromRGB(60, 80, 220)
+        ws.Thickness = 1.5
+
+        local tbar = Instance.new("Frame", win)
+        tbar.Size = UDim2.new(1, 0, 0, 30)
+        tbar.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+        tbar.BorderSizePixel = 0
+        Instance.new("UICorner", tbar).CornerRadius = UDim.new(0, 12)
+        local tfix = Instance.new("Frame", tbar)
+        tfix.Size = UDim2.new(1, 0, 0.5, 0)
+        tfix.Position = UDim2.new(0, 0, 0.5, 0)
+        tfix.BackgroundColor3 = Color3.fromRGB(16, 16, 28)
+        tfix.BorderSizePixel = 0
+        local tlbl = Instance.new("TextLabel", tbar)
+        tlbl.Size = UDim2.new(1, 0, 1, 0)
+        tlbl.BackgroundTransparency = 1
+        tlbl.Text = "🔑 SkyMoon Admin — Enter Key"
+        tlbl.TextColor3 = Color3.fromRGB(180, 190, 255)
+        tlbl.Font = Enum.Font.GothamBold
+        tlbl.TextSize = 12
+
+        local hint = Instance.new("TextLabel", win)
+        hint.Size = UDim2.new(1, -20, 0, 20)
+        hint.Position = UDim2.new(0, 10, 0, 36)
+        hint.BackgroundTransparency = 1
+        hint.Text = "Get key: hazck.github.io/ScriptHub/KeyMoon.html"
+        hint.TextColor3 = Color3.fromRGB(100, 110, 160)
+        hint.Font = Enum.Font.Code
+        hint.TextSize = 10
+        hint.TextXAlignment = Enum.TextXAlignment.Left
+
+        local inputBar = Instance.new("Frame", win)
+        inputBar.Size = UDim2.new(1, -16, 0, 32)
+        inputBar.Position = UDim2.new(0, 8, 0, 62)
+        inputBar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+        inputBar.BorderSizePixel = 0
+        Instance.new("UICorner", inputBar).CornerRadius = UDim.new(0, 6)
+        local ibs = Instance.new("UIStroke", inputBar)
+        ibs.Color = Color3.fromRGB(60, 80, 180)
+        ibs.Thickness = 1
+
+        local inputBox = Instance.new("TextBox", inputBar)
+        inputBox.Size = UDim2.new(1, -10, 1, 0)
+        inputBox.Position = UDim2.new(0, 8, 0, 0)
+        inputBox.BackgroundTransparency = 1
+        inputBox.Text = ""
+        inputBox.PlaceholderText = "SKY-XXXX-XXXX"
+        inputBox.PlaceholderColor3 = Color3.fromRGB(60, 60, 90)
+        inputBox.TextColor3 = Color3.fromRGB(200, 210, 255)
+        inputBox.Font = Enum.Font.Code
+        inputBox.TextSize = 13
+        inputBox.ClearTextOnFocus = false
+
+        local statusLbl = Instance.new("TextLabel", win)
+        statusLbl.Size = UDim2.new(1, -16, 0, 20)
+        statusLbl.Position = UDim2.new(0, 8, 0, 100)
+        statusLbl.BackgroundTransparency = 1
+        statusLbl.Text = ""
+        statusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+        statusLbl.Font = Enum.Font.Code
+        statusLbl.TextSize = 12
+
+        local enterBtn = Instance.new("TextButton", win)
+        enterBtn.Size = UDim2.new(1, -16, 0, 30)
+        enterBtn.Position = UDim2.new(0, 8, 1, -38)
+        enterBtn.BackgroundColor3 = Color3.fromRGB(30, 60, 160)
+        enterBtn.Text = "Enter"
+        enterBtn.TextColor3 = Color3.fromRGB(220, 230, 255)
+        enterBtn.Font = Enum.Font.GothamBold
+        enterBtn.TextSize = 13
+        enterBtn.BorderSizePixel = 0
+        Instance.new("UICorner", enterBtn).CornerRadius = UDim.new(0, 6)
+
+        local function tryAuth()
+            local typed = inputBox.Text:match("^%s*(.-)%s*$")
+            local validKey, validDay = getDailyKey()
+            if typed == validKey then
+                local kmNew = loadKeyMemory()
+                kmNew.Key = validKey
+                kmNew.Expired = false
+                kmNew.DayNum = validDay
+                kmNew.CompletedAt = os.time()
+                saveKeyMemory(kmNew)
+                statusLbl.Text = "✅ Verified!"
+                statusLbl.TextColor3 = Color3.fromRGB(80, 220, 120)
+                ibs.Color = Color3.fromRGB(80, 220, 120)
+                task.wait(0.8)
+                authSg:Destroy()
+                pcall(openAdminPanel)
+            else
+                statusLbl.Text = "❌ Wrong key! Get it from KeyMoon.html"
+                ibs.Color = Color3.fromRGB(255, 80, 80)
+                TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-155,0.5,-80)}):Play()
+                task.wait(0.05)
+                TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-165,0.5,-80)}):Play()
+                task.wait(0.05)
+                TweenService:Create(win, TweenInfo.new(0.05), {Position = UDim2.new(0.5,-160,0.5,-80)}):Play()
+                task.wait(1)
+                ibs.Color = Color3.fromRGB(60, 80, 180)
+            end
+        end
+
+        enterBtn.MouseButton1Click:Connect(function() pcall(tryAuth) end)
+        inputBox.FocusLost:Connect(function(enter) if enter then pcall(tryAuth) end end)
+    end)
+
+    if not ok then
+        warn("[SkyMoon] openAdminAuth error: " .. tostring(err))
+        showNotifSimple("❌ Admin error: " .. tostring(err):sub(1,40), Color3.fromRGB(255,80,80))
+    end
 end
 
 -- openMainHub: tampilkan main GUI
