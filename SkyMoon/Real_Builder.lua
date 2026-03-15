@@ -52,7 +52,20 @@ local noClipConn    = nil
 local spawnedObjs   = {}
 local expanded      = {}
 local savedCharCF   = nil
-local colorTarget   = nil -- which property to apply color to
+local colorTarget   = nil
+
+-- Mobile detection
+local isMobile = UIS.TouchEnabled and not UIS.KeyboardEnabled
+
+-- Mobile joystick state
+local joystickDir   = Vector2.new(0,0)   -- normalized direction dari joystick
+local joystickSpeed = 1.0                -- multiplier kecepatan (bisa di-setting)
+local touchCamDelta = Vector2.new(0,0)   -- delta swipe untuk rotasi kamera
+local joyActive     = false
+local joyTouchId    = nil
+local camTouchId    = nil
+local joyCenter     = Vector2.new(0,0)   -- center joystick saat finger down
+local JOY_RADIUS    = 60                 -- radius max joystick dalam pixel
 
 ----------------------------------------------------
 -- HELPERS
@@ -377,18 +390,11 @@ function updateHandles()
     end
 end
 
-----------------------------------------------------
--- FREE CAM — "Invisible Man" technique
--- Char ditempatkan di Y:-15 (underground, orang lain tidak lihat)
--- Kamera bebas bergerak di atas
--- Kalau kamera dekat part ≤5 studs → char turun ke Y:-20
--- Kecepatan char mengikuti kecepatan kamera
-----------------------------------------------------
 local camYaw    = 0
 local camPitch  = 0
 local rmhHeld   = false
 local rmhConn   = nil
-local charYBase = -15  -- posisi default char underground
+local charYBase = -15
 local lastCamPos = Vector3.new(0,0,0)
 
 local function getCharY(camPos)
@@ -472,22 +478,24 @@ local function startFreeCam()
         end
     end)
 
+    -- Joystick input (diisi oleh mobile joystick di bawah)
+    -- joystickVel = Vector2 arah joystick (-1 to 1)
     local moveSpeed = 40
 
     freeCamConn = RunService.RenderStepped:Connect(function(dt)
-        -- Rotasi mouse (hanya saat RMB ditekan)
         if rmhHeld then
             local delta = UIS:GetMouseDelta()
             camYaw   = camYaw   - delta.X * 0.3
             camPitch = math.clamp(camPitch - delta.Y * 0.3, -89, 89)
         end
-
-        -- Build camera CFrame
+        if touchCamDelta.X ~= 0 or touchCamDelta.Y ~= 0 then
+            camYaw   = camYaw   - touchCamDelta.X * 0.25
+            camPitch = math.clamp(camPitch - touchCamDelta.Y * 0.25, -89, 89)
+            touchCamDelta = Vector2.new(0,0)
+        end
         local rotCF = CFrame.new(cam.CFrame.Position)
             * CFrame.Angles(0, math.rad(camYaw), 0)
             * CFrame.Angles(math.rad(camPitch), 0, 0)
-
-        -- Keyboard movement
         local vel = Vector3.new(0,0,0)
         if UIS:IsKeyDown(Enum.KeyCode.W) then vel = vel + rotCF.LookVector end
         if UIS:IsKeyDown(Enum.KeyCode.S) then vel = vel - rotCF.LookVector end
@@ -495,47 +503,37 @@ local function startFreeCam()
         if UIS:IsKeyDown(Enum.KeyCode.D) then vel = vel + rotCF.RightVector end
         if UIS:IsKeyDown(Enum.KeyCode.E) then vel = vel + Vector3.new(0,1,0) end
         if UIS:IsKeyDown(Enum.KeyCode.Q) then vel = vel - Vector3.new(0,1,0) end
-
-        local spd = UIS:IsKeyDown(Enum.KeyCode.LeftShift) and moveSpeed*4 or moveSpeed
+        if joystickDir.Magnitude > 0.05 then
+            vel = vel + rotCF.LookVector * (-joystickDir.Y)
+            vel = vel + rotCF.RightVector * joystickDir.X
+        end
+        local spd = UIS:IsKeyDown(Enum.KeyCode.LeftShift) and moveSpeed*4 or (moveSpeed * joystickSpeed)
         local newPos = cam.CFrame.Position + vel * spd * dt
-
         cam.CFrame = CFrame.new(newPos)
             * CFrame.Angles(0, math.rad(camYaw), 0)
             * CFrame.Angles(math.rad(camPitch), 0, 0)
-
-        -- ── INVISIBLE MAN: update posisi char underground ──
-        -- Kecepatan kamera menentukan seberapa cepat char bergerak
         local camVelocity = (newPos - lastCamPos).Magnitude / dt
         lastCamPos = newPos
-
-        -- Char selalu follow posisi XZ kamera, tapi di Y underground
         local targetY = getCharY(newPos)
-
-        -- Kalau kamera bergerak cepat, char langsung teleport
-        -- Kalau pelan, lerp halus
         pcall(function()
             local char = LocalPlayer.Character
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local curCharPos = hrp.Position
                 local targetPos = Vector3.new(newPos.X, targetY, newPos.Z)
-
-                if camVelocity > 50 then
-                    -- Cepat → langsung
-                    hrp.CFrame = CFrame.new(targetPos)
-                else
-                    -- Pelan → lerp halus
-                    local alpha = math.clamp(dt * 8, 0, 1)
-                    hrp.CFrame = CFrame.new(
-                        curCharPos:Lerp(targetPos, alpha)
-                    )
-                end
+                if camVelocity > 50 then hrp.CFrame = CFrame.new(targetPos)
+                else hrp.CFrame = CFrame.new(curCharPos:Lerp(targetPos, math.clamp(dt*8,0,1))) end
             end
         end)
     end)
-
     rmhConn = {rmbDown, rmbUp}
-    statusLbl.Text = "🌙 FreeCam  |  Hold RMB+drag=look  |  WASD/QE=move  |  Shift=fast  |  Char hidden underground"
+    statusLbl.Text = isMobile
+        and "🌙 FreeCam | Joystick=gerak | Swipe=lihat | Tap=select"
+        or  "🌙 FreeCam | RMB+drag=look | WASD/QE=move | Shift=fast"
+end
+
+        and "🌙 FreeCam  |  Joystick=gerak  |  Swipe kanan=kamera  |  Tap part=select"
+        or  "🌙 FreeCam  |  RMB+drag=look  |  WASD/QE=move  |  Shift=fast"
 end
 
 local function stopFreeCam()
@@ -570,6 +568,161 @@ local function stopFreeCam()
 end
 
 startFreeCam()
+
+----------------------------------------------------
+-- MOBILE JOYSTICK UI + TOUCH CAMERA
+----------------------------------------------------
+if isMobile then
+    local joyBase = Instance.new("ImageLabel", sg)
+    joyBase.Size = UDim2.new(0,140,0,140)
+    joyBase.Position = UDim2.new(0,20,1,-170)
+    joyBase.BackgroundColor3 = Color3.fromRGB(255,255,255)
+    joyBase.BackgroundTransparency = 0.7
+    joyBase.BorderSizePixel = 0
+    joyBase.ZIndex = 25
+    joyBase.Image = ""
+    mkCorner(70, joyBase)
+    mkStroke(Color3.fromRGB(150,150,150), 2, joyBase)
+
+    local function addJoyLabel(parent, text, pos, color)
+        local l = Instance.new("TextLabel", parent)
+        l.Size = UDim2.new(0,20,0,20)
+        l.Position = pos
+        l.BackgroundTransparency = 1
+        l.Text = text
+        l.Font = Enum.Font.GothamBold
+        l.TextSize = 11
+        l.TextColor3 = color or Color3.fromRGB(200,200,200)
+        l.ZIndex = 26
+    end
+    addJoyLabel(joyBase,"W",UDim2.new(0.5,-10,0,4),Color3.fromRGB(100,220,100))
+    addJoyLabel(joyBase,"S",UDim2.new(0.5,-10,1,-24),Color3.fromRGB(100,220,100))
+    addJoyLabel(joyBase,"A",UDim2.new(0,4,0.5,-10),Color3.fromRGB(100,220,100))
+    addJoyLabel(joyBase,"D",UDim2.new(1,-24,0.5,-10),Color3.fromRGB(100,220,100))
+
+    local joyThumb = Instance.new("Frame", joyBase)
+    joyThumb.Size = UDim2.new(0,52,0,52)
+    joyThumb.Position = UDim2.new(0.5,-26,0.5,-26)
+    joyThumb.BackgroundColor3 = Color3.fromRGB(0,162,255)
+    joyThumb.BackgroundTransparency = 0.2
+    joyThumb.BorderSizePixel = 0
+    joyThumb.ZIndex = 27
+    mkCorner(26, joyThumb)
+    mkStroke(Color3.fromRGB(0,200,255), 2, joyThumb)
+
+    local speedLbl = Instance.new("TextLabel", sg)
+    speedLbl.Size = UDim2.new(0,140,0,20)
+    speedLbl.Position = UDim2.new(0,20,1,-25)
+    speedLbl.BackgroundTransparency = 1
+    speedLbl.Text = "Speed: "..joystickSpeed.."x"
+    speedLbl.Font = Enum.Font.Code
+    speedLbl.TextSize = 11
+    speedLbl.TextColor3 = Color3.fromRGB(150,150,150)
+    speedLbl.ZIndex = 25
+
+    local joySettingsBtn = mkBtn(sg,"⚙",UDim2.new(0,36,0,36),UDim2.new(0,168,1,-60),T.dark,T.text)
+    joySettingsBtn.BackgroundTransparency = 0
+    joySettingsBtn.ZIndex = 25
+
+    local settingsPanel = Instance.new("Frame", sg)
+    settingsPanel.Size = UDim2.new(0,200,0,130)
+    settingsPanel.Position = UDim2.new(0,168,1,-195)
+    settingsPanel.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    settingsPanel.BackgroundTransparency = 0.1
+    settingsPanel.BorderSizePixel = 0
+    settingsPanel.Visible = false
+    settingsPanel.ZIndex = 30
+    mkCorner(8,settingsPanel)
+    mkStroke(T.border,1,settingsPanel)
+    mkLabel(settingsPanel,"⚙ Joystick Settings",UDim2.new(1,-8,0,20),UDim2.new(0,6,0,4),11,T.accent)
+    mkLabel(settingsPanel,"Speed:",UDim2.new(0,50,0,16),UDim2.new(0,6,0,30),10,T.dimText)
+
+    local speedValLbl = mkLabel(settingsPanel,
+        tostring(joystickSpeed).."x",
+        UDim2.new(0,40,0,16),UDim2.new(0,54,0,30),11,T.text)
+
+    local minusBtn = mkBtn(settingsPanel,"-",UDim2.new(0,30,0,24),UDim2.new(0,100,0,26),T.dark,T.text)
+    minusBtn.BackgroundTransparency=0 minusBtn.ZIndex=31
+    local plusBtn = mkBtn(settingsPanel,"+",UDim2.new(0,30,0,24),UDim2.new(0,134,0,26),T.dark,T.text)
+    plusBtn.BackgroundTransparency=0 plusBtn.ZIndex=31
+
+    local function updateSpeed(delta)
+        joystickSpeed = math.clamp(math.floor((joystickSpeed+delta)*10)/10, 0.2, 3.0)
+        speedValLbl.Text = tostring(joystickSpeed).."x"
+        speedLbl.Text = "Speed: "..joystickSpeed.."x"
+    end
+    minusBtn.MouseButton1Click:Connect(function() updateSpeed(-0.2) end)
+    plusBtn.MouseButton1Click:Connect(function() updateSpeed(0.2) end)
+
+    local invertY = false
+    local invertBtn = mkBtn(settingsPanel,"Invert Y: OFF",UDim2.new(1,-12,0,22),UDim2.new(0,6,0,56),T.dark,T.dimText)
+    invertBtn.BackgroundTransparency=0 invertBtn.ZIndex=31
+    invertBtn.MouseButton1Click:Connect(function()
+        invertY = not invertY
+        invertBtn.Text = "Invert Y: "..(invertY and "ON" or "OFF")
+        invertBtn.TextColor3 = invertY and T.accent or T.dimText
+    end)
+
+    mkLabel(settingsPanel,"Swipe anywhere else = rotate cam",UDim2.new(1,-12,0,28),UDim2.new(0,6,0,82),9,T.dimText)
+
+    joySettingsBtn.MouseButton1Click:Connect(function()
+        settingsPanel.Visible = not settingsPanel.Visible
+    end)
+
+    -- Touch handler
+    local lastCamTouchPos = nil
+    local JOY_R = 80 -- radius deteksi zone joystick
+
+    local function isInJoyZone(pos)
+        local ap = joyBase.AbsolutePosition
+        local as = joyBase.AbsoluteSize
+        local c = Vector2.new(ap.X+as.X/2, ap.Y+as.Y/2)
+        return (Vector2.new(pos.X,pos.Y)-c).Magnitude <= JOY_R
+    end
+
+    UIS.TouchStarted:Connect(function(touch, gp)
+        if gp then return end
+        local pos = touch.Position
+        if isInJoyZone(pos) and not joyActive then
+            joyActive = true
+            joyTouchId = touch
+            joyCenter = Vector2.new(pos.X,pos.Y)
+            joyThumb.Position = UDim2.new(0.5,-26,0.5,-26)
+        elseif camTouchId == nil then
+            camTouchId = touch
+            lastCamTouchPos = Vector2.new(pos.X,pos.Y)
+        end
+    end)
+
+    UIS.TouchMoved:Connect(function(touch, gp)
+        if gp then return end
+        if touch == joyTouchId and joyActive then
+            local pos = Vector2.new(touch.Position.X,touch.Position.Y)
+            local delta = pos - joyCenter
+            local dist = math.min(delta.Magnitude, JOY_RADIUS)
+            local norm = delta.Magnitude > 0 and delta.Unit or Vector2.new(0,0)
+            joystickDir = Vector2.new(norm.X, invertY and -norm.Y or norm.Y) * (dist/JOY_RADIUS)
+            joyThumb.Position = UDim2.new(0.5, norm.X*dist-26, 0.5, norm.Y*dist-26)
+        elseif touch == camTouchId then
+            local pos = Vector2.new(touch.Position.X,touch.Position.Y)
+            if lastCamTouchPos then
+                touchCamDelta = touchCamDelta + (pos - lastCamTouchPos)
+            end
+            lastCamTouchPos = pos
+        end
+    end)
+
+    UIS.TouchEnded:Connect(function(touch, gp)
+        if touch == joyTouchId then
+            joyActive=false joyTouchId=nil
+            joystickDir=Vector2.new(0,0)
+            joyThumb.Position=UDim2.new(0.5,-26,0.5,-26)
+        elseif touch == camTouchId then
+            camTouchId=nil lastCamTouchPos=nil
+        end
+    end)
+end
+
 
 ----------------------------------------------------
 -- PLAY / STOP
