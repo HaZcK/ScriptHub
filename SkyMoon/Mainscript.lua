@@ -2139,14 +2139,29 @@ openAdminPanel = function()
     end
 
     makeRow(buildTab, "🔥 Real Builder — Full Studio Mode", "Run", Color3.fromRGB(0, 100, 180), function()
-        local ok, res = pcall(function()
-            return game:HttpGet(RealBuilder_URL)
+        showNotifSimple("⏳ Loading Real Builder...", Color3.fromRGB(100,180,255))
+        task.spawn(function()
+            local ok, res = pcall(function()
+                return game:HttpGet(RealBuilder_URL)
+            end)
+            if not ok then
+                showNotifSimple("❌ HttpGet failed: " .. tostring(res):sub(1,40), Color3.fromRGB(255,80,80))
+                return
+            end
+            if not res or res == "" then
+                showNotifSimple("❌ Empty response from Real Builder URL", Color3.fromRGB(255,80,80))
+                return
+            end
+            local fn, err = loadstring(res)
+            if not fn then
+                showNotifSimple("❌ Parse error: " .. tostring(err):sub(1,50), Color3.fromRGB(255,80,80))
+                return
+            end
+            local runOk, runErr = pcall(fn)
+            if not runOk then
+                showNotifSimple("❌ Run error: " .. tostring(runErr):sub(1,50), Color3.fromRGB(255,80,80))
+            end
         end)
-        if ok and res then
-            pcall(loadstring(res))
-        else
-            showNotifSimple("❌ Failed to load Real Builder!", Color3.fromRGB(255,80,80))
-        end
     end)
     makeRow(buildTab, "── Spawn Objects ──", nil, nil, nil)
     makeRow(buildTab, "🔵 Spawn Sphere Ball", "Spawn", Color3.fromRGB(30,80,60), function() spawnPart(Enum.PartType.Ball, nil, nil) end)
@@ -2209,11 +2224,6 @@ openAdminPanel = function()
     end)
     makeRow(buildTab, string.format("📦 Spawned: %d parts", #spawnedParts), nil, nil, nil)
     makeRow(buildTab, "── Extra Build ──", nil, nil, nil)
-    makeRow(buildTab, "🔥 Real Builder (Studio)", "Run", Color3.fromRGB(0,100,180), function()
-        local ok, res = pcall(function() return game:HttpGet(RealBuilder_URL) end)
-        if ok and res then pcall(loadstring(res))
-        else showNotifSimple("❌ Failed to load Real Builder!", Color3.fromRGB(255,80,80)) end
-    end)
     makeRow(buildTab, "🌐 Spawn platform (40x1x40)", "Spawn", Color3.fromRGB(30,80,60), function()
         spawnPart(nil, Enum.Material.SmoothPlastic, Vector3.new(40,1,40), function(p)
             p.BrickColor = BrickColor.new("Medium stone grey")
