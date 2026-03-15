@@ -4,7 +4,7 @@
 local RAW_PLACELIST = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/PlaceList.json"
 local RAW_UNIVERSAL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Universal.json"
 local UBUNTU_LOGO_URL = "https://tkj.smkdarmasiswasidoarjo.sch.id/wp-content/uploads/2024/08/61ef634e-0b5f-4d27-9fb6-c64d526c595c.png"
-local GETKEY_URL = "https://hazck.github.io/ScriptHub/"
+local GETKEY_URL = "https://hazck.github.io/ScriptHub/KeyMoon.html"
 local RealBuilder_URL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/SkyMoon/Real_Builder.lua" -- ganti URL ini
 
 -- Forward declarations
@@ -483,7 +483,11 @@ local function scanWorkspace(output, entry)
                 depth = depth,
                 label = parentLabel,
             })
-            collectItems(child, depth + 1, parentLabel)
+            -- Model → tampil nama aja, TIDAK masuk ke dalamnya
+            -- Folder, BasePart, Script → boleh rekursi
+            if not child:IsA("Model") then
+                collectItems(child, depth + 1, parentLabel)
+            end
         end
     end
     for _, s in ipairs(services) do
