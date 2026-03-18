@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkyMoon — Key System</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#04040a; --surface:#0a0a14; --surface2:#0f0f1e;
+    --accent:#3355ff; --accent2:#00ffaa; --accent3:#ff3355;
+    --text:#c8d0ff; --dim:#444466; --glow:rgba(51,85,255,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:'Share Tech Mono',monospace;
+    min-height:100vh; overflow-x:hidden; cursor:crosshair;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.08) 2px,rgba(0,0,0,0.08) 4px);
+    pointer-events:none; z-index:9999;
+  }
+  body::after {
+    content:''; position:fixed; inset:0;
+    background:
+      linear-gradient(rgba(51,85,255,0.04) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(51,85,255,0.04) 1px,transparent 1px);
+    background-size:40px 40px;
+    pointer-events:none; z-index:0;
+  }
+
+  /* ── PAGES ── */
+  .page { display:none; min-height:100vh; position:relative; z-index:1; }
+  .page.active { display:flex; flex-direction:column; align-items:center; justify-content:center; }
+
+  /* ── HEADER ── */
+  .logo {
+    font-family:'Orbitron',sans-serif; font-size:2.2rem; font-weight:900;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    text-align:center; letter-spacing:4px;
+    text-shadow:0 0 40px var(--glow);
+  }
+  .sub { color:var(--dim); font-size:0.75rem; letter-spacing:2px; text-align:center; margin-top:6px; }
+
+  /* ── CARD ── */
+  .card {
+    background:var(--surface); border:1px solid var(--dim);
+    border-radius:12px; padding:28px; width:min(440px,92vw);
+    box-shadow:0 0 40px rgba(51,85,255,0.08);
+    position:relative; margin-top:24px;
+  }
+
+  /* ── BUTTON ── */
+  .btn {
+    display:inline-block; padding:12px 28px;
+    background:linear-gradient(135deg,var(--accent),#2244cc);
+    color:#fff; font-family:'Orbitron',sans-serif; font-size:0.85rem;
+    font-weight:700; letter-spacing:2px; border:none; border-radius:8px;
+    cursor:pointer; transition:all 0.2s; text-decoration:none;
+    box-shadow:0 0 20px var(--glow);
+  }
+  .btn:hover { transform:translateY(-2px); box-shadow:0 0 32px rgba(51,85,255,0.5); }
+  .btn.green { background:linear-gradient(135deg,#00cc66,#009944); box-shadow:0 0 20px rgba(0,200,100,0.3); }
+  .btn.green:hover { box-shadow:0 0 32px rgba(0,200,100,0.5); }
+  .btn.dim { background:var(--surface2); color:var(--dim); box-shadow:none; }
+  .btn-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+
+  /* ── CLOCK ── */
+  .clock {
+    font-family:'Orbitron',sans-serif; font-size:2.8rem; font-weight:700;
+    color:var(--accent2); text-align:center; letter-spacing:6px;
+    text-shadow:0 0 20px rgba(0,255,170,0.4);
+    margin:12px 0;
+  }
+  .clock-sub { color:var(--dim); font-size:0.7rem; text-align:center; letter-spacing:2px; }
+
+  /* ── TIMER BAR ── */
+  .timer-wrap { width:100%; background:var(--surface2); border-radius:4px; height:6px; margin:14px 0; overflow:hidden; }
+  .timer-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width 1s linear; border-radius:4px; }
+
+  /* ── PERMISSION BANNER ── */
+  #perm-banner {
+    position:fixed; bottom:0; left:0; right:0; z-index:10000;
+    background:linear-gradient(135deg,#0a0a1e,#0f1030);
+    border-top:1px solid var(--accent); padding:16px 20px;
+    display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+    justify-content:space-between;
+    animation:slideUp 0.4s ease;
+  }
+  @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+  .perm-text { font-size:0.8rem; color:var(--text); flex:1; min-width:200px; }
+  .perm-text b { color:var(--accent2); }
+  .perm-btns { display:flex; gap:8px; }
+  .perm-allow { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:8px 16px; cursor:pointer; font-family:inherit; font-size:0.78rem; font-weight:700; }
+  .perm-deny { background:transparent; color:var(--dim); border:1px solid var(--dim); border-radius:6px; padding:8px 16px; cursor:pointer; font-family:inherit; font-size:0.78rem; }
+
+  /* ── NOTIFICATION POPUP ── */
+  .notif {
+    position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-120%);
+    background:var(--surface); border:1px solid var(--accent2); border-radius:10px;
+    padding:14px 22px; z-index:20000; font-size:0.82rem;
+    transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    text-align:center; min-width:280px; max-width:90vw;
+    box-shadow:0 0 30px rgba(0,255,170,0.15);
+  }
+  .notif.show { transform:translateX(-50%) translateY(0); }
+  .notif-title { color:var(--accent2); font-family:'Orbitron',sans-serif; font-size:0.9rem; font-weight:700; margin-bottom:4px; }
+
+  /* ── PUZZLE WORDS ── */
+  .words-area { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:18px 0; min-height:48px; }
+  .word-chip {
+    padding:7px 14px; border:1px solid var(--dim); border-radius:6px;
+    background:var(--surface2); color:var(--text); cursor:pointer;
+    transition:all 0.18s; font-size:0.85rem; user-select:none;
+  }
+  .word-chip:hover { border-color:var(--accent); color:var(--accent2); }
+  .word-chip.placed { background:rgba(51,85,255,0.2); border-color:var(--accent); color:var(--accent2); opacity:0.5; cursor:not-allowed; }
+  .answer-area { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; min-height:44px; margin:8px 0; }
+  .answer-chip {
+    padding:7px 14px; border:1px solid var(--accent); border-radius:6px;
+    background:rgba(51,85,255,0.12); color:var(--accent2); cursor:pointer;
+    transition:all 0.18s; font-size:0.85rem; user-select:none;
+  }
+  .answer-chip:hover { background:rgba(255,50,80,0.1); border-color:var(--accent3); color:var(--accent3); }
+
+  /* ── KEY DISPLAY ── */
+  .key-box {
+    background:var(--surface2); border:1px solid var(--accent2); border-radius:8px;
+    padding:16px 20px; text-align:center; font-family:'Orbitron',sans-serif;
+    font-size:1.3rem; font-weight:700; color:var(--accent2); letter-spacing:4px;
+    text-shadow:0 0 20px rgba(0,255,170,0.4); margin:16px 0;
+    cursor:pointer; transition:all 0.2s;
+  }
+  .key-box:hover { box-shadow:0 0 24px rgba(0,255,170,0.3); }
+
+  /* ── SETTINGS PANEL ── */
+  #settings-panel {
+    display:none; position:fixed; top:0; right:0; width:min(320px,90vw); height:100vh;
+    background:var(--surface); border-left:1px solid var(--dim);
+    z-index:5000; padding:24px; overflow-y:auto;
+    animation:slideIn 0.3s ease;
+  }
+  @keyframes slideIn { from{transform:translateX(100%)} to{transform:translateX(0)} }
+  .settings-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid var(--surface2); }
+  .settings-label { font-size:0.82rem; color:var(--text); }
+  .toggle-btn { padding:6px 14px; border-radius:6px; font-size:0.75rem; cursor:pointer; border:1px solid var(--dim); background:transparent; font-family:inherit; }
+  .toggle-btn.on { border-color:var(--accent2); color:var(--accent2); }
+  .toggle-btn.off { border-color:var(--accent3); color:var(--accent3); }
+
+  /* ── MISC ── */
+  .section-title { color:var(--dim); font-size:0.7rem; letter-spacing:3px; margin-bottom:10px; text-transform:uppercase; }
+  .status-bar { font-size:0.72rem; color:var(--dim); text-align:center; margin-top:10px; }
+  .expired-badge { color:var(--accent3); font-size:0.75rem; letter-spacing:1px; }
+  #settings-btn {
+    position:fixed; top:16px; right:16px; z-index:4000;
+    background:var(--surface); border:1px solid var(--dim); border-radius:8px;
+    padding:8px 14px; cursor:pointer; font-family:inherit; color:var(--dim); font-size:0.8rem;
+  }
+  #settings-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .err-msg { color:var(--accent3); font-size:0.78rem; text-align:center; min-height:20px; margin-top:6px; }
+  hr.rule { border:none; border-top:1px solid var(--surface2); margin:14px 0; }
+</style>
+</head>
+<body>
+
+<!-- ── LOADING SCREEN ── -->
+<div id="loading-screen" style="
+  position:fixed;inset:0;z-index:99999;
+  background:#04040a;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  transition:opacity 0.6s ease;
+">
+  <div style="position:relative;width:90px;height:90px;margin-bottom:28px">
+    <!-- Outer ring -->
+    <svg width="90" height="90" style="position:absolute;top:0;left:0;animation:spin 1.4s linear infinite">
+      <circle cx="45" cy="45" r="40" fill="none" stroke="url(#grad1)" stroke-width="3" stroke-dasharray="180 80" stroke-linecap="round"/>
+      <defs>
+        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#3355ff"/>
+          <stop offset="100%" stop-color="#00ffaa"/>
+        </linearGradient>
+      </defs>
+    </svg>
+    <!-- Inner ring -->
+    <svg width="90" height="90" style="position:absolute;top:0;left:0;animation:spin 0.9s linear infinite reverse">
+      <circle cx="45" cy="45" r="28" fill="none" stroke="#3355ff44" stroke-width="2" stroke-dasharray="60 120" stroke-linecap="round"/>
+    </svg>
+    <!-- Moon icon -->
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.8rem">🌙</div>
+  </div>
+
+  <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;letter-spacing:6px;
+    background:linear-gradient(135deg,#3355ff,#00ffaa);-webkit-background-clip:text;-webkit-text-fill-color:transparent;
+    margin-bottom:8px">SKYMOON</div>
+  <div style="color:#444466;font-size:0.7rem;letter-spacing:3px;margin-bottom:20px">KEY SYSTEM v2</div>
+
+  <!-- Progress bar -->
+  <div style="width:200px;height:3px;background:#0f0f1e;border-radius:2px;overflow:hidden">
+    <div id="load-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#3355ff,#00ffaa);border-radius:2px;transition:width 0.3s ease"></div>
+  </div>
+  <div id="load-text" style="color:#444466;font-size:0.68rem;letter-spacing:2px;margin-top:10px">INITIALIZING...</div>
+</div>
+
+<style>
+@keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+</style>
+<div id="perm-banner" style="display:none">
+  <div class="perm-text">
+    <b>SkyMoon Key System</b> wants to access <b>background activity</b>
+    to update key status in real-time (your local time is used).
+  </div>
+  <div class="perm-btns">
+    <button class="perm-allow" onclick="allowBackground()">Allow</button>
+    <button class="perm-deny" onclick="denyBackground()">Don't allow</button>
+  </div>
+</div>
+
+<!-- ── NOTIF POPUP ── -->
+<div class="notif" id="notif">
+  <div class="notif-title" id="notif-title">Notification</div>
+  <div id="notif-msg"></div>
+</div>
+
+<!-- ── SETTINGS BTN ── -->
+<button id="settings-btn" onclick="toggleSettings()">⚙ Settings</button>
+
+<!-- ── SETTINGS PANEL ── -->
+<div id="settings-panel">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+    <span style="font-family:'Orbitron',sans-serif;font-size:1rem;color:var(--accent)">⚙ Settings</span>
+    <button style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:1.2rem" onclick="toggleSettings()">✕</button>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Background Activity</span>
+    <button class="toggle-btn" id="bg-toggle-btn" onclick="toggleBgAccess()">ON</button>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Real-time Clock</span>
+    <button class="toggle-btn on" id="clock-toggle-btn" onclick="toggleClock()">ON</button>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Current key status</span>
+    <span id="settings-key-status" style="font-size:0.75rem;color:var(--dim)">—</span>
+  </div>
+  <div class="settings-row">
+    <span class="settings-label">Reset key</span>
+    <button class="toggle-btn off" onclick="resetKey()">Reset</button>
+  </div>
+  <hr class="rule">
+  <div style="font-size:0.72rem;color:var(--dim);line-height:1.6">
+    Key is valid for 1 hari (reset tiap 00:00 UTC).<br>
+    Background activity is used for real-time clock updates.<br>
+    Data is stored locally in your browser.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ -->
+<!-- PAGE 1 — LANDING / START            -->
+<!-- ════════════════════════════════════ -->
+<div class="page active" id="page-landing">
+  <div class="logo">🌙 SKYMOON</div>
+  <div class="sub">KEY ACCESS SYSTEM v2</div>
+
+  <div class="card" style="text-align:center">
+    <div class="section-title">📋 Before You Start</div>
+    <p style="font-size:0.82rem;line-height:1.7;color:var(--text);margin-bottom:16px">
+      You are about to enter the <b style="color:var(--accent2)">Key System</b> SkyMoon.<br>
+      Selesaikan <b style="color:var(--accent2)">word puzzle</b> untuk mendapatkan key harian.<br>
+      Key is valid for <b style="color:var(--accent3)">1 hari</b> and resets every <b style="color:var(--accent3)">00:00 UTC</b>.<br><br>
+      This website requires <b style="color:var(--accent2)">background activity</b>
+      to monitor key expiry in real-time.
+    </p>
+
+    <div class="clock" id="landing-clock">00:00:00</div>
+    <div class="clock-sub">LOCAL TIME — KEY RESETS AT 00:00 UTC</div>
+
+    <div id="landing-key-status" style="margin:12px 0;font-size:0.78rem"></div>
+
+    <div class="btn-row">
+      <button class="btn green" id="start-btn" onclick="goToKeySystem()">▶ START</button>
+    </div>
+    <div class="status-bar" id="landing-status">Checking key status...</div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ -->
+<!-- PAGE 2 — KEY PUZZLE                 -->
+<!-- ════════════════════════════════════ -->
+<div class="page" id="page-puzzle">
+  <div class="logo" style="font-size:1.6rem">🌙 KEY PUZZLE</div>
+  <div class="sub">ARRANGE WORDS — FIND THE CORRECT SENTENCE</div>
+
+  <div class="card">
+    <div class="section-title">⏱ Time Remaining</div>
+    <div class="clock" id="puzzle-clock">00:00:00</div>
+    <div class="timer-wrap"><div class="timer-fill" id="timer-fill" style="width:100%"></div></div>
+
+    <hr class="rule">
+    <div class="section-title">🔀 Available Words (click to arrange)</div>
+    <div class="words-area" id="words-pool"></div>
+
+    <div class="section-title">✍️ Your Answer</div>
+    <div class="answer-area" id="answer-area"></div>
+
+    <div class="err-msg" id="puzzle-err"></div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="checkAnswer()">✓ Verify</button>
+      <button class="btn dim" onclick="resetPuzzle()">↺ Reset</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ -->
+<!-- PAGE 3 — KEY REVEALED               -->
+<!-- ════════════════════════════════════ -->
+<div class="page" id="page-key">
+  <div class="logo" style="font-size:1.6rem">✅ KEY READY</div>
+  <div class="sub">COPY KEY AND PASTE IN YOUR EXECUTOR</div>
+
+  <div class="card" style="text-align:center">
+    <div class="section-title">🔑 Your Daily Key</div>
+    <div class="key-box" id="key-display" onclick="copyKey()" title="Click to copy">
+      SKY-????-????
+    </div>
+    <div style="font-size:0.72rem;color:var(--dim);margin-bottom:14px">Click the key to copy</div>
+
+    <div class="clock" id="key-clock">00:00:00</div>
+    <div class="clock-sub">KEY EXPIRES AT 00:00 UTC</div>
+    <div class="timer-wrap"><div class="timer-fill" id="key-timer-fill" style="width:100%"></div></div>
+
+    <div id="key-expire-msg" style="font-size:0.78rem;color:var(--dim);margin-top:8px"></div>
+
+    <div class="btn-row">
+      <button class="btn green" onclick="copyKey()">📋 Copy Key</button>
+      <button class="btn dim" onclick="goToLanding()">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ -->
+<!-- PAGE 4 — EXPIRED                    -->
+<!-- ════════════════════════════════════ -->
+<div class="page" id="page-expired">
+  <div class="logo" style="font-size:1.6rem;color:var(--accent3)">⚠ KEY EXPIRED</div>
+  <div class="sub">YOUR KEY HAS EXPIRED</div>
+  <div class="card" style="text-align:center">
+    <p style="font-size:0.82rem;color:var(--dim);line-height:1.7;margin-bottom:16px">
+      Your key from the previous day is no longer valid.<br>
+      Complete a new puzzle to get today's key.
+    </p>
+    <div class="btn-row">
+      <button class="btn green" onclick="startNewPuzzle()">🔄 Get New Key</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════
+// CONFIG — add word sets here
+// ══════════════════════════════════
+const WORD_BANK = [
+  // Set 1
+  ["Building","is","the","best","place"],
+  // Set 2
+  ["SkyMoon","scripts","run","fast"],
+  // Set 3
+  ["Execute","with","power","today"],
+  // Set 4
+  ["The","moon","never","lies"],
+  // Set 5
+  ["Code","runs","in","the","dark"],
+  // Set 6
+  ["Scripts","unlock","hidden","worlds"],
+  // Set 7
+  ["Roblox","skies","are","limitless"],
+  // Set 8
+  ["Power","comes","from","within"],
+];
+
+// ══════════════════════════════════
+// STATE
+// ══════════════════════════════════
+let bgAllowed = localStorage.getItem('sky_bg') !== 'false';
+let clockEnabled = true;
+let currentAnswer = [];
+let currentWords = [];
+let correctSentence = '';
+let clockInterval = null;
+let timerInterval = null;
+
+// ══════════════════════════════════
+// KEY ALGORITHM (deterministic)
+// Must match Lua: getDailyKey()
+// ══════════════════════════════════
+function getDayNum() {
+  return Math.floor(Date.now() / 86400000);
+}
+
+function getDailyKey() {
+  const day = getDayNum();
+  // Pure integer math — no BigInt
+  const seed1 = ((day * 73 + 17) % 9000 + 9000) % 9000 + 1000;
+  const seed2 = ((day * 137 + 53) % 9000 + 9000) % 9000 + 1000;
+  return `SKY-${seed1}-${seed2}`;
+}
+
+// ══════════════════════════════════
+// STORAGE
+// ══════════════════════════════════
+function loadSave() {
+  try {
+    const raw = localStorage.getItem('sky_save');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { key: null, day: null, completed: false };
+}
+
+function writeSave(data) {
+  localStorage.setItem('sky_save', JSON.stringify(data));
+}
+
+function isExpired(save) {
+  return save.day !== null && save.day !== getDayNum();
+}
+
+// ══════════════════════════════════
+// NOTIFICATION
+// ══════════════════════════════════
+let notifTimer = null;
+function showNotif(title, msg, duration=3000) {
+  const el = document.getElementById('notif');
+  document.getElementById('notif-title').textContent = title;
+  document.getElementById('notif-msg').textContent = msg;
+  el.classList.add('show');
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ══════════════════════════════════
+// CLOCK
+// ══════════════════════════════════
+function getTimeStr() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  return `${h}:${m}:${s}`;
+}
+
+function getSecondsUntilReset() {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setUTCHours(24,0,0,0);
+  return Math.floor((midnight - now) / 1000);
+}
+
+function formatCountdown(secs) {
+  const h = Math.floor(secs/3600);
+  const m = Math.floor((secs%3600)/60);
+  const s = secs%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateClocks() {
+  if (!clockEnabled) return;
+  const t = getTimeStr();
+  const secs = getSecondsUntilReset();
+  const totalSecs = 86400;
+  const pct = (secs / totalSecs * 100).toFixed(1);
+
+  document.querySelectorAll('.clock').forEach(el => {
+    if (el.id === 'landing-clock') el.textContent = t;
+    else el.textContent = formatCountdown(secs);
+  });
+  document.querySelectorAll('.timer-fill').forEach(el => {
+    el.style.width = pct + '%';
+    el.style.background = secs < 3600
+      ? 'linear-gradient(90deg,#ff3355,#ff6633)'
+      : 'linear-gradient(90deg,var(--accent),var(--accent2))';
+  });
+
+  // Expire check
+  const expire = document.getElementById('key-expire-msg');
+  if (expire) {
+    if (secs < 3600) {
+      expire.textContent = `⚠ Key expires in ${formatCountdown(secs)}`;
+      expire.style.color = 'var(--accent3)';
+    } else {
+      expire.textContent = `Key resets at 00:00 UTC`;
+      expire.style.color = 'var(--dim)';
+    }
+  }
+
+  // Check if day changed (expired)
+  const save = loadSave();
+  if (save.completed && isExpired(save)) {
+    save.completed = false;
+    writeSave(save);
+    showNotif('⚠ Key Expired', 'Your key has expired! Get a new key.');
+    if (currentPage() === 'page-key') showPage('page-expired');
+  }
+}
+
+// ══════════════════════════════════
+// PAGE NAVIGATION
+// ══════════════════════════════════
+function currentPage() {
+  const active = document.querySelector('.page.active');
+  return active ? active.id : null;
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ══════════════════════════════════
+// LANDING PAGE INIT
+// ══════════════════════════════════
+function initLanding() {
+  const save = loadSave();
+  const todayKey = getDailyKey();
+  const statusEl = document.getElementById('landing-key-status');
+  const startBtn = document.getElementById('start-btn');
+  const landingStatus = document.getElementById('landing-status');
+
+  if (save.completed && !isExpired(save)) {
+    statusEl.innerHTML = `<span style="color:var(--accent2)">✅ You already have today's key!</span>`;
+    startBtn.textContent = '🔑 Lihat Key';
+    landingStatus.textContent = 'Click to view your key.';
+  } else if (isExpired(save)) {
+    statusEl.innerHTML = `<span class="expired-badge">⚠ Yesterday's key has expired.</span>`;
+    landingStatus.textContent = 'Complete the puzzle for a new key.';
+  } else {
+    statusEl.innerHTML = `<span style="color:var(--dim)">No key yet for today.</span>`;
+    landingStatus.textContent = 'Complete the puzzle to get your key.';
+  }
+
+  // Settings status
+  document.getElementById('settings-key-status').textContent =
+    save.completed && !isExpired(save) ? '✅ Active' : isExpired(save) ? '⚠ Expired' : '—';
+
+  // Show permission banner
+  if (!localStorage.getItem('sky_bg_asked')) {
+    setTimeout(() => {
+      document.getElementById('perm-banner').style.display = 'flex';
+    }, 1200);
+  } else {
+    const bgBtn = document.getElementById('bg-toggle-btn');
+    bgBtn.textContent = bgAllowed ? 'ON' : 'OFF';
+    bgBtn.className = 'toggle-btn ' + (bgAllowed ? 'on' : 'off');
+  }
+}
+
+function goToKeySystem() {
+  const save = loadSave();
+  if (save.completed && !isExpired(save)) {
+    // Already has key — show it
+    document.getElementById('key-display').textContent = getDailyKey();
+    showPage('page-key');
+    showNotif('✅ Key Ditemukan', 'Key harian kamu masih aktif!');
+  } else if (isExpired(save)) {
+    showPage('page-expired');
+  } else {
+    startNewPuzzle();
+  }
+}
+
+// ══════════════════════════════════
+// PUZZLE
+// ══════════════════════════════════
+function pickWordSet() {
+  // Pick set based on day (different each day, deterministic)
+  const day = getDayNum();
+  const idx = day % WORD_BANK.length;
+  return WORD_BANK[idx];
+}
+
+function shuffleArray(arr) {
+  const a = [...arr];
+  for (let i = a.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i+1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startNewPuzzle() {
+  const wordSet = pickWordSet();
+  currentWords = shuffleArray(wordSet);
+  correctSentence = wordSet.join(' ');
+  currentAnswer = [];
+
+  showPage('page-puzzle');
+  renderPuzzle();
+  document.getElementById('puzzle-err').textContent = '';
+}
+
+function renderPuzzle() {
+  const pool = document.getElementById('words-pool');
+  const ansArea = document.getElementById('answer-area');
+  pool.innerHTML = '';
+  ansArea.innerHTML = '';
+
+  currentWords.forEach((word, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'word-chip' + (currentAnswer.includes(i) ? ' placed' : '');
+    chip.textContent = word;
+    chip.dataset.idx = i;
+    chip.onclick = () => placeWord(i);
+    pool.appendChild(chip);
+  });
+
+  currentAnswer.forEach(idx => {
+    const chip = document.createElement('div');
+    chip.className = 'answer-chip';
+    chip.textContent = currentWords[idx];
+    chip.onclick = () => removeWord(idx);
+    ansArea.appendChild(chip);
+  });
+}
+
+function placeWord(idx) {
+  if (currentAnswer.includes(idx)) return;
+  currentAnswer.push(idx);
+  document.getElementById('puzzle-err').textContent = '';
+  renderPuzzle();
+}
+
+function removeWord(idx) {
+  currentAnswer = currentAnswer.filter(i => i !== idx);
+  renderPuzzle();
+}
+
+function resetPuzzle() {
+  currentAnswer = [];
+  currentWords = shuffleArray(currentWords);
+  document.getElementById('puzzle-err').textContent = '';
+  renderPuzzle();
+}
+
+function checkAnswer() {
+  const typed = currentAnswer.map(i => currentWords[i]).join(' ');
+  if (typed === correctSentence) {
+    // Correct!
+    const todayKey = getDailyKey();
+    writeSave({ key: todayKey, day: getDayNum(), completed: true });
+    document.getElementById('key-display').textContent = todayKey;
+    showPage('page-key');
+    showNotif('🎉 Correct!', 'Your key is ready to copy!', 4000);
+  } else {
+    document.getElementById('puzzle-err').textContent = '❌ Wrong word order! Try again.';
+    // Shake animation
+    const ansArea = document.getElementById('answer-area');
+    ansArea.style.animation = 'none';
+    void ansArea.offsetWidth;
+    ansArea.style.animation = 'shake 0.4s ease';
+  }
+}
+
+// ══════════════════════════════════
+// KEY PAGE
+// ══════════════════════════════════
+function copyKey() {
+  const key = document.getElementById('key-display').textContent;
+  navigator.clipboard.writeText(key).then(() => {
+    showNotif('📋 Copied!', key, 2500);
+  }).catch(() => {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = key; document.body.appendChild(ta);
+    ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showNotif('📋 Copied!', key, 2500);
+  });
+}
+
+function goToLanding() {
+  initLanding();
+  showPage('page-landing');
+}
+
+// ══════════════════════════════════
+// EXPIRED PAGE
+// ══════════════════════════════════
+// startNewPuzzle already defined above
+
+// ══════════════════════════════════
+// PERMISSION BANNER
+// ══════════════════════════════════
+function allowBackground() {
+  bgAllowed = true;
+  localStorage.setItem('sky_bg', 'true');
+  localStorage.setItem('sky_bg_asked', '1');
+  document.getElementById('perm-banner').style.display = 'none';
+  document.getElementById('bg-toggle-btn').textContent = 'ON';
+  document.getElementById('bg-toggle-btn').className = 'toggle-btn on';
+  showNotif('✅ Allowed', 'Background activity allowed!');
+}
+
+function denyBackground() {
+  bgAllowed = false;
+  localStorage.setItem('sky_bg', 'false');
+  localStorage.setItem('sky_bg_asked', '1');
+  document.getElementById('perm-banner').style.display = 'none';
+  document.getElementById('bg-toggle-btn').textContent = 'OFF';
+  document.getElementById('bg-toggle-btn').className = 'toggle-btn off';
+  showNotif('🔕 Denied', 'Background activity denied.');
+}
+
+// ══════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════
+let settingsOpen = false;
+function toggleSettings() {
+  settingsOpen = !settingsOpen;
+  document.getElementById('settings-panel').style.display = settingsOpen ? 'block' : 'none';
+}
+
+function toggleBgAccess() {
+  bgAllowed = !bgAllowed;
+  localStorage.setItem('sky_bg', bgAllowed ? 'true' : 'false');
+  const btn = document.getElementById('bg-toggle-btn');
+  btn.textContent = bgAllowed ? 'ON' : 'OFF';
+  btn.className = 'toggle-btn ' + (bgAllowed ? 'on' : 'off');
+  showNotif(bgAllowed ? '✅ Enabled' : '🔕 Disabled', 'Background activity ' + (bgAllowed?'diizinkan':'diblokir') + '.');
+}
+
+function toggleClock() {
+  clockEnabled = !clockEnabled;
+  const btn = document.getElementById('clock-toggle-btn');
+  btn.textContent = clockEnabled ? 'ON' : 'OFF';
+  btn.className = 'toggle-btn ' + (clockEnabled ? 'on' : 'off');
+}
+
+function resetKey() {
+  writeSave({ key: null, day: null, completed: false });
+  initLanding();
+  showNotif('🔄 Key Reset', 'Local key has been deleted.');
+  if (settingsOpen) toggleSettings();
+  showPage('page-landing');
+}
+
+// ══════════════════════════════════
+// SHAKE ANIMATION
+// ══════════════════════════════════
+const shakeStyle = document.createElement('style');
+shakeStyle.textContent = `@keyframes shake {
+  0%{transform:translateX(0)} 20%{transform:translateX(-6px)}
+  40%{transform:translateX(6px)} 60%{transform:translateX(-4px)}
+  80%{transform:translateX(4px)} 100%{transform:translateX(0)}
+}`;
+document.head.appendChild(shakeStyle);
+
+// ══════════════════════════════════
+// LOADING SCREEN
+// ══════════════════════════════════
+function runLoading(callback) {
+  const bar = document.getElementById('load-bar');
+  const txt = document.getElementById('load-text');
+  const steps = [
+    [15,  "CHECKING ASSETS..."],
+    [35,  "LOADING KEY MODULE..."],
+    [55,  "VERIFYING SESSION..."],
+    [75,  "PREPARING PUZZLE..."],
+    [90,  "ALMOST READY..."],
+    [100, "DONE!"],
+  ];
+  let i = 0;
+  function next() {
+    if (i >= steps.length) {
+      setTimeout(() => {
+        const ls = document.getElementById('loading-screen');
+        ls.style.opacity = '0';
+        setTimeout(() => { ls.style.display = 'none'; callback(); }, 600);
+      }, 300);
+      return;
+    }
+    const [pct, label] = steps[i++];
+    bar.style.width = pct + '%';
+    txt.textContent = label;
+    setTimeout(next, 350 + Math.random()*250);
+  }
+  next();
+}
+
+// ══════════════════════════════════
+// INIT
+// ══════════════════════════════════
+(function init() {
+  clockInterval = setInterval(updateClocks, 1000);
+  updateClocks();
+
+  if (bgAllowed) {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        updateClocks();
+        const save = loadSave();
+        if (save.completed && isExpired(save)) {
+          showNotif('⚠ Expired', 'Your key expired while the browser was in the background!', 5000);
+        }
+      }
+    });
+  }
+
+  // Run loading first, then show landing
+  runLoading(function() {
+    initLanding();
+    showPage('page-landing');
+    // Show permission banner after small delay
+    if (!localStorage.getItem('sky_bg_asked')) {
+      setTimeout(() => {
+        document.getElementById('perm-banner').style.display = 'flex';
+      }, 800);
+    } else {
+      const bgBtn = document.getElementById('bg-toggle-btn');
+      bgBtn.textContent = bgAllowed ? 'ON' : 'OFF';
+      bgBtn.className = 'toggle-btn ' + (bgAllowed ? 'on' : 'off');
+    }
+  });
+})();
+</script>
+</body>
+</html>
