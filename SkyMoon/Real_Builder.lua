@@ -580,57 +580,6 @@ local function stopFreeCam()
             char.Humanoid.AutoRotate = true
         end
     end)
-end
-
-    -- Joystick input (diisi oleh mobile joystick di bawah)
-    -- joystickVel = Vector2 arah joystick (-1 to 1)
-    local moveSpeed = 40
-
-    freeCamConn = RunService.RenderStepped:Connect(function(dt)
-        if rmhHeld then
-            local delta = UIS:GetMouseDelta()
-            camYaw   = camYaw   - delta.X * 0.3
-            camPitch = math.clamp(camPitch - delta.Y * 0.3, -89, 89)
-        end
-        if touchCamDelta.X ~= 0 or touchCamDelta.Y ~= 0 then
-            camYaw   = camYaw   - touchCamDelta.X * 0.25
-            camPitch = math.clamp(camPitch - touchCamDelta.Y * 0.25, -89, 89)
-            touchCamDelta = Vector2.new(0,0)
-        end
-        local rotCF = CFrame.new(cam.CFrame.Position)
-            * CFrame.Angles(0, math.rad(camYaw), 0)
-            * CFrame.Angles(math.rad(camPitch), 0, 0)
-        local vel = Vector3.new(0,0,0)
-        if UIS:IsKeyDown(Enum.KeyCode.W) then vel = vel + rotCF.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.S) then vel = vel - rotCF.LookVector end
-        if UIS:IsKeyDown(Enum.KeyCode.A) then vel = vel - rotCF.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.D) then vel = vel + rotCF.RightVector end
-        if UIS:IsKeyDown(Enum.KeyCode.E) then vel = vel + Vector3.new(0,1,0) end
-        if UIS:IsKeyDown(Enum.KeyCode.Q) then vel = vel - Vector3.new(0,1,0) end
-        if joystickDir.Magnitude > 0.05 then
-            vel = vel + rotCF.LookVector * (-joystickDir.Y)
-            vel = vel + rotCF.RightVector * joystickDir.X
-        end
-        local spd = UIS:IsKeyDown(Enum.KeyCode.LeftShift) and moveSpeed*4 or (moveSpeed * joystickSpeed)
-        local newPos = cam.CFrame.Position + vel * spd * dt
-        cam.CFrame = CFrame.new(newPos)
-            * CFrame.Angles(0, math.rad(camYaw), 0)
-            * CFrame.Angles(math.rad(camPitch), 0, 0)
-        local camVelocity = (newPos - lastCamPos).Magnitude / dt
-        lastCamPos = newPos
-        local targetY = getCharY(newPos)
-        pcall(function()
-            local char = LocalPlayer.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local curCharPos = hrp.Position
-                local targetPos = Vector3.new(newPos.X, targetY, newPos.Z)
-                if camVelocity > 50 then hrp.CFrame = CFrame.new(targetPos)
-                else hrp.CFrame = CFrame.new(curCharPos:Lerp(targetPos, math.clamp(dt*8,0,1))) end
-            end
-        end)
-    end)
-startFreeCam()
 
 ----------------------------------------------------
 -- MOBILE JOYSTICK UI + TOUCH CAMERA
@@ -736,39 +685,8 @@ if isMobile then
 end
 
 ----------------------------------------------------
--- PLAY / STOP
+-- PLAY / STOP handled in INIT section below
 ----------------------------------------------------
-playBtn.MouseButton1Click:Connect(function()
-    if playMode then return end
-    playMode = true
-    playBtn.BackgroundColor3 = Color3.fromRGB(20,80,20)
-    statusLbl.Text = "▶ Play Mode — Walk around!"
-    clearHandles()
-
-    stopFreeCam()
-
-    pcall(function()
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            char.HumanoidRootPart.CFrame = savedCharCF or CFrame.new(0, 5, 0)
-            char.HumanoidRootPart.Anchored = false
-        end
-        if char and char:FindFirstChild("Humanoid") then
-            char.Humanoid.WalkSpeed = 16
-            char.Humanoid.JumpPower = 50   -- ← jump di-enable pas Play
-            char.Humanoid.AutoRotate = true
-        end
-    end)
-end)
-
-stopBtn.MouseButton1Click:Connect(function()
-    if not playMode then return end
-    playMode = false
-    playBtn.BackgroundColor3 = T.green
-    statusLbl.Text = "■ Stopped — back to builder"
-    startFreeCam()   -- ← di sini jump otomatis di-disable lagi (WalkSpeed=0, JumpPower=0)
-    updateHandles()
-end)
 
 ----------------------------------------------------
 -- COLOR PICKER
@@ -1309,11 +1227,20 @@ function refreshExplorer()
         div.BorderSizePixel = 0
         div.BackgroundTransparency = 0.7
 
+        -- Single click = select, Double click = rename
+        local lastClickTime2 = 0
         row.MouseButton1Click:Connect(function()
-            selectObject(obj)
+            local now = tick()
+            if now - lastClickTime2 < 0.35 then
+                -- Double click → rename
+                task.spawn(function() openRenamePopup(obj) end)
+            else
+                selectObject(obj)
+            end
+            lastClickTime2 = now
         end)
 
-        -- Long press (tahan) → set sebagai insert target
+        -- Long press (tahan) → set sebagai insert target + buka insert menu
         local longPressTimer = nil
         row.InputBegan:Connect(function(inp)
             if inp.UserInputType == Enum.UserInputType.MouseButton1
@@ -1322,12 +1249,12 @@ function refreshExplorer()
                     if obj:IsA("Model") or obj:IsA("Folder")
                     or obj:IsA("BasePart") or obj == workspace then
                         selectObject(obj)
-                        -- Flash biru tanda insert target
                         row.BackgroundColor3 = T.accent
-                        task.wait(0.2)
+                        task.wait(0.15)
                         row.BackgroundColor3 = T.sel
-                        statusLbl.Text = "Insert target: " .. obj.Name .. " (open Insert menu now)"
+                        statusLbl.Text = "📂 Insert into: " .. obj.Name
                         insertMenu.Visible = true
+                        insertMenu.Position = UDim2.new(0, explorerW, 0, 64)
                     end
                 end)
             end
@@ -2196,8 +2123,186 @@ closeBtn.MouseButton1Click:Connect(function()
 end)
 
 ----------------------------------------------------
+-- PHYSICS FREEZE (semua part anchored di builder mode)
+-- Baru unanchor saat Play
+----------------------------------------------------
+local frozenParts = {} -- {part, wasAnchored}
+
+local function freezePhysics()
+    frozenParts = {}
+    pcall(function()
+        for _, obj in ipairs(workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Name ~= "_SkyMoonHandle" and obj.Name ~= "_SkyMoonArrow" then
+                table.insert(frozenParts, {part=obj, was=obj.Anchored})
+                obj.Anchored = true
+            end
+        end
+    end)
+end
+
+local function unfreezePhysics()
+    for _, info in ipairs(frozenParts) do
+        pcall(function() info.part.Anchored = info.was end)
+    end
+    frozenParts = {}
+end
+
+-- Override Play/Stop buttons untuk handle physics
+local origPlayClick = nil
+playBtn.MouseButton1Click:Connect(function()
+    if playMode then return end
+    playMode = true
+    playBtn.BackgroundColor3 = Color3.fromRGB(20,80,20)
+    statusLbl.Text = "▶ Play — physics ON!"
+    clearHandles()
+    unfreezePhysics() -- baru unanchor sekarang
+    stopFreeCam()
+    pcall(function()
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            char.HumanoidRootPart.CFrame = savedCharCF or CFrame.new(0,5,0)
+            char.HumanoidRootPart.Anchored = false
+        end
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = 16
+            char.Humanoid.JumpPower = 50
+            char.Humanoid.AutoRotate = true
+        end
+    end)
+end)
+
+stopBtn.MouseButton1Click:Connect(function()
+    if not playMode then return end
+    playMode = false
+    playBtn.BackgroundColor3 = T.green
+    statusLbl.Text = "■ Stopped — physics OFF"
+    freezePhysics() -- anchor lagi
+    startFreeCam()
+    updateHandles()
+end)
+
+----------------------------------------------------
+-- DISABLE VOID (jangan matikan karakter)
+----------------------------------------------------
+local voidConn = RunService.Heartbeat:Connect(function()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and hrp.Position.Y < -200 then
+            hrp.CFrame = savedCharCF or CFrame.new(0, charYBase, 0)
+        end
+    end)
+end)
+
+----------------------------------------------------
+-- FORCE SCRIPTABLE CAMERA (jangan ikuti player)
+----------------------------------------------------
+local camForceConn = RunService.RenderStepped:Connect(function()
+    if freeCamActive then
+        local cam = workspace.CurrentCamera
+        if cam.CameraType ~= Enum.CameraType.Scriptable then
+            cam.CameraType = Enum.CameraType.Scriptable
+        end
+    end
+end)
+
+----------------------------------------------------
+-- CUT / PASTE SYSTEM
+----------------------------------------------------
+local clipboard = nil -- {obj, originalParent}
+
+-- Tambah Cut/Paste ke toolbar
+local cutBtn = mkBtn(toolbarFrame,"✂ Cut",UDim2.new(0,56,0,26),nil,T.dark,T.text)
+cutBtn.ZIndex = 16
+cutBtn.MouseButton1Click:Connect(function()
+    if not selectedObj then return end
+    clipboard = {obj=selectedObj, originalParent=selectedObj.Parent}
+    -- Visual: ubah warna jadi orange tanda akan dipindah
+    pcall(function()
+        if selectedObj:IsA("BasePart") then
+            selectedObj.BrickColor = BrickColor.new("Bright orange")
+        end
+    end)
+    statusLbl.Text = "✂ Cut: " .. selectedObj.Name .. " — select target then Paste"
+end)
+
+local pasteBtn = mkBtn(toolbarFrame,"📋 Paste",UDim2.new(0,66,0,26),nil,T.dark,T.text)
+pasteBtn.ZIndex = 16
+pasteBtn.MouseButton1Click:Connect(function()
+    if not clipboard then
+        statusLbl.Text = "Nothing to paste!"
+        return
+    end
+    local targetParent = selectedObj or workspace
+    -- Kalau target bukan valid parent
+    if not (targetParent:IsA("Model") or targetParent:IsA("Folder") or targetParent:IsA("BasePart") or targetParent == workspace) then
+        targetParent = targetParent.Parent or workspace
+    end
+    pcall(function()
+        clipboard.obj.Parent = targetParent
+        statusLbl.Text = "📋 Pasted: " .. clipboard.obj.Name .. " → " .. targetParent.Name
+        selectObject(clipboard.obj)
+        clipboard = nil
+        task.defer(refreshExplorer)
+    end)
+end)
+
+----------------------------------------------------
+-- DOUBLE-CLICK RENAME in Explorer
+-- (di addNode row sudah ada single click = select,
+--  double click → popup rename)
+----------------------------------------------------
+-- Ini dihandle via flag di addNode - lihat refreshExplorer
+-- Tambah rename popup function
+local function openRenamePopup(obj)
+    local rSg = Instance.new("ScreenGui")
+    rSg.Name = "SkyMoon_Rename"
+    rSg.ResetOnSpawn = false
+    rSg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    pcall(function() rSg.Parent = game:GetService("CoreGui") end)
+    if not rSg.Parent then rSg.Parent = LocalPlayer.PlayerGui end
+
+    local win = Instance.new("Frame", rSg)
+    win.Size = UDim2.new(0,280,0,80)
+    win.Position = UDim2.new(0.5,-140,0.5,-40)
+    win.BackgroundColor3 = Color3.fromRGB(22,22,30)
+    win.BorderSizePixel=0 win.Active=true win.Draggable=true win.ZIndex=200
+    mkCorner(8,win) mkStroke(T.accent,1.5,win)
+
+    mkLabel(win,"✏️ Rename: "..obj.ClassName,UDim2.new(1,-10,0,20),UDim2.new(0,8,0,4),11,T.dimText)
+
+    local inp = Instance.new("TextBox", win)
+    inp.Size = UDim2.new(1,-16,0,28)
+    inp.Position = UDim2.new(0,8,0,26)
+    inp.BackgroundColor3 = Color3.fromRGB(30,30,40)
+    inp.Text = obj.Name
+    inp.TextColor3 = T.text
+    inp.Font = Enum.Font.GothamBold
+    inp.TextSize = 13
+    inp.BorderSizePixel=0 inp.ClearTextOnFocus=false inp.ZIndex=201
+    mkCorner(4,inp)
+
+    inp.FocusLost:Connect(function(enter)
+        if enter and inp.Text ~= "" then
+            pcall(function() obj.Name = inp.Text end)
+            statusLbl.Text = "Renamed to: " .. inp.Text
+            task.defer(refreshExplorer)
+            refreshProperties()
+        end
+        rSg:Destroy()
+    end)
+
+    task.defer(function() inp:CaptureFocus() end)
+end
+
+-- Patch refreshExplorer untuk double-click rename
+-- Ini sudah di-handle di addNode dengan lastClickTime
+
+----------------------------------------------------
 -- INIT
 ----------------------------------------------------
+freezePhysics() -- anchor semua part saat builder dibuka
+startFreeCam()  -- mulai freecam
 refreshExplorer()
 refreshProperties()
 
@@ -2214,4 +2319,4 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-statusLbl.Text = "🌙 Real Builder v2  |  RMB+drag=look  |  WASD/QE=move  |  Click part=select  |  D-pad=mobile"
+statusLbl.Text = "🌙 Real Builder v2 | Click=select | RMB+drag=look | WASD=move | ✂Cut 📋Paste"
