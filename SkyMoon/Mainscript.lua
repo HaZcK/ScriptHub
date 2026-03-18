@@ -509,6 +509,26 @@ local function scanWorkspace(output, entry)
         local indent = string.rep("  ", item.depth)
         local line = string.format('%s[KHAFIDZKTP, %s] %s  (%d%%)', indent, item.label, item.name, pct)
 
+        -- Skip default Roblox/system GUIs
+        local ROBLOX_DEFAULT_GUIS = {
+            "RobloxGui","TopBarApp","ChatApp","EmotesApp","ChatBarParentApp",
+            "HealthGui","BackpackGui","PlayerListGui","TouchGui","InspectAndBuyGui",
+            "VoiceChatGui","ControlGui","CoreGui","RobloxLoadingGui","BubbleChatScreenGui",
+            "ShareGameGui","NotificationGui","LuaApp","screengui","UIEffects",
+        }
+        if item.class == "ScreenGui" or item.class == "Frame" then
+            local isDefault = false
+            for _, defName in ipairs(ROBLOX_DEFAULT_GUIS) do
+                if item.name == defName or item.name:lower():find("roblox",1,true) then
+                    isDefault = true break
+                end
+            end
+            if isDefault then
+                i = i + 1
+                return
+            end
+        end
+
         -- Cek duplicate dulu sebelum tampil
         if entry and item.label == "PlayerGui" and item.class == "ScreenGui" then
             local pg = LP.PlayerGui
@@ -535,7 +555,24 @@ local function scanWorkspace(output, entry)
             end
         end
 
-        output.Text = output.Text .. string.format('<font color="#00ff44">%s</font>\n', escapeRich(line))
+        -- 4 items per line kalau banyak objek di parent yang sama
+        local shortLine = string.format('%s[%s] %s', indent, item.label, item.name)
+        if lineCount > 0 and lineCount % 4 ~= 0 then
+            -- Tambah ke baris yang sama dengan separator
+            local lines = output.Text:split("\n")
+            if #lines > 0 then
+                lines[#lines] = lines[#lines] .. string.format(
+                    '  <font color="#00cc44">%s</font>', escapeRich(item.name)
+                )
+                output.Text = table.concat(lines, "\n")
+            else
+                output.Text = output.Text .. string.format('<font color="#00ff44">%s</font>\n', escapeRich(shortLine))
+            end
+        else
+            output.Text = output.Text .. string.format(
+                '<font color="#00ff44">%s</font>\n', escapeRich(line)
+            )
+        end
         lineCount = lineCount + 1
 
         if lineCount >= 25 then
@@ -705,10 +742,49 @@ scanBtn.MouseButton1Click:Connect(function()
     newLine(output)
     task.wait(0.3)
 
-    -- Fetch PlaceList
+    -- Fetch PlaceList + GameId verification
     local db = fetchPlaceList()
     local placeId = tostring(game.PlaceId)
     local entry = db and db[placeId]
+
+    -- Kalau PlaceId tidak match, coba cek via GameId (handle VoiceChat server teleport)
+    -- game.GameId = root game ID, game.PlaceId bisa beda kalau di sub-place
+    if not entry and db then
+        local gameId = tostring(game.GameId)
+        for pid, data in pairs(db) do
+            -- Cek apakah place ini bagian dari game yang sama via MarketplaceService
+            local ok, info = pcall(function()
+                return game:GetService("MarketplaceService"):GetProductInfo(tonumber(pid))
+            end)
+            if ok and info then
+                -- Kalau nama game sama atau creator sama, anggap satu game
+                local myInfo = pcall(function()
+                    return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+                end)
+                -- Simple heuristic: cek game root place
+                local rootOk, rootPlace = pcall(function()
+                    return game:GetService("TeleportService"):GetLocalPlayerTeleportData()
+                end)
+                -- Pakai GameId match — jika PlaceId ada di db dan GameId sama
+                local testOk, testInfo = pcall(function()
+                    return game:GetService("MarketplaceService"):GetProductInfo(tonumber(pid))
+                end)
+                if testOk and testInfo and testInfo.Creator then
+                    local myCreatorOk, myInfo2 = pcall(function()
+                        return game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId)
+                    end)
+                    if myCreatorOk and myInfo2 and myInfo2.Creator then
+                        if testInfo.Creator.Id == myInfo2.Creator.Id and
+                           testInfo.Creator.Name == myInfo2.Creator.Name then
+                            entry = data
+                            break
+                        end
+                    end
+                end
+            end
+            if entry then break end
+        end
+    end
 
     -- Workspace scan
     typeTextFast(output, "Check_This_Game:;", "00ff88", 0.06)
@@ -1941,6 +2017,77 @@ openAdminPanel = function()
             end
         end)
     end)
+    makeRow(playersTab, "── Extra 2 ──", nil, nil, nil)
+    makeRow(playersTab, "🏋️ Set Humanoid MaxHealth", "Run", Color3.fromRGB(60,40,80), function()
+        pcall(function() LocalPlayer.Character.Humanoid.MaxHealth = 1000 LocalPlayer.Character.Humanoid.Health = 1000 end)
+        showNotifSimple("MaxHealth = 1000", Color3.fromRGB(80,220,120))
+    end)
+    makeRow(playersTab, "💀 Set Health to 1", "Run", Color3.fromRGB(120,30,30), function()
+        pcall(function() LocalPlayer.Character.Humanoid.Health = 1 end)
+    end)
+    makeRow(playersTab, "🔇 Mute all sounds", "Run", Color3.fromRGB(40,40,60), function()
+        pcall(function()
+            for _, s in ipairs(workspace:GetDescendants()) do
+                if s:IsA("Sound") then s.Volume = 0 end
+            end
+        end)
+        showNotifSimple("All sounds muted!", Color3.fromRGB(150,150,255))
+    end)
+    makeRow(playersTab, "🔊 Unmute all sounds", "Run", Color3.fromRGB(40,60,40), function()
+        pcall(function()
+            for _, s in ipairs(workspace:GetDescendants()) do
+                if s:IsA("Sound") then s.Volume = 1 end
+            end
+        end)
+    end)
+    makeRow(playersTab, "🌈 Rainbow walk effect", "Run", Color3.fromRGB(80,40,80), function()
+        task.spawn(function()
+            local h = 0
+            for _ = 1, 120 do
+                pcall(function()
+                    for _, p in ipairs(LocalPlayer.Character:GetDescendants()) do
+                        if p:IsA("BasePart") then p.Color = Color3.fromHSV(h,0.9,1) end
+                    end
+                end)
+                h = (h + 0.008) % 1
+                task.wait(0.05)
+            end
+        end)
+    end)
+    makeRow(playersTab, "🔭 Long camera zoom", "Run", Color3.fromRGB(40,60,80), function()
+        pcall(function() LocalPlayer.CameraMaxZoomDistance = 500 end)
+        showNotifSimple("Camera zoom: 500 studs", Color3.fromRGB(150,180,255))
+    end)
+    makeRow(playersTab, "📸 First person camera", "Run", Color3.fromRGB(40,60,100), function()
+        pcall(function()
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        end)
+    end)
+    makeRow(playersTab, "🔙 Reset camera zoom", "Run", Color3.fromRGB(40,60,80), function()
+        pcall(function()
+            LocalPlayer.CameraMaxZoomDistance = 400
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        end)
+    end)
+    makeRow(playersTab, "🎭 Copy character look", "Run", Color3.fromRGB(60,40,60), function()
+        pcall(function()
+            local userId = LocalPlayer.UserId
+            local desc = game:GetService("Players"):GetCharacterAppearanceInfoAsync(userId)
+            showNotifSimple("UserID: "..userId, Color3.fromRGB(150,180,255))
+        end)
+    end)
+    makeRow(playersTab, "⏱ Show ping", "Show", Color3.fromRGB(40,60,100), function()
+        local ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
+        showNotifSimple(string.format("Ping: %.0f ms", ping), Color3.fromRGB(150,220,255))
+    end)
+    makeRow(playersTab, "📊 Show FPS", "Show", Color3.fromRGB(40,60,100), function()
+        local fps = math.floor(1/game:GetService("RunService").RenderStepped:Wait())
+        showNotifSimple("FPS: "..fps, Color3.fromRGB(150,220,255))
+    end)
+    makeRow(playersTab, "🚪 Leave game", "Leave", Color3.fromRGB(120,30,30), function()
+        game:GetService("TeleportService"):Teleport(game.PlaceId)
+    end)
 
     -- ===== TAB 2: MOVEMENT =====
     local moveTab, moveBtn = makeTab("Move", "🏃")
@@ -2114,6 +2261,104 @@ openAdminPanel = function()
         pcall(function()
             local v = LocalPlayer.Character.HumanoidRootPart.Velocity
             showNotifSimple(string.format("Vel: %.1f,%.1f,%.1f | Mag:%.1f",v.X,v.Y,v.Z,v.Magnitude), Color3.fromRGB(150,180,255))
+        end)
+    end)
+    makeRow(moveTab, "── Extra 2 ──", nil, nil, nil)
+    makeRow(moveTab, "🏊 Swim mode (low gravity + speed)", "Run", Color3.fromRGB(20,60,80), function()
+        pcall(function()
+            workspace.Gravity = 50
+            LocalPlayer.Character.Humanoid.WalkSpeed = 28
+        end)
+    end)
+    makeRow(moveTab, "🚁 Hover (gravity=0 + speed 1)", "Run", Color3.fromRGB(40,60,80), function()
+        pcall(function()
+            workspace.Gravity = 0
+            LocalPlayer.Character.Humanoid.WalkSpeed = 1
+        end)
+    end)
+    makeRow(moveTab, "⚽ Ball physics (speed + no friction)", "Run", Color3.fromRGB(60,60,80), function()
+        pcall(function()
+            for _, p in ipairs(LocalPlayer.Character:GetDescendants()) do
+                if p:IsA("BasePart") then p.CustomPhysicalProperties = PhysicalProperties.new(0.1,0,0,0,0) end
+            end
+            LocalPlayer.Character.Humanoid.WalkSpeed = 50
+        end)
+    end)
+    makeRow(moveTab, "🔄 Auto-spin (loop rotate)", "Toggle", Color3.fromRGB(80,40,80), function()
+        task.spawn(function()
+            for _ = 1, 200 do
+                pcall(function()
+                    LocalPlayer.Character.HumanoidRootPart.CFrame =
+                        LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(5), 0)
+                end)
+                task.wait(0.03)
+            end
+        end)
+    end)
+    makeRow(moveTab, "💨 Speed burst (+100 for 2s)", "Run", Color3.fromRGB(30,80,60), function()
+        pcall(function()
+            local h = LocalPlayer.Character.Humanoid
+            local orig = h.WalkSpeed
+            h.WalkSpeed = orig + 100
+            task.wait(2)
+            h.WalkSpeed = orig
+        end)
+    end)
+    makeInputRow(moveTab, "Jump Height (JumpHeight)", "7.2", "Set", function(val)
+        local n = tonumber(val)
+        if n then pcall(function() LocalPlayer.Character.Humanoid.JumpHeight = n end) end
+    end)
+    makeRow(moveTab, "🌊 Wave walk effect", "Run", Color3.fromRGB(20,60,100), function()
+        task.spawn(function()
+            local t = 0
+            for _ = 1, 100 do
+                pcall(function()
+                    local hrp = LocalPlayer.Character.HumanoidRootPart
+                    hrp.CFrame = hrp.CFrame + Vector3.new(0, math.sin(t) * 0.3, 0)
+                    t = t + 0.3
+                end)
+                task.wait(0.05)
+            end
+        end)
+    end)
+    makeRow(moveTab, "🧲 Attract to nearest player", "Run", Color3.fromRGB(60,30,80), function()
+        pcall(function()
+            local myPos = LocalPlayer.Character.HumanoidRootPart.Position
+            local nearest, dist = nil, math.huge
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    local d = (p.Character.HumanoidRootPart.Position - myPos).Magnitude
+                    if d < dist then dist=d nearest=p end
+                end
+            end
+            if nearest then
+                local bv = Instance.new("BodyVelocity", LocalPlayer.Character.HumanoidRootPart)
+                local dir = (nearest.Character.HumanoidRootPart.Position - myPos).Unit
+                bv.Velocity = dir * 80
+                bv.MaxForce = Vector3.new(1e6,1e6,1e6)
+                game:GetService("Debris"):AddItem(bv, 0.4)
+            end
+        end)
+    end)
+    makeRow(moveTab, "🏔️ Climb speed x3", "Run", Color3.fromRGB(60,40,40), function()
+        pcall(function() LocalPlayer.Character.Humanoid.ClimbSpeed = LocalPlayer.Character.Humanoid.ClimbSpeed * 3 end)
+    end)
+    makeRow(moveTab, "🔁 Teleport every 3s (loop x5)", "Run", Color3.fromRGB(80,40,60), function()
+        task.spawn(function()
+            for _ = 1, 5 do
+                pcall(function()
+                    local hrp = LocalPlayer.Character.HumanoidRootPart
+                    local cam = workspace.CurrentCamera
+                    hrp.CFrame = cam.CFrame * CFrame.new(0,0,-20)
+                end)
+                task.wait(3)
+            end
+        end)
+    end)
+    makeRow(moveTab, "📐 Print position XYZ", "Print", Color3.fromRGB(40,60,100), function()
+        pcall(function()
+            local pos = LocalPlayer.Character.HumanoidRootPart.Position
+            showNotifSimple(string.format("X:%.1f Y:%.1f Z:%.1f",pos.X,pos.Y,pos.Z), Color3.fromRGB(150,180,255))
         end)
     end)
 
