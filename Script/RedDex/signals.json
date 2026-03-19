@@ -1,13 +1,11 @@
 [
   {
-    "id": "1773915557_9umoj5dw1km",
-    "type": "message",
+    "id": "1773915584_higk5v94p0f",
+    "type": "kick",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {
-      "text": "Test"
-    },
+    "data": {},
     "processed": false,
-    "timestamp": 1773915557
+    "timestamp": 1773915584
   }
 ]
