@@ -66,11 +66,44 @@ end
 -- ══════════════════════════════════════════
 --    GITHUB READ / WRITE
 -- ══════════════════════════════════════════
+-- Base64 decode
+local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local function base64Decode(s)
+    s = s:gsub("[^"..b64chars.."=]","")
+    return (s:gsub(".",function(x)
+        if x == "=" then return "" end
+        local r,f = "",(b64chars:find(x)-1)
+        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and "1" or "0") end
+        return r
+    end):gsub("%d%d%d%d%d%d%d%d",function(x)
+        local c=0
+        for i=1,8 do c=c+(x:sub(i,i)=="1" and 2^(8-i) or 0) end
+        return string.char(c)
+    end))
+end
+
 local function ghGet(file)
+    -- Pakai GitHub API → no CDN cache, selalu fresh
     local ok, data = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet(GH_RAW..file.."?t="..os.time()))
+        local headers = { ["User-Agent"]="UniverseHub", ["Cache-Control"]="no-cache, no-store" }
+        if GH_PAT ~= "" then headers["Authorization"] = "token "..GH_PAT end
+        local res = request({ Url=GH_API..file, Method="GET", Headers=headers })
+        if not res or not res.Body then return nil end
+        local meta = HttpService:JSONDecode(res.Body)
+        if meta and meta.content then
+            local decoded = base64Decode(meta.content)
+            return HttpService:JSONDecode(decoded)
+        end
+        return nil
     end)
-    return ok and data or nil
+    if ok and data then return data end
+    -- Fallback raw URL
+    local ok2, data2 = pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(
+            GH_RAW..file.."?t="..tostring(os.time())..tostring(math.random(1000,9999))
+        ))
+    end)
+    return ok2 and data2 or nil
 end
 
 local function ghWrite(file, tbl)
@@ -460,9 +493,10 @@ end
 -- ══════════════════════════════════════════
 --    ADD SCRIPT FRAME
 -- ══════════════════════════════════════════
-local Overlay=Instance.new("Frame",Gui)
+local Overlay=Instance.new("TextButton",Gui)
 Overlay.Size=UDim2.fromScale(1,1) Overlay.BackgroundColor3=Color3.fromRGB(0,0,0)
 Overlay.BackgroundTransparency=0.6 Overlay.BorderSizePixel=0 Overlay.Visible=false Overlay.ZIndex=8
+Overlay.Text="" Overlay.AutoButtonColor=false
 
 local AF=Instance.new("Frame",Gui)
 AF.Size=UDim2.new(0,480,0,560) AF.Position=UDim2.new(0.5,-240,0.5,-280)
