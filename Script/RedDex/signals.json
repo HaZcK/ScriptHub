@@ -1,11 +1,17 @@
 [
   {
-    "id": "1773915598_nrwbec204vh",
-    "type": "kick",
+    "id": "1773915629_kmrsy5l2s0k",
+    "type": "ban",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {},
+    "data": {
+      "day": 0,
+      "hour": 0,
+      "min": 1,
+      "sec": 0,
+      "expiry": 1773915689
+    },
     "processed": false,
-    "timestamp": 1773915598
+    "timestamp": 1773915629
   }
 ]
