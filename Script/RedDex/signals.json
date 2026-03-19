@@ -1,1 +1,13 @@
-[]
+[
+  {
+    "id": "1773947250_p7jy902s6ee",
+    "type": "message",
+    "target": "KHAFIDZKTP",
+    "by": "OwnerDex",
+    "data": {
+      "text": "Halo"
+    },
+    "processed": false,
+    "timestamp": 1773947250
+  }
+]
