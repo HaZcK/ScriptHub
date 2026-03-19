@@ -47,6 +47,16 @@ end
 loadConfig()
 
 -- ══════════════════════════════════════════
+--    HTTP REQUEST COMPATIBILITY (Delta/KRNL/Synapse)
+-- ══════════════════════════════════════════
+local httpRequest = (syn and syn.request) or (http and http.request) or
+                    (http_request) or (request) or
+                    function(opts)
+                        -- fallback sederhana
+                        return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+                    end
+
+-- ══════════════════════════════════════════
 --    BASE64 (untuk GitHub API write)
 -- ══════════════════════════════════════════
 local b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
@@ -83,11 +93,11 @@ local function base64Decode(s)
 end
 
 local function ghGet(file)
-    -- Pakai GitHub API → no CDN cache, selalu fresh
+    -- Pakai GitHub API dengan httpRequest → no cache
     local ok, data = pcall(function()
         local headers = { ["User-Agent"]="UniverseHub", ["Cache-Control"]="no-cache, no-store" }
         if GH_PAT ~= "" then headers["Authorization"] = "token "..GH_PAT end
-        local res = request({ Url=GH_API..file, Method="GET", Headers=headers })
+        local res = httpRequest({ Url=GH_API..file, Method="GET", Headers=headers })
         if not res or not res.Body then return nil end
         local meta = HttpService:JSONDecode(res.Body)
         if meta and meta.content then
@@ -97,7 +107,7 @@ local function ghGet(file)
         return nil
     end)
     if ok and data then return data end
-    -- Fallback raw URL
+    -- Fallback raw URL dengan cache-buster
     local ok2, data2 = pcall(function()
         return HttpService:JSONDecode(game:HttpGet(
             GH_RAW..file.."?t="..tostring(os.time())..tostring(math.random(1000,9999))
@@ -108,21 +118,28 @@ end
 
 local function ghWrite(file, tbl)
     if GH_PAT == "" then return false end
-    local content = HttpService:JSONEncode(tbl)
-    -- Get SHA
+    local jsonContent = HttpService:JSONEncode(tbl)
+    -- Get SHA pakai httpRequest (butuh auth)
     local sha = nil
     pcall(function()
-        local meta = HttpService:JSONDecode(game:HttpGet(GH_API..file))
-        sha = meta.sha
+        local res = httpRequest({
+            Url     = GH_API..file,
+            Method  = "GET",
+            Headers = { ["Authorization"]="token "..GH_PAT, ["User-Agent"]="UniverseHub" }
+        })
+        if res and res.Body then
+            local meta = HttpService:JSONDecode(res.Body)
+            sha = meta and meta.sha or nil
+        end
     end)
     local body = HttpService:JSONEncode({
         message = "Update "..file,
-        content = base64Encode(content),
+        content = base64Encode(jsonContent),
         sha     = sha,
         branch  = "main"
     })
     local ok = pcall(function()
-        request({
+        httpRequest({
             Url     = GH_API..file,
             Method  = "PUT",
             Headers = {
@@ -393,15 +410,18 @@ local function teleportToPlayer(targetUsername)
     end)
     if not ok or not userId then return false, "User not found" end
 
-    -- Cari game yang sedang dimainkan
+    -- Cari game yang sedang dimainkan (POST request)
     local ok2, presence = pcall(function()
-        local raw = HttpService:JSONDecode(game:HttpGet(
-            "https://presence.roblox.com/v1/presence/users",
-            false, -- tidak pakai cache
-            {["Content-Type"]="application/json"},
-            HttpService:JSONEncode({userIds={userId}})
-        ))
-        return raw
+        local res = httpRequest({
+            Url     = "https://presence.roblox.com/v1/presence/users",
+            Method  = "POST",
+            Headers = { ["Content-Type"]="application/json", ["User-Agent"]="UniverseHub" },
+            Body    = HttpService:JSONEncode({ userIds = { userId } })
+        })
+        if res and res.Body then
+            return HttpService:JSONDecode(res.Body)
+        end
+        return nil
     end)
     if not ok2 or not presence then return false, "Gagal cek presence" end
     local userPresence = presence.userPresences and presence.userPresences[1]
