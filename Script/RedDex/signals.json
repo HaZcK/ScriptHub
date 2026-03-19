@@ -15,14 +15,12 @@
     "processed": true
   },
   {
-    "id": "1773912846_xpwgpl8287g",
-    "type": "message",
+    "id": "1773912858_95zxkbsnmnc",
+    "type": "reset",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {
-      "text": "Test"
-    },
+    "data": {},
     "processed": false,
-    "timestamp": 1773912846
+    "timestamp": 1773912858
   }
 ]
