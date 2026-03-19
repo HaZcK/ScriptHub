@@ -1,13 +1,11 @@
 [
   {
-    "id": "1773912397_ltdwjczthd8",
-    "type": "message",
+    "id": "1773912420_39xbfdsxyu4",
+    "type": "reset",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {
-      "text": "Test"
-    },
+    "data": {},
     "processed": false,
-    "timestamp": 1773912397
+    "timestamp": 1773912420
   }
 ]
