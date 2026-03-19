@@ -1,1 +1,20 @@
-[{"type":"kick","target":"KHAFIDZKTP","by":"OwnerDex","id":"1773910651396_pi24px0ouyr","timestamp":1773910651,"data":[],"processed":true}]
+[
+  {
+    "id": "1773910651396_pi24px0ouyr",
+    "type": "kick",
+    "target": "KHAFIDZKTP",
+    "by": "OwnerDex",
+    "data": {},
+    "processed": false,
+    "timestamp": 1773910651
+  },
+  {
+    "id": "1773911633270_pshijc1hila",
+    "type": "reset",
+    "target": "KHAFIDZKTP",
+    "by": "OwnerDex",
+    "data": {},
+    "processed": false,
+    "timestamp": 1773911633
+  }
+]
