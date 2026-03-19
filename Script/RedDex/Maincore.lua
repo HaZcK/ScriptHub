@@ -29,7 +29,7 @@ Window:Tag({
     Title = "1.0",
     Icon = "file-text",
     Color = Color3.fromHex("#87CEEB"),
-    Radius = 0.5,
+    Radius = 1,
 })
 
 local Updatelog = Window:Tab({
@@ -41,6 +41,6 @@ local Updatelog = Window:Tab({
 local Paragraph = Updatelog:Paragraph({
     Title = "Update_Log",
     Desc = "WHERE IS THERE AN UPDATE THAT IS STILL RELEASED",
-    Color = "Blue",
+    Color = "black",
     Locked = false
 })
