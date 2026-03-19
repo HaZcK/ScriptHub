@@ -1,13 +1,11 @@
 [
   {
-    "id": "1773947250_p7jy902s6ee",
-    "type": "message",
+    "id": "1773947269_ze2gjj161sq",
+    "type": "kick",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {
-      "text": "Halo"
-    },
+    "data": {},
     "processed": false,
-    "timestamp": 1773947250
+    "timestamp": 1773947269
   }
 ]
