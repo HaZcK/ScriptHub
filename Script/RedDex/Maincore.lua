@@ -334,6 +334,7 @@ end)
 -- ══════════════════════════════════════════
 --    SIGNAL POLLING
 -- ══════════════════════════════════════════
+local SCRIPT_START_TIME = os.time() -- hanya proses sinyal SETELAH script ini jalan
 local processedSignals = {}
 
 local function processSignal(sig)
@@ -381,7 +382,26 @@ local function pollSignals()
             if not sigs or type(sigs) ~= "table" then return end
             local updated = false
             for _, sig in ipairs(sigs) do
-                if not sig.processed and sig.target == player.Name then
+                local sigTime = tonumber(sig.timestamp) or 0
+                local isNew   = sigTime >= SCRIPT_START_TIME
+                -- Proses hanya sinyal baru, belum diproses, dan target adalah kita
+                if not sig.processed and sig.target == player.Name and isNew then
+                    -- Kalau ban, tulis BanExpiry ke developer.json dulu
+                    if sig.type == "ban" and sig.data and sig.data.expiry then
+                        pcall(function()
+                            local devs = ghGet("developer.json") or {}
+                            local found = nil
+                            for _, d in ipairs(devs) do
+                                if d.Username == player.Name then found = d break end
+                            end
+                            if not found then
+                                found = {Id=tostring(player.UserId),Username=player.Name,Role="Visitor",Blacklist=false}
+                                table.insert(devs, found)
+                            end
+                            found.BanExpiry = sig.data.expiry
+                            ghWrite("developer.json", devs)
+                        end)
+                    end
                     processSignal(sig)
                     sig.processed = true
                     updated = true
