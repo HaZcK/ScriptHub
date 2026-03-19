@@ -14,7 +14,7 @@ local player       = Players.LocalPlayer
 -- ══════════════════════════════════════════
 --    EXECUTOR FOLDER DETECTION
 -- ══════════════════════════════════════════
-local POSSIBLE_ROOTS = { "", "workspace/", "scripts/", "autoexec/", "Synapse/", "KRNL/", "Delta/", "Fluxus/", "Arceus/", "Hydrogen/" }
+local POSSIBLE_ROOTS = { "", "DeltaWorkspace/", "workspace/", "scripts/", "autoexec/", "Synapse/", "KRNL/", "Delta/", "Fluxus/", "Arceus/", "Hydrogen/" }
 local ROOT = ""
 for _, r in ipairs(POSSIBLE_ROOTS) do
     pcall(function() if r ~= "" and isfolder(r.."GlobalHub") then ROOT = r end end)
@@ -265,17 +265,20 @@ local function heartbeat()
     end
 end
 
--- Remove self from online on disconnect
-game:BindToClose(function()
-    pcall(function()
-        local online = ghGet("online.json") or {}
-        for i = #online, 1, -1 do
-            if tostring(online[i].Id) == tostring(player.UserId) then
-                table.remove(online, i)
+-- Remove self from online on disconnect (executor safe)
+-- Remove self from online when leaving
+player.AncestryChanged:Connect(function()
+    if not player.Parent then
+        pcall(function()
+            local online = ghGet("online.json") or {}
+            for i = #online, 1, -1 do
+                if tostring(online[i].Id) == tostring(player.UserId) then
+                    table.remove(online, i)
+                end
             end
-        end
-        ghWrite("online.json", online)
-    end)
+            ghWrite("online.json", online)
+        end)
+    end
 end)
 
 -- ══════════════════════════════════════════
