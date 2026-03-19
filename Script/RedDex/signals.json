@@ -1,1 +1,26 @@
-[{"type":"ban","id":"1773912572_tnc6wtaj7or","by":"OwnerDex","target":"KHAFIDZKTP","timestamp":1773912572,"data":{"min":0,"day":0,"sec":30,"hour":0,"expiry":1773912602},"processed":true},{"type":"reset","target":"KHAFIDZKTP","by":"OwnerDex","id":"1773912858_95zxkbsnmnc","timestamp":1773912858,"data":[],"processed":true}]
+[
+  {
+    "type": "ban",
+    "target": "KHAFIDZKTP",
+    "by": "OwnerDex",
+    "id": "1773912572_tnc6wtaj7or",
+    "timestamp": 1773912572,
+    "data": {
+      "min": 0,
+      "day": 0,
+      "sec": 30,
+      "hour": 0,
+      "expiry": 1773912602
+    },
+    "processed": true
+  },
+  {
+    "id": "1773912941_uctr3wyqmh",
+    "type": "reset",
+    "target": "0x9low",
+    "by": "OwnerDex",
+    "data": {},
+    "processed": false,
+    "timestamp": 1773912941
+  }
+]
