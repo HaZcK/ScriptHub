@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>UniverseHub — Admin Panel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#080b14;--bg2:#0d1120;--bg3:#131828;--bg4:#1a2035;
+    --ac:#87ceeb;--ac2:#00bfff;--ac3:#5fa8d3;
+    --red:#e05555;--green:#55e09a;--yellow:#e0c455;--purple:#a855e0;--orange:#e08855;
+    --tx:#e8eeff;--st:#8899cc;--border:#1e2a4a;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--tx);font-family:'Space Grotesk',sans-serif;overflow:hidden}
+
+  /* LOGIN */
+  #login-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100}
+  .login-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;box-shadow:0 0 60px rgba(0,100,200,.15)}
+  .login-box .logo{text-align:center;margin-bottom:28px}
+  .login-box .logo h1{font-size:22px;font-weight:700;color:var(--tx)}
+  .login-box .logo p{font-size:12px;color:var(--st);margin-top:4px}
+  .login-box .logo .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ac);margin-right:6px;box-shadow:0 0 8px var(--ac)}
+  .field-group{margin-bottom:16px}
+  .field-group label{display:block;font-size:11px;color:var(--st);margin-bottom:6px;font-weight:600;letter-spacing:.5px;text-transform:uppercase}
+  .field-group input{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:11px 14px;color:var(--tx);font-family:inherit;font-size:14px;outline:none;transition:.2s}
+  .field-group input:focus{border-color:var(--ac);box-shadow:0 0 0 3px rgba(135,206,235,.1)}
+  .btn-login{width:100%;background:var(--ac);color:#06090f;border:none;border-radius:9px;padding:13px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer;transition:.2s;margin-top:4px}
+  .btn-login:hover{background:var(--ac2);box-shadow:0 0 20px rgba(135,206,235,.3)}
+  .login-error{background:rgba(224,85,85,.1);border:1px solid rgba(224,85,85,.3);border-radius:8px;padding:10px;color:var(--red);font-size:13px;text-align:center;display:none;margin-top:12px}
+
+  /* MAIN LAYOUT */
+  #app{display:flex;height:100vh;display:none}
+  .sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+  .sidebar-head{padding:20px 16px 14px;border-bottom:1px solid var(--border)}
+  .sidebar-head .brand{font-size:14px;font-weight:700;color:var(--tx)}
+  .sidebar-head .user-badge{margin-top:10px;background:var(--bg3);border-radius:8px;padding:8px 10px;display:flex;align-items:center;gap:8px}
+  .sidebar-head .user-badge img{width:30px;height:30px;border-radius:50%;border:2px solid var(--border)}
+  .sidebar-head .user-badge .info{flex:1;min-width:0}
+  .sidebar-head .user-badge .info .name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sidebar-head .user-badge .info .role-tag{font-size:10px;margin-top:2px;font-weight:600}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;cursor:pointer;font-size:13px;color:var(--st);border-left:2px solid transparent;transition:.2s}
+  .nav-item:hover{color:var(--tx);background:rgba(255,255,255,.03)}
+  .nav-item.active{color:var(--ac);background:rgba(135,206,235,.06);border-left-color:var(--ac)}
+  .nav-item .icon{font-size:15px;width:20px;text-align:center}
+  .nav-divider{height:1px;background:var(--border);margin:8px 0}
+  .nav-section-label{font-size:10px;color:var(--st);padding:8px 16px 4px;text-transform:uppercase;letter-spacing:.8px;font-weight:600}
+  .sidebar-footer{margin-top:auto;padding:12px 16px;border-top:1px solid var(--border)}
+  .pat-indicator{font-size:11px;display:flex;align-items:center;gap:6px;color:var(--st)}
+  .pat-indicator .dot{width:7px;height:7px;border-radius:50%}
+  .pat-indicator .dot.ok{background:var(--green)}
+  .pat-indicator .dot.no{background:var(--red)}
+
+  /* CONTENT */
+  .content{flex:1;overflow-y:auto;background:var(--bg)}
+  .page{display:none;padding:28px;animation:fadeIn .2s}
+  .page.active{display:block}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+  .page-title{font-size:20px;font-weight:700;margin-bottom:4px}
+  .page-sub{font-size:13px;color:var(--st);margin-bottom:24px}
+
+  /* CARDS */
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px}
+  .card-title{font-size:12px;font-weight:600;color:var(--st);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+
+  /* INPUTS */
+  .search-bar{display:flex;gap:10px;margin-bottom:20px}
+  .search-bar input{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--tx);font-family:inherit;font-size:14px;outline:none;transition:.2s}
+  .search-bar input:focus{border-color:var(--ac)}
+  .btn{padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-family:inherit;font-weight:600;font-size:13px;transition:.2s;display:inline-flex;align-items:center;gap:6px}
+  .btn-primary{background:var(--ac);color:#06090f}
+  .btn-primary:hover{background:var(--ac2);box-shadow:0 0 16px rgba(135,206,235,.25)}
+  .btn-danger{background:rgba(224,85,85,.15);color:var(--red);border:1px solid rgba(224,85,85,.3)}
+  .btn-danger:hover{background:rgba(224,85,85,.25)}
+  .btn-warn{background:rgba(224,196,85,.12);color:var(--yellow);border:1px solid rgba(224,196,85,.3)}
+  .btn-warn:hover{background:rgba(224,196,85,.22)}
+  .btn-success{background:rgba(85,224,154,.12);color:var(--green);border:1px solid rgba(85,224,154,.3)}
+  .btn-success:hover{background:rgba(85,224,154,.22)}
+  .btn-purple{background:rgba(168,85,224,.12);color:var(--purple);border:1px solid rgba(168,85,224,.3)}
+  .btn-purple:hover{background:rgba(168,85,224,.22)}
+  .btn-sm{padding:7px 12px;font-size:12px}
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* PLAYER CARD */
+  .player-list{display:flex;flex-direction:column;gap:10px}
+  .player-card{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:.2s}
+  .player-card:hover{border-color:var(--ac3);background:var(--bg4)}
+  .player-card.selected{border-color:var(--ac);background:rgba(135,206,235,.06)}
+  .player-card img{width:44px;height:44px;border-radius:50%;border:2px solid var(--border);background:var(--bg4)}
+  .player-card .info{flex:1}
+  .player-card .info .displayname{font-size:14px;font-weight:600}
+  .player-card .info .username{font-size:12px;color:var(--st);margin-top:2px}
+  .player-card .info .uid{font-size:11px;color:var(--border);font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .player-card .actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .role-badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+  .role-owner{background:rgba(224,136,85,.2);color:var(--orange);border:1px solid rgba(224,136,85,.3)}
+  .role-co-owner{background:rgba(168,85,224,.2);color:var(--purple);border:1px solid rgba(168,85,224,.3)}
+  .role-moderate{background:rgba(85,224,154,.2);color:var(--green);border:1px solid rgba(85,224,154,.3)}
+  .role-developer{background:rgba(135,206,235,.2);color:var(--ac);border:1px solid rgba(135,206,235,.3)}
+  .role-admin{background:rgba(224,85,85,.2);color:var(--red);border:1px solid rgba(224,85,85,.3)}
+  .role-visitor{background:rgba(136,153,204,.2);color:var(--st);border:1px solid rgba(136,153,204,.3)}
+  .blacklisted-badge{background:rgba(224,85,85,.15);color:var(--red);border:1px solid rgba(224,85,85,.25);padding:3px 8px;border-radius:20px;font-size:10px;font-weight:700}
+
+  /* BAN TIME FORM */
+  .time-input-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .time-field{display:flex;flex-direction:column;gap:4px;align-items:center}
+  .time-field label{font-size:10px;color:var(--st);font-weight:600;text-transform:uppercase}
+  .time-field input{width:60px;background:var(--bg3);border:1px solid var(--border);border-radius:7px;padding:8px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:14px;text-align:center;outline:none}
+  .time-field input:focus{border-color:var(--ac)}
+
+  /* MESSAGE COMPOSE */
+  .msg-area{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px;color:var(--tx);font-family:inherit;font-size:14px;outline:none;resize:vertical;min-height:80px;transition:.2s}
+  .msg-area:focus{border-color:var(--ac)}
+
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:center;justify-content:center;display:none}
+  .modal-overlay.show{display:flex}
+  .modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:28px;width:440px;max-width:90vw;position:relative}
+  .modal-title{font-size:16px;font-weight:700;margin-bottom:6px}
+  .modal-sub{font-size:13px;color:var(--st);margin-bottom:20px}
+  .modal-close{position:absolute;top:16px;right:16px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;color:var(--st);cursor:pointer;font-size:12px}
+  .modal-close:hover{color:var(--tx)}
+  .modal-footer{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+
+  /* TOAST */
+  .toast-wrap{position:fixed;top:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+  .toast{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;display:flex;align-items:center;gap:10px;pointer-events:auto;animation:slideIn .3s;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  .toast.success{border-color:rgba(85,224,154,.4);color:var(--green)}
+  .toast.error{border-color:rgba(224,85,85,.4);color:var(--red)}
+  .toast.info{border-color:rgba(135,206,235,.3);color:var(--ac)}
+  .toast.warn{border-color:rgba(224,196,85,.3);color:var(--yellow)}
+  @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+  /* ROLE SELECT */
+  select{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:inherit;font-size:13px;outline:none;cursor:pointer}
+  select:focus{border-color:var(--ac)}
+
+  /* TABLE */
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{text-align:left;padding:10px 12px;color:var(--st);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+  .tbl td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:middle}
+  .tbl tr:hover td{background:rgba(255,255,255,.02)}
+
+  /* STAT CHIPS */
+  .stat-row{display:flex;gap:12px;margin-bottom:20px}
+  .stat-chip{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 18px;flex:1;text-align:center}
+  .stat-chip .val{font-size:24px;font-weight:700;color:var(--ac)}
+  .stat-chip .lbl{font-size:11px;color:var(--st);margin-top:4px}
+
+  /* ONLINE DOT */
+  .online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);margin-right:5px}
+  .offline-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--st);margin-right:5px}
+
+  /* PAT SETTINGS */
+  .pat-form{display:flex;gap:10px}
+  .pat-form input{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:'JetBrains Mono',monospace;font-size:12px;outline:none}
+  .pat-form input:focus{border-color:var(--ac)}
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar{width:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+  .empty-state{text-align:center;padding:40px;color:var(--st);font-size:14px}
+  .empty-state .ico{font-size:36px;margin-bottom:12px;opacity:.4}
+
+  .ban-info{background:rgba(224,196,85,.08);border:1px solid rgba(224,196,85,.2);border-radius:8px;padding:12px;font-size:12px;color:var(--yellow);margin-top:10px;display:none}
+
+  .input-full{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--tx);font-family:inherit;font-size:14px;outline:none;transition:.2s;margin-bottom:12px}
+  .input-full:focus{border-color:var(--ac)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-box">
+    <div class="logo">
+      <h1><span class="dot"></span>UniverseHub</h1>
+      <p>Admin Control Panel</p>
+    </div>
+    <div class="field-group">
+      <label>Username</label>
+      <input type="text" id="login-user" placeholder="Enter username..." autocomplete="off">
+    </div>
+    <div class="field-group">
+      <label>Password</label>
+      <input type="password" id="login-pass" placeholder="Enter password...">
+    </div>
+    <button class="btn-login" onclick="doLogin()">Sign In</button>
+    <div class="login-error" id="login-error">Invalid username or password.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <div class="brand">⬡ UniverseHub</div>
+      <div class="user-badge">
+        <img id="sb-avatar" src="" onerror="this.src='https://www.roblox.com/asset-thumbnail/image?assetId=1&width=60&height=60'">
+        <div class="info">
+          <div class="name" id="sb-name">—</div>
+          <div class="role-tag" id="sb-role">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding-top:8px">
+      <div class="nav-section-label">General</div>
+      <div class="nav-item active" onclick="showPage('players',this)" id="nav-players"><span class="icon">🔍</span> Players</div>
+      <div class="nav-item" onclick="showPage('online',this)" id="nav-online"><span class="icon">🟢</span> Online</div>
+
+      <div class="nav-divider"></div>
+      <div class="nav-section-label">Actions</div>
+      <div class="nav-item" onclick="showPage('kick',this)" id="nav-kick" style="display:none"><span class="icon">👢</span> Kick</div>
+      <div class="nav-item" onclick="showPage('devtools',this)" id="nav-devtools" style="display:none"><span class="icon">🛠️</span> Dev Tools</div>
+      <div class="nav-item" onclick="showPage('moderate',this)" id="nav-moderate" style="display:none"><span class="icon">🛡️</span> Moderate</div>
+      <div class="nav-item" onclick="showPage('whitelist',this)" id="nav-whitelist" style="display:none"><span class="icon">📋</span> Whitelist</div>
+      <div class="nav-item" onclick="showPage('roles',this)" id="nav-roles" style="display:none"><span class="icon">👑</span> Roles</div>
+
+      <div class="nav-divider"></div>
+      <div class="nav-section-label">Config</div>
+      <div class="nav-item" onclick="showPage('settings',this)"><span class="icon">⚙️</span> Settings</div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="pat-indicator" style="margin-bottom:10px">
+        <div class="dot" id="pat-dot" style="background:var(--red)"></div>
+        <span id="pat-status">PAT not set</span>
+      </div>
+      <button onclick="doLogout()" style="width:100%;background:rgba(224,85,85,.12);color:var(--red);border:1px solid rgba(224,85,85,.3);border-radius:8px;padding:9px;font-family:inherit;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+        &#x1F6AA; Log Out
+      </button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- PLAYERS PAGE -->
+    <div class="page active" id="page-players">
+      <div class="page-title">Search Players</div>
+      <div class="page-sub">Cari player Roblox berdasarkan nama untuk assign role atau aksi.</div>
+      <div class="search-bar">
+        <input id="player-search" placeholder="Ketik nama player (display name / username)..." onkeydown="if(event.key==='Enter')searchPlayers()">
+        <button class="btn btn-primary" onclick="searchPlayers()">🔍 Search</button>
+      </div>
+      <div id="player-results" class="player-list"></div>
+    </div>
+
+    <!-- ONLINE PAGE -->
+    <div class="page" id="page-online">
+      <div class="page-title">Online Players</div>
+      <div class="page-sub">Player yang sedang menggunakan UniverseHub script (heartbeat ≤60 detik).</div>
+      <div class="stat-row" id="online-stats"></div>
+      <div class="card">
+        <div class="card-title">🟢 Currently Online</div>
+        <div id="online-list"></div>
+      </div>
+    </div>
+
+    <!-- KICK PAGE -->
+    <div class="page" id="page-kick">
+      <div class="page-title">Kick Player</div>
+      <div class="page-sub">Kirim sinyal kick ke player yang sedang menggunakan script.</div>
+      <div class="card">
+        <div class="card-title">👢 Kick Action</div>
+        <input class="input-full" id="kick-target" placeholder="Username target...">
+        <button class="btn btn-danger" onclick="sendKick()">Send Kick Signal</button>
+      </div>
+    </div>
+
+    <!-- DEV TOOLS PAGE -->
+    <div class="page" id="page-devtools">
+      <div class="page-title">Developer Tools</div>
+      <div class="page-sub">Tools eksklusif untuk role Developer ke atas.</div>
+
+      <div class="card">
+        <div class="card-title">⏱️ Ban Time</div>
+        <input class="input-full" id="ban-target" placeholder="Username target...">
+        <div class="time-input-row" style="margin-bottom:14px">
+          <div class="time-field"><label>Day</label><input type="number" id="ban-day" min="0" max="3" value="0"></div>
+          <div class="time-field"><label>Hour</label><input type="number" id="ban-hour" min="0" max="24" value="0"></div>
+          <div class="time-field"><label>Min</label><input type="number" id="ban-min" min="0" max="60" value="0"></div>
+          <div class="time-field"><label>Sec</label><input type="number" id="ban-sec" min="0" max="60" value="0"></div>
+        </div>
+        <button class="btn btn-warn" onclick="sendBan()">⏱️ Apply Ban Time</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🔄 Reset Character</div>
+        <input class="input-full" id="reset-target" placeholder="Username target...">
+        <button class="btn btn-primary" onclick="sendReset()">Reset Character</button>
+      </div>
+    </div>
+
+    <!-- MODERATE PAGE -->
+    <div class="page" id="page-moderate">
+      <div class="page-title">Moderate</div>
+      <div class="page-sub">Tools moderation — Blacklist, Whitelist, dan kirim pesan ke player.</div>
+
+      <div class="card">
+        <div class="card-title">✉️ Give Message</div>
+        <input class="input-full" id="msg-target" placeholder="Username target...">
+        <textarea class="msg-area" id="msg-content" placeholder="Tulis pesan yang akan muncul sebagai notifikasi di script player..."></textarea>
+        <button class="btn btn-primary" style="margin-top:10px" onclick="sendMessage()">📨 Kirim Pesan</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">⛔ Blacklist Player</div>
+        <input class="input-full" id="bl-target" placeholder="Username target...">
+        <button class="btn btn-danger" onclick="sendBlacklist()">⛔ Blacklist</button>
+      </div>
+    </div>
+
+    <!-- WHITELIST PAGE -->
+    <div class="page" id="page-whitelist">
+      <div class="page-title">Whitelist Manager</div>
+      <div class="page-sub">Player yang saat ini atau pernah di-blacklist.</div>
+      <div class="card">
+        <div class="card-title" style="justify-content:space-between">
+          ⛔ Blacklisted Players
+          <button class="btn btn-primary btn-sm" onclick="loadWhitelist()">🔄 Refresh</button>
+        </div>
+        <div id="whitelist-list"></div>
+      </div>
+    </div>
+
+    <!-- ROLES PAGE -->
+    <div class="page" id="page-roles">
+      <div class="page-title">Role Management</div>
+      <div class="page-sub">Set role player. Co-Owner tidak bisa assign Co-Owner, Owner tidak bisa diubah.</div>
+      <div class="card">
+        <div class="card-title">👑 Change Role</div>
+        <input class="input-full" id="role-target" placeholder="Username target..." id="role-target">
+        <select id="role-select" style="margin-bottom:12px;width:100%">
+          <option value="Visitor">Visitor</option>
+          <option value="Admin">Admin</option>
+          <option value="Developer">Developer</option>
+          <option value="Moderate">Moderate</option>
+          <option value="Co-Owner" id="opt-coowner">Co-Owner</option>
+        </select>
+        <br>
+        <button class="btn btn-purple" onclick="applyRole()">Set Role</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📋 All Registered Players</div>
+        <div id="all-players-list"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="page-title">Settings</div>
+      <div class="page-sub">Konfigurasi koneksi ke GitHub.</div>
+      <div class="card">
+        <div class="card-title">🔑 GitHub Personal Access Token</div>
+        <p style="font-size:12px;color:var(--st);margin-bottom:12px">PAT perlu scope: <code style="background:var(--bg3);padding:2px 6px;border-radius:4px;font-size:11px">repo</code>. Generate di GitHub → Settings → Developer Settings → Tokens.</p>
+        <div class="pat-form">
+          <input type="password" id="pat-input" placeholder="ghp_xxxxxxxxxxxx...">
+          <button class="btn btn-primary" onclick="savePAT()">Save</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">📁 GitHub Repository</div>
+        <p style="font-size:12px;color:var(--st);margin-bottom:12px">Path ke folder tempat developer.json, signals.json, online.json disimpan.</p>
+        <div style="display:flex;gap:10px;margin-bottom:10px">
+          <div style="flex:1"><label style="font-size:11px;color:var(--st);display:block;margin-bottom:4px">Owner</label><input class="input-full" id="cfg-owner" value="HaZcK" style="margin:0"></div>
+          <div style="flex:1"><label style="font-size:11px;color:var(--st);display:block;margin-bottom:4px">Repo</label><input class="input-full" id="cfg-repo" value="ScriptHub" style="margin:0"></div>
+          <div style="flex:1"><label style="font-size:11px;color:var(--st);display:block;margin-bottom:4px">Branch</label><input class="input-full" id="cfg-branch" value="main" style="margin:0"></div>
+        </div>
+        <div><label style="font-size:11px;color:var(--st);display:block;margin-bottom:4px">Folder Path</label>
+        <input class="input-full" id="cfg-path" value="Script/RedDex" style="margin-bottom:10px"></div>
+        <button class="btn btn-primary" onclick="saveCfg()">Save Config</button>
+      </div>
+    </div>
+
+  </div><!-- content -->
+</div><!-- app -->
+
+<!-- TOAST -->
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-confirm')">✕ Close</button>
+    <div class="modal-title" id="mc-title">Konfirmasi</div>
+    <div class="modal-sub" id="mc-sub">Apakah kamu yakin?</div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-confirm')" style="background:var(--bg3);color:var(--st)">Batal</button>
+      <button class="btn btn-danger" id="mc-confirm">Konfirmasi</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//            STATE & CONFIG
+// ═══════════════════════════════════════════
+const OWNER_CRED = { username: 'OwnerDex', password: 'Khafidz_3' }
+const PROTECTED = 'KHAFIDZKTP'
+const ROLE_LEVELS = { 'Visitor': 0, 'Admin': 1, 'Developer': 2, 'Moderate': 3, 'Co-Owner': 4, 'Owner': 5 }
+
+let state = {
+  loggedIn: false,
+  currentUser: null,
+  currentRole: 'Visitor',
+  currentLevel: 0,
+  pat: localStorage.getItem('uh_pat') || '',
+  cfg: JSON.parse(localStorage.getItem('uh_cfg') || '{"owner":"HaZcK","repo":"ScriptHub","branch":"main","path":"Script/RedDex"}'),
+  devJson: [],
+  onlineJson: [],
+}
+
+// ═══════════════════════════════════════════
+//            GITHUB API
+// ═══════════════════════════════════════════
+function ghRaw(file) {
+  const c = state.cfg
+  return `https://raw.githubusercontent.com/${c.owner}/${c.repo}/${c.branch}/${c.path}/${file}?_=${Date.now()}`
+}
+function ghAPI(file) {
+  const c = state.cfg
+  return `https://api.github.com/repos/${c.owner}/${c.repo}/contents/${c.path}/${file}`
+}
+
+async function ghGet(file) {
+  try {
+    const r = await fetch(ghRaw(file))
+    if (!r.ok) return []
+    return await r.json()
+  } catch { return [] }
+}
+
+async function ghWrite(file, data) {
+  if (!state.pat) { toast('PAT belum diset! Pergi ke Settings.', 'error'); return false }
+  try {
+    const metaR = await fetch(ghAPI(file), { headers: { 'Authorization': `token ${state.pat}` } })
+    const meta = metaR.ok ? await metaR.json() : null
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))))
+    const body = { message: `Update ${file}`, content, branch: state.cfg.branch }
+    if (meta && meta.sha) body.sha = meta.sha
+    const r = await fetch(ghAPI(file), {
+      method: 'PUT',
+      headers: { 'Authorization': `token ${state.pat}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    })
+    return r.ok
+  } catch (e) { toast('GitHub write error: ' + e.message, 'error'); return false }
+}
+
+// ═══════════════════════════════════════════
+//            LOGIN
+// ═══════════════════════════════════════════
+async function doLogin() {
+  const u = document.getElementById('login-user').value.trim()
+  const p = document.getElementById('login-pass').value
+  const err = document.getElementById('login-error')
+
+  // Owner login
+  if (u === OWNER_CRED.username && p === OWNER_CRED.password) {
+    await loginSuccess({ username: u, role: 'Owner', id: 'owner', displayName: 'OwnerDex' })
+    return
+  }
+
+  // Check developer.json
+  toast('Memverifikasi akun...', 'info')
+  const devs = await ghGet('developer.json')
+  if (Array.isArray(devs)) {
+    const found = devs.find(d => d.Username === u)
+    if (found) {
+      if (found.Blacklist) { err.textContent = 'Akun kamu di-blacklist!'; err.style.display='block'; return }
+      // Simple: no password for dev accounts - use Roblox verification
+      // For now accept any dev account login (they login via username only, no password)
+      toast('Akun ditemukan! Masuk...', 'info')
+      await loginSuccess({ username: found.Username, role: found.Role, id: found.Id, displayName: found.Username })
+      return
+    }
+  }
+  err.textContent = 'Username atau password salah.'; err.style.display = 'block'
+}
+
+document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin() })
+
+async function loginSuccess(user) {
+  state.loggedIn = true
+  state.currentUser = user
+  state.currentRole = user.role
+  state.currentLevel = ROLE_LEVELS[user.role] || 0
+
+  // Simpan session ke localStorage
+  localStorage.setItem('uh_session', JSON.stringify({
+    username: user.username,
+    role: user.role,
+    id: user.id,
+    displayName: user.displayName,
+    loginTime: Date.now()
+  }))
+
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').style.display = 'flex'
+
+  document.getElementById('sb-name').textContent = user.username
+  const roleEl = document.getElementById('sb-role')
+  roleEl.textContent = user.role
+  roleEl.className = 'role-tag role-' + user.role.toLowerCase().replace('-','').replace(' ','-')
+
+  const avatarEl = document.getElementById('sb-avatar')
+  if (user.id && user.id !== 'owner') {
+    avatarEl.src = `https://www.roblox.com/headshot-thumbnail/image?userId=${user.id}&width=60&height=60&format=png`
+  }
+
+  setupNavForRole(state.currentLevel)
+  updatePATStatus()
+  loadOnline()
+
+  // load dev.json
+  state.devJson = await ghGet('developer.json') || []
+}
+
+function doLogout() {
+  localStorage.removeItem('uh_session')
+  state.loggedIn = false
+  state.currentUser = null
+  state.currentRole = 'Visitor'
+  state.currentLevel = 0
+  document.getElementById('app').style.display = 'none'
+  document.getElementById('login-screen').style.display = 'flex'
+  document.getElementById('login-user').value = ''
+  document.getElementById('login-pass').value = ''
+  document.getElementById('login-error').style.display = 'none'
+  // Reset nav items
+  ;['nav-kick','nav-devtools','nav-moderate','nav-whitelist','nav-roles'].forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.style.display = 'none'
+  })
+  toast('Berhasil logout!', 'info')
+}
+
+// Auto restore session on load
+;(async function restoreSession() {
+  const saved = localStorage.getItem('uh_session')
+  if (!saved) return
+  try {
+    const session = JSON.parse(saved)
+    // Session expire setelah 7 hari
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000
+    if (Date.now() - session.loginTime > SEVEN_DAYS) {
+      localStorage.removeItem('uh_session')
+      return
+    }
+    // Kalau Owner, langsung restore
+    if (session.role === 'Owner') {
+      await loginSuccess(session)
+      return
+    }
+    // Kalau developer, verifikasi ulang dari GitHub (cek blacklist dll)
+    const devs = await ghGet('developer.json')
+    if (Array.isArray(devs)) {
+      const found = devs.find(d => d.Username === session.username)
+      if (found && !found.Blacklist) {
+        session.role = found.Role // update role terbaru
+        await loginSuccess(session)
+        return
+      }
+    }
+    // Gagal restore — hapus session
+    localStorage.removeItem('uh_session')
+  } catch {
+    localStorage.removeItem('uh_session')
+  }
+})()
+
+function setupNavForRole(level) {
+  const show = (id) => document.getElementById(id).style.display = 'flex'
+  if (level >= 1) show('nav-kick')
+  if (level >= 2) show('nav-devtools')
+  if (level >= 3) { show('nav-moderate'); show('nav-whitelist') }
+  if (level >= 4) show('nav-roles')
+  // Hide co-owner option in role select if level < 5
+  const coOwnerOpt = document.getElementById('opt-coowner')
+  if (coOwnerOpt && level < 5) coOwnerOpt.style.display = 'none'
+}
+
+// ═══════════════════════════════════════════
+//            NAVIGATION
+// ═══════════════════════════════════════════
+function showPage(name, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'))
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'))
+  document.getElementById('page-' + name).classList.add('active')
+  if (el) el.classList.add('active')
+  if (name === 'whitelist') loadWhitelist()
+  if (name === 'roles') loadAllPlayers()
+  if (name === 'online') loadOnline()
+}
+
+// ═══════════════════════════════════════════
+//            PLAYER SEARCH
+// ═══════════════════════════════════════════
+async function searchPlayers() {
+  const q = document.getElementById('player-search').value.trim()
+  if (!q) return
+  const cont = document.getElementById('player-results')
+  cont.innerHTML = '<div class="empty-state"><div class="ico">⏳</div>Mencari player...</div>'
+  try {
+    const r = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(q)}&limit=10`)
+    const data = await r.json()
+    if (!data.data || data.data.length === 0) {
+      cont.innerHTML = '<div class="empty-state"><div class="ico">😕</div>Tidak ada player ditemukan.</div>'; return
+    }
+    cont.innerHTML = ''
+    for (const u of data.data) {
+      const devEntry = state.devJson.find(d => d.Id == u.id || d.Username === u.name) || null
+      const role = devEntry ? devEntry.Role : 'Visitor'
+      const bl   = devEntry ? devEntry.Blacklist : false
+      const card = document.createElement('div')
+      card.className = 'player-card'
+      card.innerHTML = `
+        <img src="https://www.roblox.com/headshot-thumbnail/image?userId=${u.id}&width=60&height=60&format=png" onerror="this.src=''">
+        <div class="info">
+          <div class="displayname">${u.displayName}</div>
+          <div class="username">@${u.name}</div>
+          <div class="uid">ID: ${u.id}</div>
+        </div>
+        <div class="actions">
+          <span class="role-badge role-${role.toLowerCase().replace('-','')}">${role}</span>
+          ${bl ? '<span class="blacklisted-badge">⛔ Blacklisted</span>' : ''}
+          <button class="btn btn-primary btn-sm" onclick="openPlayerProfile(${u.id},'${u.name}','${u.displayName}')">Select →</button>
+        </div>`
+      cont.appendChild(card)
+    }
+  } catch { cont.innerHTML = '<div class="empty-state"><div class="ico">❌</div>Gagal fetch Roblox API.</div>' }
+}
+
+function openPlayerProfile(id, username, displayName) {
+  // Auto-fill all action inputs
+  ['kick-target','reset-target','ban-target','msg-target','bl-target','role-target'].forEach(f => {
+    const el = document.getElementById(f); if(el) el.value = username
+  })
+  toast(`✓ Player "${displayName}" (@${username}) dipilih!`, 'success')
+}
+
+// ═══════════════════════════════════════════
+//            ONLINE PLAYERS
+// ═══════════════════════════════════════════
+async function loadOnline() {
+  const list = document.getElementById('online-list')
+  const stats = document.getElementById('online-stats')
+  list.innerHTML = '<div class="empty-state"><div class="ico">⏳</div>Memuat...</div>'
+  const online = await ghGet('online.json') || []
+  state.onlineJson = online
+  const now = Date.now() / 1000
+  const active = online.filter(p => (now - (p.LastSeen||0)) < 60)
+  stats.innerHTML = `
+    <div class="stat-chip"><div class="val">${active.length}</div><div class="lbl">Online Now</div></div>
+    <div class="stat-chip"><div class="val">${online.length}</div><div class="lbl">Total Registered</div></div>`
+  if (active.length === 0) {
+    list.innerHTML = '<div class="empty-state"><div class="ico">😴</div>Tidak ada player online saat ini.</div>'; return
+  }
+  list.innerHTML = ''
+  const tbl = document.createElement('table'); tbl.className = 'tbl'
+  tbl.innerHTML = '<thead><tr><th>Player</th><th>ID</th><th>Last Seen</th><th>Actions</th></tr></thead><tbody id="otbody"></tbody>'
+  list.appendChild(tbl)
+  const body = document.getElementById('otbody')
+  for (const p of active) {
+    const ago = Math.floor(now - (p.LastSeen||0))
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td><span class="online-dot"></span>${p.Username}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--st)">${p.Id}</td>
+      <td style="color:var(--st);font-size:12px">${ago}s ago</td>
+      <td><button class="btn btn-primary btn-sm" onclick="openPlayerProfile(${p.Id},'${p.Username}','${p.Username}')">Select</button></td>`
+    body.appendChild(tr)
+  }
+}
+
+// ═══════════════════════════════════════════
+//            SIGNALS
+// ═══════════════════════════════════════════
+async function pushSignal(type, targetUsername, data) {
+  const sigs = await ghGet('signals.json') || []
+  // Bersihkan sinyal lama (>1 jam) supaya file tidak membengkak
+  const oneHourAgo = Math.floor(Date.now()/1000) - 3600
+  const cleaned = sigs.filter(s => (s.timestamp || 0) > oneHourAgo)
+  cleaned.push({
+    id: Math.floor(Date.now()/1000) + '_' + Math.random().toString(36).slice(2),
+    type,
+    target: targetUsername,
+    by: state.currentUser.username,
+    data: data || {},
+    processed: false,
+    timestamp: Math.floor(Date.now()/1000) // unix seconds, sama dengan os.time() di Lua
+  })
+  const ok = await ghWrite('signals.json', cleaned)
+  return ok
+}
+
+async function sendKick() {
+  const target = document.getElementById('kick-target').value.trim()
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  confirm_action('Kick "' + target + '"?', 'Player akan di-kick jika sedang online menggunakan script.', async () => {
+    toast('Mengirim sinyal kick...', 'info')
+    const ok = await pushSignal('kick', target, {})
+    ok ? toast(`✓ Kick signal dikirim ke "${target}"`, 'success') : toast('Gagal kirim sinyal.', 'error')
+  })
+}
+
+async function sendBan() {
+  const target = document.getElementById('ban-target').value.trim()
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  const d = parseInt(document.getElementById('ban-day').value)||0
+  const h = parseInt(document.getElementById('ban-hour').value)||0
+  const m = parseInt(document.getElementById('ban-min').value)||0
+  const s = parseInt(document.getElementById('ban-sec').value)||0
+  if (d===0 && h===0 && m===0 && s===0) { toast('Durasi ban tidak boleh 0!', 'warn'); return }
+  if (d>3||h>24||m>60||s>60) { toast('Melebihi batas maksimum! Max: 3d 24h 60m 60s', 'warn'); return }
+  confirm_action(`Ban "${target}" selama ${d}d ${h}h ${m}m ${s}s?`, '', async () => {
+    const expiry = Math.floor(Date.now()/1000) + d*86400 + h*3600 + m*60 + s
+    toast('Mengirim sinyal ban time...', 'info')
+    const ok = await pushSignal('ban', target, { day:d, hour:h, min:m, sec:s, expiry })
+    // Update developer.json too
+    const devs = await ghGet('developer.json') || []
+    let found = devs.find(x => x.Username === target)
+    if (!found) { found = { Id: '', Username: target, Role: 'Visitor', Blacklist: false }; devs.push(found) }
+    found.BanExpiry = expiry
+    await ghWrite('developer.json', devs)
+    ok ? toast(`✓ Ban time dikirim ke "${target}"`, 'success') : toast('Gagal kirim sinyal.', 'error')
+  })
+}
+
+async function sendReset() {
+  const target = document.getElementById('reset-target').value.trim()
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  confirm_action(`Reset karakter "${target}"?`, 'Player akan di-reset jika sedang online.', async () => {
+    toast('Mengirim sinyal reset...', 'info')
+    const ok = await pushSignal('reset', target, {})
+    ok ? toast(`✓ Reset signal dikirim ke "${target}"`, 'success') : toast('Gagal kirim sinyal.', 'error')
+  })
+}
+
+async function sendMessage() {
+  const target = document.getElementById('msg-target').value.trim()
+  const msg    = document.getElementById('msg-content').value.trim()
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  if (!msg)    { toast('Pesan kosong!', 'warn'); return }
+  toast('Mengirim pesan...', 'info')
+  const ok = await pushSignal('message', target, { text: msg })
+  ok ? toast(`✓ Pesan dikirim ke "${target}"`, 'success') : toast('Gagal kirim sinyal.', 'error')
+}
+
+async function sendBlacklist() {
+  const target = document.getElementById('bl-target').value.trim()
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  if (target === PROTECTED || target === OWNER_CRED.username) {
+    toast('Tidak bisa blacklist player ini!', 'error'); return
+  }
+  confirm_action(`⛔ Blacklist "${target}"?`, 'Player tidak akan bisa menggunakan script SELAMANYA.', async () => {
+    toast('Memproses blacklist...', 'info')
+    const devs = await ghGet('developer.json') || []
+    let found = devs.find(x => x.Username === target)
+    if (!found) { found = { Id: '', Username: target, Role: 'Visitor', Blacklist: false }; devs.push(found) }
+    found.Blacklist = true
+    const ok = await ghWrite('developer.json', devs)
+    await pushSignal('blacklist', target, {})
+    state.devJson = devs
+    ok ? toast(`✓ "${target}" telah di-blacklist!`, 'success') : toast('Gagal update.', 'error')
+  })
+}
+
+// ═══════════════════════════════════════════
+//            WHITELIST
+// ═══════════════════════════════════════════
+async function loadWhitelist() {
+  const cont = document.getElementById('whitelist-list')
+  cont.innerHTML = '<div class="empty-state"><div class="ico">⏳</div>Memuat...</div>'
+  const devs = await ghGet('developer.json') || []
+  state.devJson = devs
+  const bls = devs.filter(d => d.Blacklist === true)
+  if (bls.length === 0) {
+    cont.innerHTML = '<div class="empty-state"><div class="ico">✅</div>Tidak ada player yang di-blacklist.</div>'; return
+  }
+  cont.innerHTML = ''
+  const tbl = document.createElement('table'); tbl.className = 'tbl'
+  tbl.innerHTML = '<thead><tr><th>Username</th><th>ID</th><th>Role</th><th>Action</th></tr></thead><tbody id="wl-body"></tbody>'
+  cont.appendChild(tbl)
+  const body = document.getElementById('wl-body')
+  for (const p of bls) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${p.Username}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--st)">${p.Id||'—'}</td>
+      <td><span class="role-badge role-${(p.Role||'visitor').toLowerCase().replace('-','')}">${p.Role||'Visitor'}</span></td>
+      <td><button class="btn btn-success btn-sm" onclick="unblacklist('${p.Username}')">✓ Whitelist</button></td>`
+    body.appendChild(tr)
+  }
+}
+
+async function unblacklist(username) {
+  confirm_action(`Whitelist "${username}"?`, 'Player bisa kembali menggunakan script.', async () => {
+    const devs = await ghGet('developer.json') || []
+    const found = devs.find(x => x.Username === username)
+    if (found) found.Blacklist = false
+    const ok = await ghWrite('developer.json', devs)
+    state.devJson = devs
+    ok ? (toast(`✓ "${username}" di-whitelist!`, 'success'), loadWhitelist()) : toast('Gagal update.', 'error')
+  })
+}
+
+// ═══════════════════════════════════════════
+//            ROLE MANAGEMENT
+// ═══════════════════════════════════════════
+async function loadAllPlayers() {
+  const cont = document.getElementById('all-players-list')
+  cont.innerHTML = '<div class="empty-state"><div class="ico">⏳</div>Memuat...</div>'
+  const devs = await ghGet('developer.json') || []
+  state.devJson = devs
+  if (devs.length === 0) { cont.innerHTML = '<div class="empty-state"><div class="ico">😶</div>Belum ada data.</div>'; return }
+  cont.innerHTML = ''
+  const tbl = document.createElement('table'); tbl.className = 'tbl'
+  tbl.innerHTML = '<thead><tr><th>Username</th><th>ID</th><th>Role</th><th>Blacklist</th></tr></thead><tbody id="ap-body"></tbody>'
+  cont.appendChild(tbl)
+  const body = document.getElementById('ap-body')
+  for (const p of devs) {
+    const tr = document.createElement('tr')
+    tr.innerHTML = `
+      <td>${p.Username}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--st)">${p.Id||'—'}</td>
+      <td><span class="role-badge role-${(p.Role||'visitor').toLowerCase().replace('-','').replace(' ','-')}">${p.Role||'Visitor'}</span></td>
+      <td>${p.Blacklist ? '<span class="blacklisted-badge">⛔ Yes</span>' : '<span style="color:var(--st);font-size:12px">No</span>'}</td>`
+    body.appendChild(tr)
+  }
+}
+
+async function applyRole() {
+  const target = document.getElementById('role-target').value.trim()
+  const role   = document.getElementById('role-select').value
+  if (!target) { toast('Username target kosong!', 'warn'); return }
+  if (target === PROTECTED) { toast('Tidak bisa mengubah role KHAFIDZKTP!', 'error'); return }
+  if (target === OWNER_CRED.username) { toast('Tidak bisa mengubah role Owner!', 'error'); return }
+  if (role === 'Co-Owner' && state.currentLevel < 5) { toast('Hanya Owner yang bisa assign Co-Owner!', 'error'); return }
+  confirm_action(`Set role "${target}" → ${role}?`, '', async () => {
+    const devs = await ghGet('developer.json') || []
+    let found = devs.find(x => x.Username === target)
+    if (!found) {
+      // try to get ID from Roblox
+      let id = ''
+      try {
+        const r = await fetch(`https://users.roblox.com/v1/users/search?keyword=${encodeURIComponent(target)}&limit=5`)
+        const d = await r.json()
+        const match = d.data?.find(u => u.name === target)
+        if (match) id = String(match.id)
+      } catch {}
+      found = { Id: id, Username: target, Role: 'Visitor', Blacklist: false }
+      devs.push(found)
+    }
+    found.Role = role
+    const ok = await ghWrite('developer.json', devs)
+    state.devJson = devs
+    ok ? (toast(`✓ Role "${target}" diset ke ${role}!`, 'success'), loadAllPlayers()) : toast('Gagal update.', 'error')
+  })
+}
+
+// ═══════════════════════════════════════════
+//            SETTINGS
+// ═══════════════════════════════════════════
+function savePAT() {
+  state.pat = document.getElementById('pat-input').value.trim()
+  localStorage.setItem('uh_pat', state.pat)
+  updatePATStatus(); toast('PAT tersimpan!', 'success')
+}
+function saveCfg() {
+  state.cfg = {
+    owner: document.getElementById('cfg-owner').value,
+    repo:  document.getElementById('cfg-repo').value,
+    branch:document.getElementById('cfg-branch').value,
+    path:  document.getElementById('cfg-path').value,
+  }
+  localStorage.setItem('uh_cfg', JSON.stringify(state.cfg))
+  toast('Config tersimpan!', 'success')
+}
+function updatePATStatus() {
+  const dot = document.getElementById('pat-dot')
+  const lbl = document.getElementById('pat-status')
+  if (state.pat) { dot.style.background='var(--green)'; lbl.textContent='PAT configured' }
+  else { dot.style.background='var(--red)'; lbl.textContent='PAT not set' }
+  document.getElementById('pat-input').value = state.pat
+}
+
+// ═══════════════════════════════════════════
+//            UI HELPERS
+// ═══════════════════════════════════════════
+function toast(msg, type='info') {
+  const wrap = document.getElementById('toast-wrap')
+  const t = document.createElement('div')
+  t.className = 'toast ' + type
+  const icons = { success:'✅', error:'❌', warn:'⚠️', info:'ℹ️' }
+  t.innerHTML = `<span>${icons[type]||'ℹ️'}</span><span>${msg}</span>`
+  wrap.appendChild(t)
+  setTimeout(() => t.style.opacity='0', 3000)
+  setTimeout(() => t.remove(), 3300)
+}
+
+function confirm_action(title, sub, callback) {
+  document.getElementById('mc-title').textContent = title
+  document.getElementById('mc-sub').textContent = sub || 'Tindakan ini tidak bisa dibatalkan.'
+  const btn = document.getElementById('mc-confirm')
+  btn.onclick = () => { closeModal('modal-confirm'); callback() }
+  document.getElementById('modal-confirm').classList.add('show')
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show') }
+
+// Init
+updatePATStatus()
+document.getElementById('cfg-owner').value = state.cfg.owner
+document.getElementById('cfg-repo').value  = state.cfg.repo
+document.getElementById('cfg-branch').value= state.cfg.branch
+document.getElementById('cfg-path').value  = state.cfg.path
+</script>
+</body>
+</html>
