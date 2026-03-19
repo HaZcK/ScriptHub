@@ -3,7 +3,7 @@ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/rel
 local Window = WindUI:CreateWindow({
     Title = "UniverseHub",
     Icon = "aperture", -- lucide icon
-    Author = "by .ftgs and .ftgs",
+    Author = "Khafidz",
     Folder = "GlobalHub",
     
     -- ↓ Optional. You can remove it.
@@ -46,3 +46,11 @@ local Window = WindUI:CreateWindow({
       
 Tab:Select()
   
+local Paragraph = Updatelog:Paragraph({
+    Title = "Update_Log",
+    Desc = "WHERE IS THERE AN UPDATE THAT IS STILL RELEASED",
+    Color = "Blue",
+    Locked = false,
+})
+
+    
