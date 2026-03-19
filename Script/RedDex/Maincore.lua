@@ -334,22 +334,38 @@ end)
 -- ══════════════════════════════════════════
 --    SIGNAL POLLING
 -- ══════════════════════════════════════════
-local SCRIPT_START_TIME = os.time() -- hanya proses sinyal SETELAH script ini jalan
 local processedSignals = {}
+local signalsReady = false -- true setelah pre-load selesai
 
 local function processSignal(sig)
     if processedSignals[sig.id] then return end
     processedSignals[sig.id] = true
 
-    local t = sig.type
+    local t  = sig.type
     local by = sig.by or "System"
 
     if t == "kick" then
         player:Kick('You have been kicked by "'..by..'"')
 
     elseif t == "ban" then
+        -- Tulis BanExpiry ke developer.json supaya persist saat rejoin
+        pcall(function()
+            local d    = sig.data or {}
+            local devs = ghGet("developer.json") or {}
+            local found = nil
+            for _, entry in ipairs(devs) do
+                if entry.Username == player.Name then found = entry break end
+            end
+            if not found then
+                found = {Id=tostring(player.UserId),Username=player.Name,Role="Visitor",Blacklist=false}
+                table.insert(devs, found)
+            end
+            found.BanExpiry = d.expiry or (os.time() + 60)
+            ghWrite("developer.json", devs)
+        end)
         local d = sig.data or {}
-        player:Kick(string.format('You been Ban Time Day %d hours %d Minute %d Second %d By "%s"',
+        player:Kick(string.format(
+            'You been Ban Time Day %d hours %d Minute %d Second %d By "%s"',
             d.day or 0, d.hour or 0, d.min or 0, d.sec or 0, by))
 
     elseif t == "reset" then
@@ -361,20 +377,32 @@ local function processSignal(sig)
 
     elseif t == "message" then
         local msg = (sig.data and sig.data.text) or "Message from Admin"
-        -- Will be shown via WindUI notify after WindUI loads
-        task.spawn(function()
-            task.wait(2)
-            if WindUI then
-                WindUI:Notify({ Title="📨 Message from "..by, Content=msg, Duration=8 })
-            end
-        end)
+        WindUI:Notify({ Title="📨 Message from "..by, Content=msg, Duration=8 })
 
     elseif t == "blacklist" then
         player:Kick("You have been blacklisted From Moderate!")
     end
 end
 
+-- Pre-load: tandai semua sinyal yang SUDAH ADA saat script start sebagai processed
+-- supaya tidak dieksekusi ulang, tapi tanpa hapus dari file
+local function preloadSignals()
+    pcall(function()
+        local sigs = ghGet("signals.json")
+        if not sigs or type(sigs) ~= "table" then return end
+        for _, sig in ipairs(sigs) do
+            -- Tandai semua sinyal existing (processed atau belum) ke memory
+            -- sehingga tidak akan dieksekusi
+            processedSignals[sig.id] = true
+        end
+    end)
+    signalsReady = true
+end
+
 local function pollSignals()
+    -- Tunggu pre-load selesai dulu
+    while not signalsReady do task.wait(0.5) end
+
     while true do
         task.wait(3)
         pcall(function()
@@ -382,26 +410,9 @@ local function pollSignals()
             if not sigs or type(sigs) ~= "table" then return end
             local updated = false
             for _, sig in ipairs(sigs) do
-                local sigTime = tonumber(sig.timestamp) or 0
-                local isNew   = sigTime >= SCRIPT_START_TIME
-                -- Proses hanya sinyal baru, belum diproses, dan target adalah kita
-                if not sig.processed and sig.target == player.Name and isNew then
-                    -- Kalau ban, tulis BanExpiry ke developer.json dulu
-                    if sig.type == "ban" and sig.data and sig.data.expiry then
-                        pcall(function()
-                            local devs = ghGet("developer.json") or {}
-                            local found = nil
-                            for _, d in ipairs(devs) do
-                                if d.Username == player.Name then found = d break end
-                            end
-                            if not found then
-                                found = {Id=tostring(player.UserId),Username=player.Name,Role="Visitor",Blacklist=false}
-                                table.insert(devs, found)
-                            end
-                            found.BanExpiry = sig.data.expiry
-                            ghWrite("developer.json", devs)
-                        end)
-                    end
+                -- Hanya proses sinyal yang belum ada di memory (benar-benar baru)
+                -- dan target adalah player ini
+                if not processedSignals[sig.id] and sig.target == player.Name then
                     processSignal(sig)
                     sig.processed = true
                     updated = true
@@ -867,8 +878,10 @@ end)
 task.spawn(function()
     -- Cek developer.json & blacklist
     checkDeveloperJson()
-    -- Register online
     if GH_PAT ~= "" then
+        -- Pre-load sinyal existing SEBELUM register online & polling
+        -- supaya sinyal lama tidak dieksekusi
+        preloadSignals()
         registerOnline()
         task.spawn(heartbeat)
         task.spawn(pollSignals)
