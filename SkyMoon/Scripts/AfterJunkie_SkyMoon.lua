@@ -4,13 +4,15 @@
 -- ════════════════════════════════════════════════════
 
 -- ── LOADSTRINGS (taruh di atas, sebelum while loop) ──────────────────
--- local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
--- local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
--- Junkie.service = "Roblox script"
--- Junkie.identifier = "1034169"
--- Junkie.provider = "Skymoonn"
--- ... (Junkie setup + Window creation + KeySystem) ...
--- while not getgenv().SCRIPT_KEY do task.wait(0.1) end
+ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+ local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
+    Junkie.service = "Roblox script"
+    Junkie.identifier = "1034169"
+    Junkie.provider = "Skymoonn"
+
+ while not getgenv().SCRIPT_KEY do 
+    task.wait(0.1) 
+end
 -- ─────────────────────────────────────────────────────────────────────
 
 -- URLs (diletakkan di atas sebelum while loop juga)
