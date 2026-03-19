@@ -4,12 +4,12 @@
 -- ════════════════════════════════════════════════════
 
 -- ── LOADSTRINGS (taruh di atas, sebelum while loop) ──────────────────
--- local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
--- local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
--- Junkie.service = "Roblox script"
--- Junkie.identifier = "1034169"
--- Junkie.provider = "Skymoonn"
--- ... (Junkie setup + Window creation + KeySystem) ...
+ local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local Junkie = loadstring(game:HttpGet("https://jnkie.com/sdk/library.lua"))()
+    Junkie.service = "Roblox script"
+    Junkie.identifier = "1034169"
+    Junkie.provider = "Skymoonn"
+--... (Junkie setup + Window creation + KeySystem) ...
 -- while not getgenv().SCRIPT_KEY do task.wait(0.1) end
 -- ─────────────────────────────────────────────────────────────────────
 
@@ -23,9 +23,9 @@ local RealBuilder_URL = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/
 local allToolsFn = loadstring(game:HttpGet(ALL_TOOLS_URL))
 
 -- ═══════════════════════════════════════
--- while not getgenv().SCRIPT_KEY do
---     task.wait(0.1)
--- end
+ while not getgenv().SCRIPT_KEY do
+     task.wait(0.1)
+ end
 -- ═══════════════════════════════════════
 -- KODE DI BAWAH INI JALAN SETELAH KEY VERIFIED
 
