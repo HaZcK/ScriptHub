@@ -20,13 +20,13 @@ local Window = WindUI:CreateWindow({
         Anonymous = false,
         Callback = function()
         print("Display Name: " .. player.DisplayName)
-        print("Username: " .. player.Name)
-        print("ID: " .. player.UserId)
-        
-    WindUI:Notify({
-        Title = "Info Player",
-        Content = "Logged: " .. player.DisplayName,
-        Duration = 5,
+            print("Username: " .. player.Name)
+            print("ID: " .. player.UserId)
+
+            WindUI:Notify({
+                Title = "Info Player",
+                Content = "Logged: " .. player.DisplayName,
+                Duration = 5,
     }),
   } ,
 })
@@ -50,7 +50,7 @@ local Paragraph = Updatelog:Paragraph({
     Title = "Update_Log",
     Desc = "WHERE IS THERE AN UPDATE THAT IS STILL RELEASED",
     Color = "Blue",
-    Locked = false,
+    Locked = false
 })
 
     
