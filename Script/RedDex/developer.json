@@ -5,5 +5,11 @@
     "Username": "KHAFIDZKTP",
     "Blacklist": false,
     "BanExpiry": 1773912602
+  },
+  {
+    "Id": "",
+    "Username": "0x9low",
+    "Role": "Admin",
+    "Blacklist": false
   }
 ]
