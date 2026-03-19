@@ -1,17 +1,11 @@
 [
   {
-    "id": "1773947296_inwsapc7o6s",
-    "type": "ban",
+    "id": "1773947307_0ffugq6h6297",
+    "type": "reset",
     "target": "KHAFIDZKTP",
     "by": "OwnerDex",
-    "data": {
-      "day": 0,
-      "hour": 0,
-      "min": 9,
-      "sec": 0,
-      "expiry": 1773947836
-    },
+    "data": {},
     "processed": false,
-    "timestamp": 1773947296
+    "timestamp": 1773947307
   }
 ]
