@@ -1,1 +1,13 @@
-[{"type":"reset","target":"KHAFIDZKTP","by":"OwnerDex","id":"1773915541_rivp0j1zzsr","timestamp":1773915541,"data":[],"processed":true}]
+[
+  {
+    "id": "1773915557_9umoj5dw1km",
+    "type": "message",
+    "target": "KHAFIDZKTP",
+    "by": "OwnerDex",
+    "data": {
+      "text": "Test"
+    },
+    "processed": false,
+    "timestamp": 1773915557
+  }
+]
