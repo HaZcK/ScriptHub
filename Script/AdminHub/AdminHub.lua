@@ -14,66 +14,24 @@ local player       = Players.LocalPlayer
 -- ══════════════════════════════════════════
 --    HTTP COMPAT
 -- ══════════════════════════════════════════
--- Delta Android mengacak nama executor setiap join
+-- HttpService:RequestAsync bekerja di Delta Android (tidak perlu detect nama executor)
+local HttpService = game:GetService("HttpService")
+local function httpRequest(opts)
+    local ok, result = pcall(function()
+        return HttpService:RequestAsync({
+            Url     = opts.Url,
+            Method  = opts.Method or "GET",
+            Headers = opts.Headers or {},
+            Body    = opts.Body or ""
+        })
+    end)
+    if ok and result then
+        return { Body = result.Body, StatusCode = result.StatusCode }
+    end
+    -- Fallback GET only
+    return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+end
 -- Jadi kita scan getgenv() untuk cari fungsi request yang valid
-local httpRequest = nil
-
--- Coba nama umum dulu
-local _common = {"request","http_request","http","syn","fluxus","krnl","oxygen","proto","carbon"}
-for _,name in ipairs(_common) do
-    local ok,v = pcall(function() return getgenv()[name] end)
-    if ok and v then
-        if type(v)=="function" then
-            httpRequest=v break
-        elseif type(v)=="table" and type(v.request)=="function" then
-            httpRequest=v.request break
-        end
-    end
-end
-
--- Kalau belum ketemu, scan semua global (Delta acak nama)
-if not httpRequest then
-    local ok,env = pcall(getgenv)
-    if ok and env then
-        for k,v in pairs(env) do
-            -- Cari function yang namanya pendek dan acak (bukan Roblox standard)
-            if type(v)=="function" and type(k)=="string" then
-                -- Test apakah ini http request function
-                local testOk = pcall(function()
-                    local r = v({
-                        Url    = "https://httpbin.org/get",
-                        Method = "GET"
-                    })
-                    if r and (r.Body or r.StatusCode) then
-                        httpRequest = v
-                    end
-                end)
-                if httpRequest then break end
-            elseif type(v)=="table" and type(k)=="string" then
-                if type(v.request)=="function" then
-                    httpRequest=v.request break
-                end
-            end
-        end
-    end
-end
-
--- Final fallback - pakai HttpService langsung (GET only)
-if not httpRequest then
-    httpRequest = function(opts)
-        if opts.Method=="GET" or not opts.Method then
-            return { Body=game:HttpGet(opts.Url), StatusCode=200 }
-        end
-        -- POST/PUT via Delta workaround
-        local HttpService = game:GetService("HttpService")
-        return { Body=HttpService:RequestAsync({
-            Url    = opts.Url,
-            Method = opts.Method or "GET",
-            Headers= opts.Headers or {},
-            Body   = opts.Body or ""
-        }).Body, StatusCode=200 }
-    end
-end
 
 -- ══════════════════════════════════════════
 --    JSONBIN CONFIG (sama dengan Loader.lua)
