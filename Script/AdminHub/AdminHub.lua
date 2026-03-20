@@ -21,10 +21,10 @@ local httpRequest = (syn and syn.request) or (http and http.request)
 -- ══════════════════════════════════════════
 --    FOLDER SETUP
 -- ══════════════════════════════════════════
-local ROOT   = "DeltaWorkspace/"
+local ROOT   = "Delta/Workspace"
 local FOLDER = ROOT.."AdminHub"
 local ASSETS = ROOT.."AdminHub/assets"
-local SCRIPTS_FOLDER = ROOT.."AdminHub/scripts"
+local SCRIPTS_FOLDER = ROOT.."AdminHub/Script"
 local CFG_JSON = ASSETS.."/config.json"
 
 for _, f in ipairs({FOLDER, ASSETS, SCRIPTS_FOLDER}) do
