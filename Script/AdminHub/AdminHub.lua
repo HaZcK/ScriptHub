@@ -36,8 +36,8 @@ end
 -- ══════════════════════════════════════════
 --    JSONBIN CONFIG (sama dengan Loader.lua)
 -- ══════════════════════════════════════════
-local BIN_ID     = "69bcf4b3c3097a1dd540e510"
-local ACCESS_KEY = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
+local BIN_ID     = "YOUR_BIN_ID_HERE"
+local ACCESS_KEY = "YOUR_ACCESS_KEY_HERE"
 local JSONBIN_URL= "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
@@ -421,8 +421,8 @@ checkBan()
 -- WindUI load dengan fallback
 local WindUI
 local _windui_urls = {
-    "https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua",
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua",
+    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/main_example.lua",
+    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/main_example.lua",
 }
 for _, url in ipairs(_windui_urls) do
     local ok, result = pcall(function()
