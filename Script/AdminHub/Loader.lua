@@ -10,16 +10,84 @@ local TweenService = game:GetService("TweenService")
 local UIS          = game:GetService("UserInputService")
 local player       = Players.LocalPlayer
 
-local httpRequest = (syn and syn.request) or (http and http.request)
-    or (http_request) or (request)
-    or function(o) return {Body=game:HttpGet(o.Url),StatusCode=200} end
+local httpRequest
+if syn and syn.request then
+    httpRequest = syn.request
+elseif http and http.request then
+    httpRequest = http.request
+elseif http_request then
+    httpRequest = http_request
+elseif request then
+    httpRequest = request
+else
+    httpRequest = function(opts)
+        return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+    end
+end
+
+-- GitHub config (sama dengan AdminHub)
+local GH_OWNER  = "HaZcK"
+local GH_REPO   = "ScriptHub"
+local GH_BRANCH = "main"
+local GH_PATH   = "Script/AdminHub"
+local GH_RAW    = "https://raw.githubusercontent.com/"..GH_OWNER.."/"..GH_REPO.."/refs/heads/"..GH_BRANCH.."/"..GH_PATH.."/"
+local GH_API    = "https://api.github.com/repos/"..GH_OWNER.."/"..GH_REPO.."/contents/"..GH_PATH.."/"
+local GH_PAT    = ""
+
+-- Load PAT lokal
+local ROOTS = {"","Delta/Workspace/","DeltaWorkspace/","workspace/","KRNL/","Synapse/"}
+for _,r in ipairs(ROOTS) do
+    pcall(function()
+        local f=r.."Control_Hub/assets/config.json"
+        if isfile(f) then
+            local d=HttpService:JSONDecode(readfile(f))
+            if d and d.PAT then GH_PAT=d.PAT end
+        end
+    end)
+    if GH_PAT~="" then break end
+end
+
+-- Base64
+local b64c="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local function b64Decode(s)
+    s=s:gsub("[^"..b64c.."=]","")
+    return (s:gsub(".",function(x)
+        if x=="=" then return "" end
+        local r,f="",b64c:find(x)-1
+        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and "1" or "0") end return r
+    end):gsub("%d%d%d%d%d%d%d%d",function(x)
+        local c=0 for i=1,8 do c=c+(x:sub(i,i)=="1" and 2^(8-i) or 0) end return string.char(c)
+    end))
+end
+
+local function ghGetDB()
+    -- Baca scripts_db.json dari GitHub (fresh, no cache)
+    local ok,data = pcall(function()
+        local h={["User-Agent"]="AdminHubLoader",["Cache-Control"]="no-cache"}
+        if GH_PAT~="" then h["Authorization"]="token "..GH_PAT end
+        local res=httpRequest({Url=GH_API.."scripts_db.json",Method="GET",Headers=h})
+        if res and res.Body then
+            local meta=HttpService:JSONDecode(res.Body)
+            if meta and meta.content then
+                return HttpService:JSONDecode(b64Decode(meta.content))
+            end
+        end
+        return nil
+    end)
+    if ok and data then return data end
+    -- Fallback raw
+    local ok2,d2=pcall(function()
+        return HttpService:JSONDecode(game:HttpGet(GH_RAW.."scripts_db.json?t="..os.time()))
+    end)
+    return ok2 and d2 or {}
+end
 
 -- ══════════════════════════════════════════
 --    JSONBIN CONFIG (Global, no PAT needed)
 -- ══════════════════════════════════════════
 -- Buat bin di jsonbin.io, ambil BIN_ID dan X_ACCESS_KEY
-local BIN_ID       = "69bcf4b3c3097a1dd540e510"
-local ACCESS_KEY   = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
+local BIN_ID       = "YOUR_BIN_ID_HERE"
+local ACCESS_KEY   = "YOUR_ACCESS_KEY_HERE"
 local JSONBIN_URL  = "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
@@ -50,49 +118,9 @@ local function jbSet(data)
 end
 
 -- ══════════════════════════════════════════
---    SCRIPT DATABASE
---    Tambah game & script di sini
+--    SCRIPT DATABASE (dynamic dari GitHub)
 -- ══════════════════════════════════════════
-local SCRIPT_DB = {
-    {
-        game = "Grow A Garden",
-        icon = "🌱",
-        scripts = {
-            {
-                name = "Black Luck",
-                desc = "Make luck get bigger bamboo or 9999X",
-                url  = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/GrowAGarden/BlackLuck.lua"
-            },
-            {
-                name = "Auto Farm",
-                desc = "Automatically farm plants 24/7",
-                url  = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/GrowAGarden/AutoFarm.lua"
-            },
-        }
-    },
-    {
-        game = "Blox Fruits",
-        icon = "🍎",
-        scripts = {
-            {
-                name = "Auto Raid",
-                desc = "Auto complete raids for max rewards",
-                url  = ""
-            },
-        }
-    },
-    {
-        game = "Valley Prison",
-        icon = "🏛️",
-        scripts = {
-            {
-                name = "God Mode",
-                desc = "Become invincible in prison",
-                url  = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/ValleyPrison/GodMode.lua"
-            },
-        }
-    },
-}
+local SCRIPT_DB = {}
 
 -- ══════════════════════════════════════════
 --    COLORS
@@ -325,26 +353,7 @@ local function buildScriptList(gameEntry)
     end
 end
 
-for i, gameEntry in ipairs(SCRIPT_DB) do
-    local card=Instance.new("Frame",F1Scroll) card.Size=UDim2.new(1,0,0,68) card.BackgroundColor3=D2 card.BorderSizePixel=0 card.LayoutOrder=i card.ZIndex=11 mkC(card,10) mkS(card,Color3.fromRGB(30,45,90),1)
-
-    local ico=Instance.new("TextLabel",card) ico.Size=UDim2.new(0,44,0,44) ico.Position=UDim2.new(0,12,0.5,-22) ico.BackgroundColor3=D4 ico.BorderSizePixel=0 ico.Text=gameEntry.icon ico.TextColor3=TX ico.Font=Enum.Font.GothamBold ico.TextSize=22 ico.ZIndex=12 mkC(ico,10)
-    local nameL=Instance.new("TextLabel",card) nameL.Size=UDim2.new(1,-130,0,22) nameL.Position=UDim2.new(0,66,0,12) nameL.BackgroundTransparency=1 nameL.Text=gameEntry.game nameL.TextColor3=TX nameL.Font=Enum.Font.GothamBold nameL.TextSize=14 nameL.TextXAlignment=Enum.TextXAlignment.Left nameL.ZIndex=12
-    local countL=Instance.new("TextLabel",card) countL.Size=UDim2.new(1,-130,0,16) countL.Position=UDim2.new(0,66,0,36) countL.BackgroundTransparency=1 countL.Text=#gameEntry.scripts.." script"..( #gameEntry.scripts>1 and "s" or "") .." available" countL.TextColor3=ST countL.Font=Enum.Font.Gotham countL.TextSize=11 countL.TextXAlignment=Enum.TextXAlignment.Left countL.ZIndex=12
-
-    local selBtn=Instance.new("TextButton",card) selBtn.Size=UDim2.new(0,80,0,30) selBtn.Position=UDim2.new(1,-94,0.5,-15) selBtn.BackgroundColor3=D4 selBtn.TextColor3=AC selBtn.Font=Enum.Font.GothamBold selBtn.TextSize=12 selBtn.Text="Open →" selBtn.BorderSizePixel=0 selBtn.ZIndex=12 mkC(selBtn,7) mkS(selBtn,AC,1)
-
-    selBtn.MouseButton1Click:Connect(function()
-        selectedGame = gameEntry
-        buildScriptList(gameEntry)
-        hideFrame(F1, function()
-            showFrame(F2)
-        end)
-    end)
-
-    card.MouseEnter:Connect(function() tween(card,{BackgroundColor3=D4},0.15) end)
-    card.MouseLeave:Connect(function() tween(card,{BackgroundColor3=D2},0.15) end)
-end
+-- Game list sekarang di-build secara dynamic di task.spawn bawah
 
 -- ══════════════════════════════════════════
 --    FRAME NAVIGATION
@@ -548,6 +557,41 @@ task.spawn(function()
     task.spawn(pollSignals)
 end)
 
--- Tampilkan frame pilih game
-task.wait(0.5)
-showFrame(F1)
+-- Load SCRIPT_DB dari GitHub lalu tampilkan frame
+task.spawn(function()
+    task.wait(0.3)
+    -- Loading indicator
+    local loadLbl = Instance.new("TextLabel", Gui)
+    loadLbl.Size=UDim2.new(0,200,0,30) loadLbl.Position=UDim2.new(0.5,-100,0.5,-15)
+    loadLbl.BackgroundColor3=Color3.fromRGB(13,15,28) loadLbl.BorderSizePixel=0
+    loadLbl.Text="⏳ Loading scripts..." loadLbl.TextColor3=Color3.fromRGB(135,206,235)
+    loadLbl.Font=Enum.Font.GothamBold loadLbl.TextSize=14 loadLbl.ZIndex=20
+    do Instance.new("UICorner",loadLbl).CornerRadius=UDim.new(0,8) end
+
+    -- Fetch DB
+    local db = ghGetDB()
+    SCRIPT_DB = (#db > 0) and db or {
+        {game="No Scripts Yet", icon="📭", scripts={
+            {name="Ask admin to inject scripts!", desc="Use AdminHub → Infect tab to add scripts.", url=""}
+        }}
+    }
+
+    -- Build game list sekarang
+    for i, gameEntry in ipairs(SCRIPT_DB) do
+        local card=Instance.new("Frame",F1Scroll) card.Size=UDim2.new(1,0,0,68) card.BackgroundColor3=D2 card.BorderSizePixel=0 card.LayoutOrder=i card.ZIndex=11 mkC(card,10) mkS(card,Color3.fromRGB(30,45,90),1)
+        local ico=Instance.new("TextLabel",card) ico.Size=UDim2.new(0,44,0,44) ico.Position=UDim2.new(0,12,0.5,-22) ico.BackgroundColor3=D4 ico.BorderSizePixel=0 ico.Text=gameEntry.icon or "🎮" ico.TextColor3=TX ico.Font=Enum.Font.GothamBold ico.TextSize=22 ico.ZIndex=12 mkC(ico,10)
+        local nameL=Instance.new("TextLabel",card) nameL.Size=UDim2.new(1,-130,0,22) nameL.Position=UDim2.new(0,66,0,12) nameL.BackgroundTransparency=1 nameL.Text=gameEntry.game nameL.TextColor3=TX nameL.Font=Enum.Font.GothamBold nameL.TextSize=14 nameL.TextXAlignment=Enum.TextXAlignment.Left nameL.ZIndex=12
+        local countL=Instance.new("TextLabel",card) countL.Size=UDim2.new(1,-130,0,16) countL.Position=UDim2.new(0,66,0,36) countL.BackgroundTransparency=1 countL.Text=#gameEntry.scripts.." script"..( #gameEntry.scripts>1 and "s" or "").." available" countL.TextColor3=ST countL.Font=Enum.Font.Gotham countL.TextSize=11 countL.TextXAlignment=Enum.TextXAlignment.Left countL.ZIndex=12
+        local selBtn=Instance.new("TextButton",card) selBtn.Size=UDim2.new(0,80,0,30) selBtn.Position=UDim2.new(1,-94,0.5,-15) selBtn.BackgroundColor3=D4 selBtn.TextColor3=AC selBtn.Font=Enum.Font.GothamBold selBtn.TextSize=12 selBtn.Text="Open →" selBtn.BorderSizePixel=0 selBtn.ZIndex=12 mkC(selBtn,7) mkS(selBtn,AC,1)
+        local ge = gameEntry
+        selBtn.MouseButton1Click:Connect(function()
+            selectedGame=ge buildScriptList(ge)
+            hideFrame(F1,function() showFrame(F2) end)
+        end)
+        card.MouseEnter:Connect(function() tween(card,{BackgroundColor3=D4},0.15) end)
+        card.MouseLeave:Connect(function() tween(card,{BackgroundColor3=D2},0.15) end)
+    end
+
+    loadLbl:Destroy()
+    showFrame(F1)
+end)

@@ -14,9 +14,21 @@ local player       = Players.LocalPlayer
 -- ══════════════════════════════════════════
 --    HTTP COMPAT
 -- ══════════════════════════════════════════
-local httpRequest = (syn and syn.request) or (http and http.request)
-    or (http_request) or (request)
-    or function(o) return {Body=game:HttpGet(o.Url), StatusCode=200} end
+-- Delta executor fix
+local httpRequest
+if syn and syn.request then
+    httpRequest = syn.request
+elseif http and http.request then
+    httpRequest = http.request
+elseif http_request then
+    httpRequest = http_request
+elseif request then
+    httpRequest = request
+else
+    httpRequest = function(opts)
+        return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+    end
+end
 
 -- ══════════════════════════════════════════
 --    JSONBIN CONFIG (sama dengan Loader.lua)
@@ -417,6 +429,7 @@ local Window = WindUI:CreateWindow({
 Window:Tag({Title="1.0", Icon="terminal", Color=Color3.fromHex("#87CEEB"), Radius=0.5})
 
 local TabInject   = Window:Tab({Title="Injector",  Icon="shield-alert"       })
+local TabInfect   = Window:Tab({Title="Infect",    Icon="syringe"            })
 local TabControls = Window:Tab({Title="Controls",  Icon="sliders-horizontal" })
 local TabTest     = Window:Tab({Title="Test",       Icon="flask-conical"      })
 local TabSettings = Window:Tab({Title="Settings",   Icon="settings"           })
@@ -731,6 +744,129 @@ TabTest:Input({Title="Test Message",Placeholder="Tulis pesan tes...",Callback=fu
 TabTest:Button({Title="Test Message Frame",Icon="message-square",Callback=function()
     if testMsg=="" then WindUI:Notify({Title="❌",Content="Pesan kosong!",Duration=3}) return end
     showMsg("Test (You)", testMsg)
+end})
+
+
+-- ══════════════════════════════════════════
+--    INFECT TAB
+-- ══════════════════════════════════════════
+TabInfect:Paragraph({
+    Title = "💉 Infect — Add Script to Loader",
+    Desc  = "Tambah script baru ke Loader. User yang execute Loader akan lihat script ini.",
+    Color = "Blue"
+})
+
+-- Form state
+local iTitle,iDesc,iIcon,iScript,iPlace = "","","🎮","",""
+
+TabInfect:Input({Title="Script Title",    Placeholder="Nama script...",           Callback=function(v) iTitle=v end})
+TabInfect:Input({Title="Description",     Placeholder="Deskripsi singkat...",     Callback=function(v) iDesc=v end})
+TabInfect:Input({Title="Icon (emoji/url)",Placeholder="🎮 atau URL gambar...",    Callback=function(v) iIcon=v end})
+TabInfect:Input({Title="Script URL (raw)",Placeholder="https://raw.github...",   Callback=function(v) iScript=v end})
+TabInfect:Input({Title="Game Name",       Placeholder="Nama game di Loader...",   Callback=function(v) iPlace=v end})
+
+TabInfect:Button({Title="💉 Infect",Icon="syringe",Callback=function()
+    -- Validasi
+    if iTitle=="" then WindUI:Notify({Title="❌",Content="Title wajib diisi!",Duration=3}) return end
+    if iScript=="" then WindUI:Notify({Title="❌",Content="Script URL wajib diisi!",Duration=3}) return end
+    if iPlace=="" then WindUI:Notify({Title="❌",Content="Game Name wajib diisi!",Duration=3}) return end
+    if iIcon==""  then iIcon="🎮" end
+    if iDesc==""  then iDesc="No description." end
+
+    WindUI:Notify({Title="⏳ Infecting...",Content="Menambahkan script ke Loader...",Duration=3})
+
+    task.spawn(function()
+        -- Baca scripts_db.json dari GitHub
+        local db = ghGet("scripts_db.json")
+        if not db or type(db)~="table" then db = {} end
+
+        -- Cari apakah game sudah ada
+        local gameEntry = nil
+        for _,g in ipairs(db) do
+            if g.game == iPlace then gameEntry=g break end
+        end
+
+        -- Kalau belum ada, buat baru
+        if not gameEntry then
+            gameEntry = { game=iPlace, icon=iIcon, scripts={} }
+            table.insert(db, gameEntry)
+        end
+
+        -- Cek duplikat script
+        for _,s in ipairs(gameEntry.scripts) do
+            if s.name==iTitle then
+                WindUI:Notify({Title="⚠️",Content="Script '"..iTitle.."' sudah ada di game ini!",Duration=4})
+                return
+            end
+        end
+
+        -- Tambah script baru
+        table.insert(gameEntry.scripts, {
+            name = iTitle,
+            desc = iDesc,
+            icon = iIcon,
+            url  = iScript
+        })
+
+        -- Upload ke GitHub
+        local ok, err = ghWrite("scripts_db.json", db)
+        if ok then
+            WindUI:Notify({
+                Title   = "✅ Infected!",
+                Content = '"'..iTitle..'" berhasil ditambahkan ke Loader!
+Game: '..iPlace,
+                Duration = 5
+            })
+            -- Reset form
+            iTitle="" iDesc="" iIcon="🎮" iScript="" iPlace=""
+        else
+            WindUI:Notify({Title="❌ Gagal",Content="Gagal upload: "..tostring(err),Duration=5})
+        end
+    end)
+end})
+
+TabInfect:Button({Title="🗑️ Remove Script from Loader",Icon="trash-2",Callback=function()
+    if iTitle=="" or iPlace=="" then
+        WindUI:Notify({Title="⚠️",Content="Isi Title dan Game Name dulu!",Duration=3}) return
+    end
+    task.spawn(function()
+        local db = ghGet("scripts_db.json") or {}
+        local removed = false
+        for _,g in ipairs(db) do
+            if g.game==iPlace then
+                for i=#g.scripts,1,-1 do
+                    if g.scripts[i].name==iTitle then
+                        table.remove(g.scripts,i)
+                        removed=true break
+                    end
+                end
+            end
+        end
+        if removed then
+            ghWrite("scripts_db.json",db)
+            WindUI:Notify({Title="✅",Content='"'..iTitle..'" dihapus dari Loader!',Duration=4})
+        else
+            WindUI:Notify({Title="❌",Content="Script tidak ditemukan!",Duration=4})
+        end
+    end)
+end})
+
+TabInfect:Button({Title="📋 List Scripts in Loader",Icon="list",Callback=function()
+    task.spawn(function()
+        local db = ghGet("scripts_db.json") or {}
+        if #db==0 then
+            WindUI:Notify({Title="📋",Content="Belum ada script di Loader.",Duration=4}) return
+        end
+        local lines={}
+        for _,g in ipairs(db) do
+            table.insert(lines, g.icon.." "..g.game.." ("..#g.scripts.." scripts)")
+            for _,s in ipairs(g.scripts) do
+                table.insert(lines, "  › "..s.name)
+            end
+        end
+        WindUI:Notify({Title="📋 Loader Scripts",Content=table.concat(lines,"
+"),Duration=10})
+    end)
 end})
 
 -- ══════════════════════════════════════════
