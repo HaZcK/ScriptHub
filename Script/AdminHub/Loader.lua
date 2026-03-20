@@ -10,18 +10,41 @@ local TweenService = game:GetService("TweenService")
 local UIS          = game:GetService("UserInputService")
 local player       = Players.LocalPlayer
 
-local httpRequest
-if syn and syn.request then
-    httpRequest = syn.request
-elseif http and http.request then
-    httpRequest = http.request
-elseif http_request then
-    httpRequest = http_request
-elseif request then
-    httpRequest = request
-else
+-- Delta Android mengacak nama executor setiap join
+local httpRequest = nil
+local _common = {"request","http_request","http","syn","fluxus","krnl","oxygen","proto","carbon"}
+for _,name in ipairs(_common) do
+    local ok,v = pcall(function() return getgenv()[name] end)
+    if ok and v then
+        if type(v)=="function" then httpRequest=v break
+        elseif type(v)=="table" and type(v.request)=="function" then httpRequest=v.request break end
+    end
+end
+if not httpRequest then
+    local ok,env = pcall(getgenv)
+    if ok and env then
+        for k,v in pairs(env) do
+            if type(v)=="function" and type(k)=="string" then
+                local testOk = pcall(function()
+                    local r = v({Url="https://httpbin.org/get",Method="GET"})
+                    if r and (r.Body or r.StatusCode) then httpRequest=v end
+                end)
+                if httpRequest then break end
+            elseif type(v)=="table" and type(k)=="string" then
+                if type(v.request)=="function" then httpRequest=v.request break end
+            end
+        end
+    end
+end
+if not httpRequest then
     httpRequest = function(opts)
-        return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+        if opts.Method=="GET" or not opts.Method then
+            return {Body=game:HttpGet(opts.Url),StatusCode=200}
+        end
+        return {Body=game:GetService("HttpService"):RequestAsync({
+            Url=opts.Url,Method=opts.Method or "GET",
+            Headers=opts.Headers or {},Body=opts.Body or ""
+        }).Body,StatusCode=200}
     end
 end
 
@@ -86,8 +109,8 @@ end
 --    JSONBIN CONFIG (Global, no PAT needed)
 -- ══════════════════════════════════════════
 -- Buat bin di jsonbin.io, ambil BIN_ID dan X_ACCESS_KEY
-local BIN_ID       = "69bcf4b3c3097a1dd540e510"
-local ACCESS_KEY   = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
+local BIN_ID       = "YOUR_BIN_ID_HERE"
+local ACCESS_KEY   = "YOUR_ACCESS_KEY_HERE"
 local JSONBIN_URL  = "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
