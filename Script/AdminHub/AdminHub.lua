@@ -1,4 +1,5 @@
 -- AdminHub v2 - No WindUI, Pure Roblox GUI
+print("[AdminHub] Script starting...")
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/AdminHub/AdminHub.lua"))()
 
 local Players      = game:GetService("Players")
@@ -68,7 +69,9 @@ end
 -- NOTIFY SYSTEM
 local _nGui = Instance.new("ScreenGui", player.PlayerGui)
 _nGui.Name="AHNotif" _nGui.ResetOnSpawn=false
-_nGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling _nGui.IgnoreGuiInset=true
+_nGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+_nGui.IgnoreGuiInset=false
+_nGui.DisplayOrder=101
 
 local _nList = Instance.new("Frame", _nGui)
 _nList.Size=UDim2.new(0,280,1,0) _nList.Position=UDim2.new(1,-290,0,0)
@@ -190,10 +193,27 @@ local function mkC(p,r) Instance.new("UICorner",p).CornerRadius=UDim.new(0,r or 
 local function mkS(p,c,t) for _,ch in ipairs(p:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end local s=Instance.new("UIStroke",p) s.Color=c or Color3.fromRGB(40,60,120) s.Thickness=t or 1 end
 local function mkP(p,l,r,t,b) local x=Instance.new("UIPadding",p) x.PaddingLeft=UDim.new(0,l or 0) x.PaddingRight=UDim.new(0,r or 0) x.PaddingTop=UDim.new(0,t or 0) x.PaddingBottom=UDim.new(0,b or 0) end
 local function mkDrag(frame,handle)
-    local drag,ds,sp
-    handle.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=true ds=i.Position sp=frame.Position end end)
-    UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then local d=i.Position-ds frame.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end)
-    UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end end)
+    local drag,ds,sp,touchId
+    -- Pakai handle events saja, bukan UIS global (supaya tidak block joystick)
+    handle.InputBegan:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 then
+            drag=true ds=i.Position sp=frame.Position
+        elseif i.UserInputType==Enum.UserInputType.Touch then
+            drag=true ds=i.Position sp=frame.Position touchId=i
+        end
+    end)
+    handle.InputChanged:Connect(function(i)
+        if not drag then return end
+        if i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch then
+            local d=i.Position-ds
+            frame.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y)
+        end
+    end)
+    handle.InputEnded:Connect(function(i)
+        if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+            drag=false
+        end
+    end)
 end
 local function mkBtn(parent,text,color,order)
     local b=Instance.new("TextButton",parent) b.Size=UDim2.new(1,0,0,38) b.BackgroundColor3=color or D4
@@ -219,13 +239,24 @@ end
 -- MAIN GUI
 local Gui=Instance.new("ScreenGui",player.PlayerGui)
 Gui.Name="AdminHubGui" Gui.ResetOnSpawn=false
-Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling Gui.IgnoreGuiInset=true
+Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+Gui.IgnoreGuiInset=false  -- JANGAN true, nanti nutup TouchGui
+Gui.DisplayOrder=100
 
 -- SIDEBAR + CONTENT
-local Main=Instance.new("Frame",Gui) Main.Size=UDim2.new(0,520,0,580) Main.Position=UDim2.new(0.5,-260,0.5,-290)
+-- Ukuran responsif untuk mobile
+local screenX = workspace.CurrentCamera.ViewportSize.X
+local screenY = workspace.CurrentCamera.ViewportSize.Y
+local isMobile = screenX < 800
+local mainW = isMobile and math.min(screenX - 20, 420) or 520
+local mainH = isMobile and math.min(screenY - 100, 520) or 580
+
+local Main=Instance.new("Frame",Gui)
+Main.Size=UDim2.new(0,mainW,0,mainH)
+Main.Position=UDim2.new(0.5,-mainW/2,0.5,-mainH/2)
 Main.BackgroundColor3=D1 Main.BorderSizePixel=0 mkC(Main,14) mkS(Main,Color3.fromRGB(35,55,110),1.5)
+print("[AdminHub] GUI size:", mainW, "x", mainH, "Mobile:", isMobile)
 do local g=Instance.new("Frame",Main) g.Size=UDim2.new(1,0,0,2) g.BackgroundColor3=AC g.BorderSizePixel=0 mkC(g,2) end
-mkDrag(Main,Main)
 
 -- HEADER
 local Header=Instance.new("Frame",Main) Header.Size=UDim2.new(1,0,0,50) Header.BackgroundColor3=D3 Header.BorderSizePixel=0 mkC(Header,14)
@@ -236,6 +267,7 @@ local HClose=Instance.new("TextButton",Header) HClose.Size=UDim2.new(0,28,0,28) 
 HClose.BackgroundColor3=Color3.fromRGB(180,50,50) HClose.TextColor3=Color3.fromRGB(255,255,255)
 HClose.Font=Enum.Font.GothamBold HClose.TextSize=13 HClose.Text="✕" HClose.BorderSizePixel=0 mkC(HClose,6)
 HClose.MouseButton1Click:Connect(function() Main.Visible=false end)
+mkDrag(Main, Header) -- Drag dari header saja, bukan seluruh frame
 
 -- TABS BAR
 local TabBar=Instance.new("Frame",Main) TabBar.Size=UDim2.new(1,-20,0,36) TabBar.Position=UDim2.new(0,10,0,56) TabBar.BackgroundTransparency=1 TabBar.BorderSizePixel=0
@@ -446,6 +478,8 @@ OpenBtn.MouseButton1Click:Connect(function() Main.Visible=true OpenBtn.Visible=f
 HClose.MouseButton1Click:Connect(function() Main.Visible=false OpenBtn.Visible=true end)
 
 -- START
+print("[AdminHub] GUI created, showing main frame")
+Main.Visible = true
 showPage(PageControls,BtnControls)
 task.spawn(function()
     preload()
