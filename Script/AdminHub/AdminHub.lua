@@ -1,23 +1,15 @@
--- ╔══════════════════════════════════════════╗
--- ║           AdminHub - Maincore            ║
--- ║         Author: Khafidz (KHAFIDZKTP)    ║
--- ╚══════════════════════════════════════════╝
+-- AdminHub v2 - No WindUI, Pure Roblox GUI
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/AdminHub/AdminHub.lua"))()
 
 local Players      = game:GetService("Players")
 local HttpService  = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local UIS          = game:GetService("UserInputService")
-local TS           = game:GetService("TeleportService")
 local player       = Players.LocalPlayer
 
--- ══════════════════════════════════════════
---    HTTP COMPAT
--- ══════════════════════════════════════════
--- HttpService:RequestAsync bekerja di Delta Android (tidak perlu detect nama executor)
-local HttpService = game:GetService("HttpService")
+-- HTTP
 local function httpRequest(opts)
-    local ok, result = pcall(function()
+    local ok, res = pcall(function()
         return HttpService:RequestAsync({
             Url     = opts.Url,
             Method  = opts.Method or "GET",
@@ -25,30 +17,23 @@ local function httpRequest(opts)
             Body    = opts.Body or ""
         })
     end)
-    if ok and result then
-        return { Body = result.Body, StatusCode = result.StatusCode }
-    end
-    -- Fallback GET only
-    return { Body = game:HttpGet(opts.Url), StatusCode = 200 }
+    if ok and res then return {Body=res.Body, StatusCode=res.StatusCode} end
+    return {Body=game:HttpGet(opts.Url), StatusCode=200}
 end
--- Jadi kita scan getgenv() untuk cari fungsi request yang valid
 
--- ══════════════════════════════════════════
---    JSONBIN CONFIG (sama dengan Loader.lua)
--- ══════════════════════════════════════════
+-- JSONBIN
 local BIN_ID     = "69bcf4b3c3097a1dd540e510"
 local ACCESS_KEY = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
-local JSONBIN_URL= "https://api.jsonbin.io/v3/b/"..BIN_ID
+local JBURL      = "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
-    local ok,data = pcall(function()
+    local ok, data = pcall(function()
         local res = httpRequest({
-            Url     = JSONBIN_URL.."/latest",
+            Url     = JBURL.."/latest",
             Method  = "GET",
-            Headers = { ["X-Access-Key"]=ACCESS_KEY, ["X-Bin-Meta"]="false" }
+            Headers = {["X-Access-Key"]=ACCESS_KEY,["X-Bin-Meta"]="false"}
         })
         if res and res.Body then return HttpService:JSONDecode(res.Body) end
-        return nil
     end)
     return ok and data or {signals={},online={}}
 end
@@ -56,18 +41,15 @@ end
 local function jbSet(data)
     pcall(function()
         httpRequest({
-            Url     = JSONBIN_URL,
+            Url     = JBURL,
             Method  = "PUT",
-            Headers = {
-                ["Content-Type"] = "application/json",
-                ["X-Access-Key"] = ACCESS_KEY
-            },
-            Body = HttpService:JSONEncode(data)
+            Headers = {["Content-Type"]="application/json",["X-Access-Key"]=ACCESS_KEY},
+            Body    = HttpService:JSONEncode(data)
         })
     end)
 end
 
-local function sendSignalJB(type_, target, data_)
+local function sendSignal(type_, target, data_)
     local data = jbGet()
     local sigs = data.signals or {}
     table.insert(sigs, {
@@ -83,203 +65,106 @@ local function sendSignalJB(type_, target, data_)
     jbSet(data)
 end
 
--- ══════════════════════════════════════════
---    FOLDER SETUP (auto-detect executor root)
--- ══════════════════════════════════════════
-local POSSIBLE_ROOTS = {
-    "",
-    "Delta/Workspace/",
-    "workspace/",
-    "scripts/",
-    "autoexec/",
-    "Synapse/",
-    "KRNL/",
-    "Delta/",
-    "Fluxus/",
-    "Arceus/",
-    "Hydrogen/",
-}
-local ROOT = ""
-for _, r in ipairs(POSSIBLE_ROOTS) do
-    pcall(function()
-        if r ~= "" and isfolder(r.."AdminHub") then ROOT = r end
+-- NOTIFY SYSTEM
+local _nGui = Instance.new("ScreenGui", player.PlayerGui)
+_nGui.Name="AHNotif" _nGui.ResetOnSpawn=false
+_nGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling _nGui.IgnoreGuiInset=true
+
+local _nList = Instance.new("Frame", _nGui)
+_nList.Size=UDim2.new(0,280,1,0) _nList.Position=UDim2.new(1,-290,0,0)
+_nList.BackgroundTransparency=1 _nList.BorderSizePixel=0
+do local l=Instance.new("UIListLayout",_nList) l.SortOrder=Enum.SortOrder.LayoutOrder
+   l.VerticalAlignment=Enum.VerticalAlignment.Bottom l.Padding=UDim.new(0,6) end
+do local p=Instance.new("UIPadding",_nList) p.PaddingBottom=UDim.new(0,14) end
+
+local _nc=0
+local function Notify(title, content, duration)
+    _nc=_nc+1
+    local card=Instance.new("Frame",_nList)
+    card.Size=UDim2.new(1,0,0,0) card.AutomaticSize=Enum.AutomaticSize.Y
+    card.BackgroundColor3=Color3.fromRGB(10,12,24) card.BorderSizePixel=0
+    card.LayoutOrder=_nc card.BackgroundTransparency=1
+    do Instance.new("UICorner",card).CornerRadius=UDim.new(0,10) end
+    do local s=Instance.new("UIStroke",card) s.Color=Color3.fromHex("#87CEEB") s.Thickness=1.2 end
+    do local p=Instance.new("UIPadding",card) p.PaddingLeft=UDim.new(0,12) p.PaddingRight=UDim.new(0,12) p.PaddingTop=UDim.new(0,10) p.PaddingBottom=UDim.new(0,10) end
+    do local l=Instance.new("UIListLayout",card) l.SortOrder=Enum.SortOrder.LayoutOrder l.Padding=UDim.new(0,3) end
+    local tl=Instance.new("TextLabel",card) tl.Size=UDim2.new(1,0,0,16) tl.BackgroundTransparency=1
+    tl.Text=title tl.TextColor3=Color3.fromHex("#87CEEB") tl.Font=Enum.Font.GothamBold
+    tl.TextSize=12 tl.TextXAlignment=Enum.TextXAlignment.Left tl.LayoutOrder=1
+    local bl=Instance.new("TextLabel",card) bl.Size=UDim2.new(1,0,0,0) bl.AutomaticSize=Enum.AutomaticSize.Y
+    bl.BackgroundTransparency=1 bl.Text=content bl.TextColor3=Color3.fromRGB(180,200,240)
+    bl.Font=Enum.Font.Gotham bl.TextSize=11 bl.TextWrapped=true
+    bl.TextXAlignment=Enum.TextXAlignment.Left bl.LayoutOrder=2
+    TweenService:Create(card,TweenInfo.new(0.3),{BackgroundTransparency=0}):Play()
+    task.delay(duration or 4,function()
+        TweenService:Create(card,TweenInfo.new(0.3),{BackgroundTransparency=1}):Play()
+        task.wait(0.35) card:Destroy()
     end)
-    if ROOT ~= "" then break end
 end
 
-local FOLDER         = ROOT.."Control_Hub"
-local ASSETS         = ROOT.."Control_Hub/assets"
-local SCRIPTS_FOLDER = ROOT.."Control_Hub/scripts"
-local CFG_JSON       = ASSETS.."/config.json"
+-- SIGNAL POLLING
+local processedSignals={}
+local signalsReady=false
 
--- Buat folder kalau belum ada
-for _, f in ipairs({FOLDER, ASSETS, SCRIPTS_FOLDER}) do
-    if not isfolder(f) then pcall(makefolder, f) end
-end
-
--- ══════════════════════════════════════════
---    CONFIG
--- ══════════════════════════════════════════
-local GH_PAT    = ""
-local GH_OWNER  = "HaZcK"
-local GH_REPO   = "ScriptHub"
-local GH_BRANCH = "main"
-local GH_PATH   = "Script/AdminHub"
-local GH_RAW = "https://raw.githubusercontent.com/"..GH_OWNER.."/"..GH_REPO.."/refs/heads/"..GH_BRANCH.."/"..GH_PATH.."/"
-local GH_API = "https://api.github.com/repos/"..GH_OWNER.."/"..GH_REPO.."/contents/"..GH_PATH.."/"
-
-local function loadConfig()
-    if isfile(CFG_JSON) then
-        local ok, d = pcall(function() return HttpService:JSONDecode(readfile(CFG_JSON)) end)
-        if ok and type(d)=="table" then
-            GH_PAT    = d.PAT    or ""
-            GH_OWNER  = d.Owner  or GH_OWNER
-            GH_REPO   = d.Repo   or GH_REPO
-            GH_BRANCH = d.Branch or GH_BRANCH
-            GH_PATH   = d.Path   or GH_PATH
-            GH_RAW = "https://raw.githubusercontent.com/"..GH_OWNER.."/"..GH_REPO.."/"..GH_BRANCH.."/"..GH_PATH.."/"
-            GH_API = "https://api.github.com/repos/"..GH_OWNER.."/"..GH_REPO.."/contents/"..GH_PATH.."/"
-        end
+local function processSignal(sig)
+    if processedSignals[sig.id] then return end
+    processedSignals[sig.id]=true
+    local t=sig.type local by=sig.by or "System"
+    if t=="kick" then
+        Notify('👢 Kicked By "'..by..'"',"Disconnecting...",3)
+        task.wait(2) player:Kick('You have been kicked by "'..by..'"')
+    elseif t=="ban" then
+        local d=sig.data or {}
+        Notify('⛔ Ban Time By "'..by..'"',string.format("Day %d Hr %d Min %d Sec %d",d.day or 0,d.hour or 0,d.min or 0,d.sec or 0),4)
+        task.wait(3)
+        player:Kick(string.format('You been Ban Time Day %d hours %d Minute %d Second %d By "%s"',d.day or 0,d.hour or 0,d.min or 0,d.sec or 0,by))
+    elseif t=="reset" then
+        Notify('🔄 Reset By "'..by..'"',"Character resetting...",3)
+        task.wait(1.5) pcall(function() player:LoadCharacter() end)
+    elseif t=="message" then
+        Notify('📨 Message By "'..by..'"',(sig.data and sig.data.text) or "",8)
     end
 end
-loadConfig()
 
--- ══════════════════════════════════════════
---    BASE64
--- ══════════════════════════════════════════
-local b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local function b64Encode(data)
-    return ((data:gsub(".",function(x)
-        local r,b="",x:byte()
-        for i=8,1,-1 do r=r..(b%2^i-b%2^(i-1)>0 and "1" or "0") end return r
-    end).."0000"):gsub("%d%d%d?%d?%d?%d?",function(x)
-        if #x<6 then return "" end
-        local c=0 for i=1,6 do c=c+(x:sub(i,i)=="1" and 2^(6-i) or 0) end
-        return b64:sub(c+1,c+1)
-    end)..({""," ==","="})[#data%3+1])
-end
-
-local function b64Decode(s)
-    s=s:gsub("[^"..b64.."=]","")
-    return (s:gsub(".",function(x)
-        if x=="=" then return "" end
-        local r,f="",b64:find(x)-1
-        for i=6,1,-1 do r=r..(f%2^i-f%2^(i-1)>0 and "1" or "0") end return r
-    end):gsub("%d%d%d%d%d%d%d%d",function(x)
-        local c=0 for i=1,8 do c=c+(x:sub(i,i)=="1" and 2^(8-i) or 0) end return string.char(c)
-    end))
-end
-
--- ══════════════════════════════════════════
---    GITHUB READ / WRITE
--- ══════════════════════════════════════════
-local function ghGet(path)
-    local ok, data = pcall(function()
-        local h = {["User-Agent"]="AdminHub",["Cache-Control"]="no-cache"}
-        if GH_PAT~="" then h["Authorization"]="token "..GH_PAT end
-        local res = httpRequest({Url=GH_API..path, Method="GET", Headers=h})
-        if not res or not res.Body then return nil end
-        local meta = HttpService:JSONDecode(res.Body)
-        if meta and meta.content then
-            return HttpService:JSONDecode(b64Decode(meta.content))
-        end
-        return nil
+local function preload()
+    pcall(function()
+        local d=jbGet() for _,s in ipairs(d.signals or {}) do processedSignals[s.id]=true end
     end)
-    if ok and data then return data end
-    local ok2, d2 = pcall(function()
-        return HttpService:JSONDecode(game:HttpGet(GH_RAW..path.."?t="..os.time()..math.random(1000,9999)))
-    end)
-    return ok2 and d2 or nil
+    signalsReady=true
 end
 
-local function ghGetRaw(path)
-    -- Ambil konten raw (bukan JSON parse)
-    local ok, data = pcall(function()
-        local h = {["User-Agent"]="AdminHub",["Cache-Control"]="no-cache"}
-        if GH_PAT~="" then h["Authorization"]="token "..GH_PAT end
-        local res = httpRequest({Url=GH_API..path, Method="GET", Headers=h})
-        if not res or not res.Body then return nil end
-        local meta = HttpService:JSONDecode(res.Body)
-        if meta and meta.content then return b64Decode(meta.content) end
-        return nil
-    end)
-    return ok and data or nil
+local function poll()
+    while not signalsReady do task.wait(0.5) end
+    while true do
+        task.wait(4)
+        pcall(function()
+            local d=jbGet() local sigs=d.signals or {} local updated=false
+            for _,sig in ipairs(sigs) do
+                if not processedSignals[sig.id] and sig.target==player.Name then
+                    processSignal(sig) sig.processed=true updated=true
+                end
+            end
+            if updated then d.signals=sigs jbSet(d) end
+        end)
+    end
 end
-
-local function ghGetSHA(path)
-    local ok, sha = pcall(function()
-        local h = {["User-Agent"]="AdminHub"}
-        if GH_PAT~="" then h["Authorization"]="token "..GH_PAT end
-        local res = httpRequest({Url=GH_API..path, Method="GET", Headers=h})
-        if res and res.Body then
-            local meta = HttpService:JSONDecode(res.Body)
-            return meta and meta.sha or nil
-        end
-        return nil
-    end)
-    return ok and sha or nil
-end
-
-local function ghWrite(path, content, isRaw)
-    -- isRaw=true → content sudah string, false → encode JSON dulu
-    if GH_PAT=="" then return false, "PAT tidak diset!" end
-    local strContent = isRaw and content or HttpService:JSONEncode(content)
-    local sha = ghGetSHA(path)
-    local body = HttpService:JSONEncode({
-        message = "AdminHub: update "..path,
-        content = b64Encode(strContent),
-        sha     = sha,
-        branch  = GH_BRANCH
-    })
-    local ok, err = pcall(function()
-        local res = httpRequest({
-            Url    = GH_API..path,
-            Method = "PUT",
-            Headers = {
-                ["Authorization"] = "token "..GH_PAT,
-                ["Content-Type"]  = "application/json",
-                ["User-Agent"]    = "AdminHub"
-            },
-            Body = body
-        })
-        if res.StatusCode and res.StatusCode >= 400 then
-            error("GitHub error "..tostring(res.StatusCode))
-        end
-    end)
-    return ok, err
-end
-
--- ══════════════════════════════════════════
---    ONLINE & SIGNALS
--- ══════════════════════════════════════════
-local processedSignals = {}
-local signalsReady     = false
 
 local function registerOnline()
-    local online = ghGet("online.json") or {}
-    for i=#online,1,-1 do
-        if tostring(online[i].Id)==tostring(player.UserId) then table.remove(online,i) end
-    end
-    table.insert(online, {
-        Id       = tostring(player.UserId),
-        Username = player.Name,
-        Display  = player.DisplayName,
-        LastSeen = os.time()
-    })
-    ghWrite("online.json", online)
+    pcall(function()
+        local d=jbGet() local ol=d.online or {}
+        for i=#ol,1,-1 do if ol[i].Username==player.Name then table.remove(ol,i) end end
+        table.insert(ol,{Username=player.Name,Display=player.DisplayName,LastSeen=os.time()})
+        d.online=ol jbSet(d)
+    end)
 end
 
 local function heartbeat()
     while true do
         task.wait(25)
         pcall(function()
-            local online = ghGet("online.json") or {}
-            for _,e in ipairs(online) do
-                if tostring(e.Id)==tostring(player.UserId) then
-                    e.LastSeen=os.time() break
-                end
-            end
-            ghWrite("online.json", online)
+            local d=jbGet() local ol=d.online or {}
+            for _,e in ipairs(ol) do if e.Username==player.Name then e.LastSeen=os.time() break end end
+            d.online=ol jbSet(d)
         end)
     end
 end
@@ -287,296 +172,22 @@ end
 player.AncestryChanged:Connect(function()
     if not player.Parent then
         pcall(function()
-            local online = ghGet("online.json") or {}
-            for i=#online,1,-1 do
-                if tostring(online[i].Id)==tostring(player.UserId) then table.remove(online,i) end
-            end
-            ghWrite("online.json", online)
+            local d=jbGet() local ol=d.online or {}
+            for i=#ol,1,-1 do if ol[i].Username==player.Name then table.remove(ol,i) end end
+            d.online=ol jbSet(d)
         end)
     end
 end)
 
--- ══════════════════════════════════════════
---    MESSAGE FRAME GUI
--- ══════════════════════════════════════════
-local msgGui = Instance.new("ScreenGui")
-msgGui.Name="AdminHubMsgFrame" msgGui.ResetOnSpawn=false
-msgGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-msgGui.IgnoreGuiInset=true msgGui.Enabled=false
-msgGui.Parent=player.PlayerGui
-
-local msgBG=Instance.new("Frame",msgGui)
-msgBG.Size=UDim2.new(0,380,0,200) msgBG.Position=UDim2.new(0.5,-190,0.5,-100)
-msgBG.BackgroundColor3=Color3.fromRGB(10,12,22) msgBG.BorderSizePixel=0 msgBG.ZIndex=30
-do Instance.new("UICorner",msgBG).CornerRadius=UDim.new(0,14) end
-do local s=Instance.new("UIStroke",msgBG) s.Color=Color3.fromHex("#87CEEB") s.Thickness=1.5 end
-do local g=Instance.new("Frame",msgBG) g.Size=UDim2.new(1,0,0,2) g.BackgroundColor3=Color3.fromHex("#87CEEB") g.BorderSizePixel=0 g.ZIndex=31 Instance.new("UICorner",g).CornerRadius=UDim.new(0,2) end
-
-local msgH=Instance.new("Frame",msgBG) msgH.Size=UDim2.new(1,0,0,46) msgH.BackgroundColor3=Color3.fromRGB(18,22,44) msgH.BorderSizePixel=0 msgH.ZIndex=31
-do Instance.new("UICorner",msgH).CornerRadius=UDim.new(0,14) end
-do local f=Instance.new("Frame",msgH) f.Size=UDim2.new(1,0,0.5,0) f.Position=UDim2.new(0,0,0.5,0) f.BackgroundColor3=Color3.fromRGB(18,22,44) f.BorderSizePixel=0 f.ZIndex=31 end
-
-local msgFromLbl=Instance.new("TextLabel",msgH) msgFromLbl.Size=UDim2.new(1,-50,1,0) msgFromLbl.Position=UDim2.new(0,14,0,0) msgFromLbl.BackgroundTransparency=1 msgFromLbl.Text="📨  Message" msgFromLbl.TextColor3=Color3.fromRGB(220,230,255) msgFromLbl.Font=Enum.Font.GothamBold msgFromLbl.TextSize=14 msgFromLbl.TextXAlignment=Enum.TextXAlignment.Left msgFromLbl.ZIndex=32
-
-local msgXBtn=Instance.new("TextButton",msgH) msgXBtn.Size=UDim2.new(0,28,0,28) msgXBtn.Position=UDim2.new(1,-38,0.5,-14) msgXBtn.BackgroundColor3=Color3.fromRGB(180,50,50) msgXBtn.TextColor3=Color3.fromRGB(255,255,255) msgXBtn.Font=Enum.Font.GothamBold msgXBtn.TextSize=13 msgXBtn.Text="✕" msgXBtn.BorderSizePixel=0 msgXBtn.ZIndex=32
-do Instance.new("UICorner",msgXBtn).CornerRadius=UDim.new(0,6) end
-
-local msgBodyLbl=Instance.new("TextLabel",msgBG) msgBodyLbl.Size=UDim2.new(1,-28,0,88) msgBodyLbl.Position=UDim2.new(0,14,0,56) msgBodyLbl.BackgroundTransparency=1 msgBodyLbl.Text="" msgBodyLbl.TextColor3=Color3.fromRGB(180,200,240) msgBodyLbl.Font=Enum.Font.Gotham msgBodyLbl.TextSize=13 msgBodyLbl.TextWrapped=true msgBodyLbl.TextXAlignment=Enum.TextXAlignment.Left msgBodyLbl.TextYAlignment=Enum.TextYAlignment.Top msgBodyLbl.ZIndex=31
-
-local msgOK=Instance.new("TextButton",msgBG) msgOK.Size=UDim2.new(0,120,0,34) msgOK.Position=UDim2.new(0.5,-60,1,-44) msgOK.BackgroundColor3=Color3.fromHex("#87CEEB") msgOK.TextColor3=Color3.fromRGB(8,10,20) msgOK.Font=Enum.Font.GothamBold msgOK.TextSize=13 msgOK.Text="✓  OK" msgOK.BorderSizePixel=0 msgOK.ZIndex=32
-do Instance.new("UICorner",msgOK).CornerRadius=UDim.new(0,8) end
-
-local function showMsg(from, msg)
-    msgFromLbl.Text="📨  From: "..from
-    msgBodyLbl.Text=msg
-    msgGui.Enabled=true
-end
-msgXBtn.MouseButton1Click:Connect(function() msgGui.Enabled=false end)
-msgOK.MouseButton1Click:Connect(function() msgGui.Enabled=false end)
-
--- ══════════════════════════════════════════
---    PROCESS SIGNAL
--- ══════════════════════════════════════════
-local function processSignal(sig)
-    if processedSignals[sig.id] then return end
-    processedSignals[sig.id]=true
-    local t=sig.type local by=sig.by or "System"
-
-    if t=="kick" then
-        player:Kick('You have been kicked by "'..by..'"')
-    elseif t=="ban" then
-        pcall(function()
-            local d=sig.data or {}
-            local devs=ghGet("online.json") or {}
-            -- simpan ban ke config lokal
-            local banData={BanExpiry=(d.expiry or os.time()+60)}
-            writefile(ASSETS.."/ban.json", HttpService:JSONEncode(banData))
-        end)
-        local d=sig.data or {}
-        player:Kick(string.format('You been Ban Time Day %d hours %d Minute %d Second %d By "%s"',
-            d.day or 0,d.hour or 0,d.min or 0,d.sec or 0,by))
-    elseif t=="reset" then
-        pcall(function() player:LoadCharacter() end)
-    elseif t=="message" then
-        local msg=(sig.data and sig.data.text) or "No message"
-        showMsg(by, msg)
-    end
-end
-
-local function preloadSignals()
-    pcall(function()
-        local sigs=ghGet("signals.json") or {}
-        for _,s in ipairs(sigs) do processedSignals[s.id]=true end
-    end)
-    signalsReady=true
-end
-
-local function pollSignals()
-    while not signalsReady do task.wait(0.5) end
-    while true do
-        task.wait(3)
-        pcall(function()
-            local sigs=ghGet("signals.json") or {}
-            local updated=false
-            for _,sig in ipairs(sigs) do
-                if not processedSignals[sig.id] and sig.target==player.Name then
-                    processSignal(sig)
-                    sig.processed=true
-                    updated=true
-                end
-            end
-            if updated then ghWrite("signals.json", sigs) end
-        end)
-    end
-end
-
--- ══════════════════════════════════════════
---    BAN CHECK ON START
--- ══════════════════════════════════════════
-local function checkBan()
-    if isfile(ASSETS.."/ban.json") then
-        local ok,d=pcall(function() return HttpService:JSONDecode(readfile(ASSETS.."/ban.json")) end)
-        if ok and d and d.BanExpiry then
-            local now=os.time()
-            if d.BanExpiry>now then
-                local r=d.BanExpiry-now
-                local dd=math.floor(r/86400)
-                local hh=math.floor((r%86400)/3600)
-                local mm=math.floor((r%3600)/60)
-                local ss=r%60
-                player:Kick(string.format("You been Ban Time Day %d hours %d Minute %d Second %d",dd,hh,mm,ss))
-                return
-            else
-                -- expired, hapus
-                pcall(function() writefile(ASSETS.."/ban.json","{}") end)
-            end
-        end
-    end
-end
-checkBan()
-
--- ══════════════════════════════════════════
---    WINDUI
--- ══════════════════════════════════════════
--- Load WindUI dengan versi spesifik (anti-redirect)
--- ══════════════════════════════════════════
---    NOTIFY SYSTEM (tanpa WindUI, pure Roblox GUI)
--- ══════════════════════════════════════════
-local _notifGui = Instance.new("ScreenGui")
-_notifGui.Name = "AdminHubNotif"
-_notifGui.ResetOnSpawn = false
-_notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-_notifGui.IgnoreGuiInset = true
-_notifGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
-
-local _notifList = Instance.new("Frame", _notifGui)
-_notifList.Size = UDim2.new(0, 280, 1, 0)
-_notifList.Position = UDim2.new(1, -290, 0, 0)
-_notifList.BackgroundTransparency = 1
-_notifList.BorderSizePixel = 0
-do
-    local l = Instance.new("UIListLayout", _notifList)
-    l.SortOrder = Enum.SortOrder.LayoutOrder
-    l.VerticalAlignment = Enum.VerticalAlignment.Bottom
-    l.Padding = UDim.new(0, 6)
-    local p = Instance.new("UIPadding", _notifList)
-    p.PaddingBottom = UDim.new(0, 12)
-    p.PaddingRight = UDim.new(0, 0)
-end
-
-local _notifCount = 0
-local function Notify(opts)
-    _notifCount = _notifCount + 1
-    local title    = opts.Title   or "AdminHub"
-    local content  = opts.Content or ""
-    local duration = opts.Duration or 4
-
-    local card = Instance.new("Frame", _notifList)
-    card.Size = UDim2.new(1, 0, 0, 0)
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = Color3.fromRGB(12, 14, 26)
-    card.BorderSizePixel = 0
-    card.LayoutOrder = _notifCount
-    card.BackgroundTransparency = 1
-    do Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10) end
-    do
-        local s = Instance.new("UIStroke", card)
-        s.Color = Color3.fromHex("#87CEEB")
-        s.Thickness = 1
-    end
-    do
-        local p = Instance.new("UIPadding", card)
-        p.PaddingLeft = UDim.new(0, 12)
-        p.PaddingRight = UDim.new(0, 12)
-        p.PaddingTop = UDim.new(0, 10)
-        p.PaddingBottom = UDim.new(0, 10)
-    end
-    do
-        local l = Instance.new("UIListLayout", card)
-        l.SortOrder = Enum.SortOrder.LayoutOrder
-        l.Padding = UDim.new(0, 4)
-    end
-
-    local titleLbl = Instance.new("TextLabel", card)
-    titleLbl.Size = UDim2.new(1, 0, 0, 18)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = title
-    titleLbl.TextColor3 = Color3.fromHex("#87CEEB")
-    titleLbl.Font = Enum.Font.GothamBold
-    titleLbl.TextSize = 13
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.LayoutOrder = 1
-
-    local bodyLbl = Instance.new("TextLabel", card)
-    bodyLbl.Size = UDim2.new(1, 0, 0, 0)
-    bodyLbl.AutomaticSize = Enum.AutomaticSize.Y
-    bodyLbl.BackgroundTransparency = 1
-    bodyLbl.Text = content
-    bodyLbl.TextColor3 = Color3.fromRGB(180, 200, 240)
-    bodyLbl.Font = Enum.Font.Gotham
-    bodyLbl.TextSize = 11
-    bodyLbl.TextWrapped = true
-    bodyLbl.TextXAlignment = Enum.TextXAlignment.Left
-    bodyLbl.LayoutOrder = 2
-
-    -- Animate in
-    game:GetService("TweenService"):Create(card, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
-
-    -- Auto remove
-    task.delay(duration, function()
-        game:GetService("TweenService"):Create(card, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
-        task.wait(0.35)
-        card:Destroy()
-    end)
-end
-
--- WindUI stub
-local WindUI = { Notify = Notify }
-
--- Load WindUI yang asli
-local _wuiOk, _wuiReal = pcall(function()
-    local code = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
-    if #code > 1000 then
-        local fn = loadstring(code)
-        if fn then return fn() end
-    end
-    return nil
-end)
-if _wuiOk and _wuiReal then
-    WindUI = _wuiReal
-end
-
-local Window
-if WindUI.CreateWindow then
-    Window = WindUI:CreateWindow({
-        Title  = "AdminHub",
-        Icon   = "box",
-        Author = "Khafidz",
-        Folder = "Control_Hub",
-    })
-    pcall(function()
-        Window:Tag({Title="1.0", Icon="terminal", Color=Color3.fromHex("#87CEEB"), Radius=0.5})
-    end)
-else
-    -- Fallback window stub kalau WindUI gagal load
-    local function stubTab(opts)
-        local t = {}
-        local mt = {__index = function(_, k)
-            return function(self, o, cb)
-                if type(o)=="table" and o.Callback then
-                    -- store callback tapi tidak tampilkan UI
-                end
-                return {}
-            end
-        end}
-        setmetatable(t, mt)
-        return t
-    end
-    Window = {
-        Tag = function() end,
-        Tab = stubTab,
-    }
-    Notify({Title="⚠️ AdminHub", Content="WindUI gagal load. Fitur UI terbatas.", Duration=5})
-end
-
-local TabInject   = Window:Tab({Title="Injector",  Icon="shield-alert"       })
-local TabInfect   = Window:Tab({Title="Infect",    Icon="syringe"            })
-local TabControls = Window:Tab({Title="Controls",  Icon="sliders-horizontal" })
-local TabTest     = Window:Tab({Title="Test",       Icon="flask-conical"      })
-local TabSettings = Window:Tab({Title="Settings",   Icon="settings"           })
-
--- ══════════════════════════════════════════
---    HELPER GUI
--- ══════════════════════════════════════════
-local Gui=Instance.new("ScreenGui",player.PlayerGui)
-Gui.Name="AdminHubGui" Gui.ResetOnSpawn=false
-Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling Gui.IgnoreGuiInset=true
-
+-- COLORS
 local D1=Color3.fromRGB(10,12,22) local D2=Color3.fromRGB(16,18,32) local D3=Color3.fromRGB(22,26,46)
-local AC=Color3.fromHex("#87CEEB") local TX=Color3.fromRGB(220,230,255) local ST=Color3.fromRGB(120,140,180)
+local D4=Color3.fromRGB(28,32,58) local AC=Color3.fromHex("#87CEEB")
+local TX=Color3.fromRGB(220,230,255) local ST=Color3.fromRGB(110,130,180)
+local RED=Color3.fromRGB(224,85,85) local GRN=Color3.fromRGB(85,224,154)
 
+-- HELPERS
 local function mkC(p,r) Instance.new("UICorner",p).CornerRadius=UDim.new(0,r or 10) end
-local function mkS(p,c,t) for _,ch in ipairs(p:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end local s=Instance.new("UIStroke",p) s.Color=c or Color3.fromRGB(60,80,120) s.Thickness=t or 1 end
+local function mkS(p,c,t) for _,ch in ipairs(p:GetChildren()) do if ch:IsA("UIStroke") then ch:Destroy() end end local s=Instance.new("UIStroke",p) s.Color=c or Color3.fromRGB(40,60,120) s.Thickness=t or 1 end
 local function mkP(p,l,r,t,b) local x=Instance.new("UIPadding",p) x.PaddingLeft=UDim.new(0,l or 0) x.PaddingRight=UDim.new(0,r or 0) x.PaddingTop=UDim.new(0,t or 0) x.PaddingBottom=UDim.new(0,b or 0) end
 local function mkDrag(frame,handle)
     local drag,ds,sp
@@ -584,450 +195,262 @@ local function mkDrag(frame,handle)
     UIS.InputChanged:Connect(function(i) if drag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then local d=i.Position-ds frame.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end)
     UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then drag=false end end)
 end
-
--- ══════════════════════════════════════════
---    INJECT FRAME (draggable)
--- ══════════════════════════════════════════
-local OV=Instance.new("TextButton",Gui) OV.Size=UDim2.fromScale(1,1) OV.BackgroundColor3=Color3.fromRGB(0,0,0) OV.BackgroundTransparency=0.6 OV.BorderSizePixel=0 OV.Visible=false OV.ZIndex=8 OV.Text="" OV.AutoButtonColor=false
-
-local IF=Instance.new("Frame",Gui) IF.Size=UDim2.new(0,500,0,520) IF.Position=UDim2.new(0.5,-250,0.5,-260) IF.BackgroundColor3=D1 IF.BorderSizePixel=0 IF.Visible=false IF.ZIndex=9 mkC(IF,14) mkS(IF,Color3.fromRGB(40,70,130),1.5)
-do local g=Instance.new("Frame",IF) g.Size=UDim2.new(1,0,0,2) g.BackgroundColor3=AC g.BorderSizePixel=0 g.ZIndex=10 mkC(g,2) end
-
-local IH=Instance.new("Frame",IF) IH.Size=UDim2.new(1,0,0,52) IH.BackgroundColor3=D3 IH.BorderSizePixel=0 IH.ZIndex=10 mkC(IH,14)
-do local f=Instance.new("Frame",IH) f.Size=UDim2.new(1,0,0.5,0) f.Position=UDim2.new(0,0,0.5,0) f.BackgroundColor3=D3 f.BorderSizePixel=0 f.ZIndex=10 end
-local IHIcon=Instance.new("TextLabel",IH) IHIcon.Size=UDim2.new(0,36,0,36) IHIcon.Position=UDim2.new(0,14,0.5,-18) IHIcon.BackgroundColor3=Color3.fromRGB(30,40,80) IHIcon.BorderSizePixel=0 IHIcon.Text="⚡" IHIcon.TextColor3=AC IHIcon.Font=Enum.Font.GothamBold IHIcon.TextSize=18 IHIcon.ZIndex=11 mkC(IHIcon,8)
-local IHT=Instance.new("TextLabel",IH) IHT.Size=UDim2.new(1,-120,1,0) IHT.Position=UDim2.new(0,58,0,0) IHT.BackgroundTransparency=1 IHT.Text="Script Injector" IHT.TextColor3=TX IHT.Font=Enum.Font.GothamBold IHT.TextSize=15 IHT.TextXAlignment=Enum.TextXAlignment.Left IHT.ZIndex=11
-local IXBtn=Instance.new("TextButton",IH) IXBtn.Size=UDim2.new(0,30,0,30) IXBtn.Position=UDim2.new(1,-42,0.5,-15) IXBtn.BackgroundColor3=Color3.fromRGB(180,50,50) IXBtn.TextColor3=Color3.fromRGB(255,255,255) IXBtn.Font=Enum.Font.GothamBold IXBtn.TextSize=14 IXBtn.Text="✕" IXBtn.BorderSizePixel=0 IXBtn.ZIndex=12 mkC(IXBtn,6)
-mkDrag(IF,IH)
-
--- File name input
-local FNWrap=Instance.new("Frame",IF) FNWrap.Size=UDim2.new(1,-24,0,38) FNWrap.Position=UDim2.new(0,12,0,62) FNWrap.BackgroundColor3=D2 FNWrap.BorderSizePixel=0 FNWrap.ZIndex=10 mkC(FNWrap,8) mkS(FNWrap,Color3.fromRGB(35,50,90),1)
-local FNBox=Instance.new("TextBox",FNWrap) FNBox.Size=UDim2.new(1,0,1,0) FNBox.BackgroundTransparency=1 FNBox.PlaceholderText="Nama file (contoh: myscript.lua)" FNBox.PlaceholderColor3=ST FNBox.TextColor3=TX FNBox.Font=Enum.Font.Gotham FNBox.TextSize=13 FNBox.Text="" FNBox.ClearTextOnFocus=false FNBox.TextXAlignment=Enum.TextXAlignment.Left FNBox.ZIndex=11 mkP(FNBox,10,10,0,0)
-FNBox.Focused:Connect(function() TweenService:Create(FNWrap,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(20,25,50)}):Play() mkS(FNWrap,AC,1.2) end)
-FNBox.FocusLost:Connect(function() TweenService:Create(FNWrap,TweenInfo.new(0.2),{BackgroundColor3=D2}):Play() mkS(FNWrap,Color3.fromRGB(35,50,90),1) end)
-
--- File name label
-local FNLbl=Instance.new("TextLabel",IF) FNLbl.Size=UDim2.new(1,-24,0,14) FNLbl.Position=UDim2.new(0,12,0,54) FNLbl.BackgroundTransparency=1 FNLbl.Text="File Name" FNLbl.TextColor3=ST FNLbl.Font=Enum.Font.GothamMedium FNLbl.TextSize=10 FNLbl.TextXAlignment=Enum.TextXAlignment.Left FNLbl.ZIndex=10
-
--- Code area
-local SWrap=Instance.new("Frame",IF) SWrap.Size=UDim2.new(1,-24,0,300) SWrap.Position=UDim2.new(0,12,0,112) SWrap.BackgroundColor3=Color3.fromRGB(8,9,18) SWrap.BorderSizePixel=0 SWrap.ZIndex=10 mkC(SWrap,8) mkS(SWrap,Color3.fromRGB(30,45,90),1)
-local SBox=Instance.new("TextBox",SWrap) SBox.Size=UDim2.new(1,0,1,0) SBox.BackgroundTransparency=1 SBox.PlaceholderText="-- Paste script kamu di sini...\n-- Bisa berupa apapun: print(), GUI, loadstring(), dll." SBox.PlaceholderColor3=ST SBox.TextColor3=Color3.fromHex("#87CEEB") SBox.Font=Enum.Font.Code SBox.TextSize=12 SBox.Text="" SBox.MultiLine=true SBox.ClearTextOnFocus=false SBox.TextXAlignment=Enum.TextXAlignment.Left SBox.TextYAlignment=Enum.TextYAlignment.Top SBox.ZIndex=11 mkP(SBox,10,10,8,8)
-local SLbl=Instance.new("TextLabel",IF) SLbl.Size=UDim2.new(1,-24,0,14) SLbl.Position=UDim2.new(0,12,0,104) SLbl.BackgroundTransparency=1 SLbl.Text="Script Content" SLbl.TextColor3=ST SLbl.Font=Enum.Font.GothamMedium SLbl.TextSize=10 SLbl.TextXAlignment=Enum.TextXAlignment.Left SLbl.ZIndex=10
-
--- Status label
-local StatusLbl=Instance.new("TextLabel",IF) StatusLbl.Size=UDim2.new(1,-140,0,16) StatusLbl.Position=UDim2.new(0,12,1,-50) StatusLbl.BackgroundTransparency=1 StatusLbl.Text="" StatusLbl.TextColor3=ST StatusLbl.Font=Enum.Font.Gotham StatusLbl.TextSize=11 StatusLbl.TextXAlignment=Enum.TextXAlignment.Left StatusLbl.ZIndex=10
-
--- Inject button
-local InjectBtn=Instance.new("TextButton",IF) InjectBtn.Size=UDim2.new(0,120,0,38) InjectBtn.Position=UDim2.new(1,-132,1,-48) InjectBtn.BackgroundColor3=AC InjectBtn.TextColor3=Color3.fromRGB(8,10,20) InjectBtn.Font=Enum.Font.GothamBold InjectBtn.TextSize=14 InjectBtn.Text="⚡ Inject" InjectBtn.BorderSizePixel=0 InjectBtn.ZIndex=10 mkC(InjectBtn,8)
-
--- Raw URL copy frame (muncul setelah inject berhasil)
-local URLFrame=Instance.new("Frame",IF) URLFrame.Size=UDim2.new(1,-24,0,0) URLFrame.Position=UDim2.new(0,12,0,420) URLFrame.BackgroundColor3=D2 URLFrame.BorderSizePixel=0 URLFrame.ZIndex=10 URLFrame.Visible=false mkC(URLFrame,8) mkS(URLFrame,AC,1)
-local URLLbl=Instance.new("TextLabel",URLFrame) URLLbl.Size=UDim2.new(1,-100,1,0) URLLbl.Position=UDim2.new(0,8,0,0) URLLbl.BackgroundTransparency=1 URLLbl.Text="" URLLbl.TextColor3=Color3.fromHex("#87CEEB") URLLbl.Font=Enum.Font.Code URLLbl.TextSize=10 URLLbl.TextWrapped=true URLLbl.TextXAlignment=Enum.TextXAlignment.Left URLLbl.ZIndex=11
-local CopyBtn=Instance.new("TextButton",URLFrame) CopyBtn.Size=UDim2.new(0,80,0,28) CopyBtn.Position=UDim2.new(1,-88,0.5,-14) CopyBtn.BackgroundColor3=Color3.fromRGB(30,80,160) CopyBtn.TextColor3=Color3.fromRGB(220,230,255) CopyBtn.Font=Enum.Font.GothamBold CopyBtn.TextSize=11 CopyBtn.Text="📋 Copy" CopyBtn.BorderSizePixel=0 CopyBtn.ZIndex=11 mkC(CopyBtn,6)
-
--- ══════════════════════════════════════════
---    INJECT LOGIC
--- ══════════════════════════════════════════
-local lastRawURL = ""
-
-local function setStatus(msg, color)
-    StatusLbl.Text=msg StatusLbl.TextColor3=color or ST
+local function mkBtn(parent,text,color,order)
+    local b=Instance.new("TextButton",parent) b.Size=UDim2.new(1,0,0,38) b.BackgroundColor3=color or D4
+    b.TextColor3=color==AC and Color3.fromRGB(8,10,20) or TX b.Font=Enum.Font.GothamBold b.TextSize=13
+    b.Text=text b.BorderSizePixel=0 b.LayoutOrder=order or 0 mkC(b,8)
+    b.MouseEnter:Connect(function() TweenService:Create(b,TweenInfo.new(0.15),{BackgroundColor3=Color3.fromRGB(b.BackgroundColor3.R*255+15,b.BackgroundColor3.G*255+15,b.BackgroundColor3.B*255+15)}):Play() end)
+    b.MouseLeave:Connect(function() TweenService:Create(b,TweenInfo.new(0.15),{BackgroundColor3=color or D4}):Play() end)
+    return b
+end
+local function mkInput(parent,placeholder,order)
+    local wrap=Instance.new("Frame",parent) wrap.Size=UDim2.new(1,0,0,38) wrap.BackgroundColor3=D2 wrap.BorderSizePixel=0 wrap.LayoutOrder=order or 0 mkC(wrap,8) mkS(wrap,Color3.fromRGB(35,50,90),1)
+    local tb=Instance.new("TextBox",wrap) tb.Size=UDim2.new(1,0,1,0) tb.BackgroundTransparency=1 tb.PlaceholderText=placeholder tb.PlaceholderColor3=ST tb.TextColor3=TX tb.Font=Enum.Font.Gotham tb.TextSize=13 tb.Text="" tb.ClearTextOnFocus=false tb.TextXAlignment=Enum.TextXAlignment.Left mkP(tb,10,10,0,0)
+    tb.Focused:Connect(function() TweenService:Create(wrap,TweenInfo.new(0.2),{BackgroundColor3=Color3.fromRGB(20,25,50)}):Play() mkS(wrap,AC,1.2) end)
+    tb.FocusLost:Connect(function() TweenService:Create(wrap,TweenInfo.new(0.2),{BackgroundColor3=D2}):Play() mkS(wrap,Color3.fromRGB(35,50,90),1) end)
+    return tb
+end
+local function mkLabel(parent,text,color,order)
+    local l=Instance.new("TextLabel",parent) l.Size=UDim2.new(1,0,0,14) l.BackgroundTransparency=1
+    l.Text=text l.TextColor3=color or ST l.Font=Enum.Font.GothamMedium l.TextSize=11
+    l.TextXAlignment=Enum.TextXAlignment.Left l.LayoutOrder=order or 0 return l
 end
 
-local function injectScript()
-    local fname = FNBox.Text:gsub("^%s*(.-)%s*$","%1")
-    local code  = SBox.Text
+-- MAIN GUI
+local Gui=Instance.new("ScreenGui",player.PlayerGui)
+Gui.Name="AdminHubGui" Gui.ResetOnSpawn=false
+Gui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling Gui.IgnoreGuiInset=true
 
-    -- Validasi nama file
-    if fname=="" then
-        setStatus("❌ Nama file tidak boleh kosong!", Color3.fromRGB(224,85,85)) return
-    end
-    if not fname:match("%.lua$") then fname=fname..".lua" end
-    if fname:match("[/\\%*%?<>|\":]") then
-        setStatus("❌ Nama file mengandung karakter tidak valid!", Color3.fromRGB(224,85,85)) return
-    end
+-- SIDEBAR + CONTENT
+local Main=Instance.new("Frame",Gui) Main.Size=UDim2.new(0,520,0,580) Main.Position=UDim2.new(0.5,-260,0.5,-290)
+Main.BackgroundColor3=D1 Main.BorderSizePixel=0 mkC(Main,14) mkS(Main,Color3.fromRGB(35,55,110),1.5)
+do local g=Instance.new("Frame",Main) g.Size=UDim2.new(1,0,0,2) g.BackgroundColor3=AC g.BorderSizePixel=0 mkC(g,2) end
+mkDrag(Main,Main)
 
-    -- Validasi kode
-    if code=="" then
-        setStatus("❌ Script tidak boleh kosong!", Color3.fromRGB(224,85,85)) return
-    end
-    local fn, err = loadstring(code)
-    if not fn then
-        local short = tostring(err):match("%[.-%]:(.+)") or tostring(err)
-        setStatus("❌ Syntax Error: "..short, Color3.fromRGB(224,85,85)) return
-    end
+-- HEADER
+local Header=Instance.new("Frame",Main) Header.Size=UDim2.new(1,0,0,50) Header.BackgroundColor3=D3 Header.BorderSizePixel=0 mkC(Header,14)
+do local f=Instance.new("Frame",Header) f.Size=UDim2.new(1,0,0.5,0) f.Position=UDim2.new(0,0,0.5,0) f.BackgroundColor3=D3 f.BorderSizePixel=0 end
+local HTitle=Instance.new("TextLabel",Header) HTitle.Size=UDim2.new(1,-20,1,0) HTitle.Position=UDim2.new(0,16,0,0) HTitle.BackgroundTransparency=1
+HTitle.Text="⬡  AdminHub" HTitle.TextColor3=TX HTitle.Font=Enum.Font.GothamBold HTitle.TextSize=16 HTitle.TextXAlignment=Enum.TextXAlignment.Left
+local HClose=Instance.new("TextButton",Header) HClose.Size=UDim2.new(0,28,0,28) HClose.Position=UDim2.new(1,-38,0.5,-14)
+HClose.BackgroundColor3=Color3.fromRGB(180,50,50) HClose.TextColor3=Color3.fromRGB(255,255,255)
+HClose.Font=Enum.Font.GothamBold HClose.TextSize=13 HClose.Text="✕" HClose.BorderSizePixel=0 mkC(HClose,6)
+HClose.MouseButton1Click:Connect(function() Main.Visible=false end)
 
-    -- Simpan lokal dulu
-    pcall(function() writefile(SCRIPTS_FOLDER.."/"..fname, code) end)
+-- TABS BAR
+local TabBar=Instance.new("Frame",Main) TabBar.Size=UDim2.new(1,-20,0,36) TabBar.Position=UDim2.new(0,10,0,56) TabBar.BackgroundTransparency=1 TabBar.BorderSizePixel=0
+do local l=Instance.new("UIListLayout",TabBar) l.FillDirection=Enum.FillDirection.Horizontal l.Padding=UDim.new(0,6) end
 
-    -- Upload ke GitHub
-    setStatus("⏳ Mengupload ke GitHub...", Color3.fromRGB(224,196,85))
-    InjectBtn.Text="⏳..."
-    InjectBtn.Active=false
+local function mkTab(name,icon)
+    local b=Instance.new("TextButton",TabBar) b.Size=UDim2.new(0,100,1,0) b.BackgroundColor3=D3
+    b.TextColor3=ST b.Font=Enum.Font.GothamBold b.TextSize=11 b.Text=icon.."  "..name b.BorderSizePixel=0 mkC(b,8)
+    return b
+end
 
-    task.spawn(function()
-        local ghPath = "scripts/"..fname
-        local ok, ghErr = ghWrite(ghPath, code, true)
+local BtnControls = mkTab("Controls","🎮")
+local BtnInfect   = mkTab("Infect","💉")
+local BtnTest     = mkTab("Test","🧪")
 
-        if ok then
-            lastRawURL = "https://raw.githubusercontent.com/"..GH_OWNER.."/"..GH_REPO.."/"..GH_BRANCH.."/"..GH_PATH.."/scripts/"..fname
-            URLLbl.Text = lastRawURL
-            URLFrame.Size = UDim2.new(1,-24,0,42)
-            URLFrame.Visible = true
-            setStatus("✅ Script berhasil di-inject!", Color3.fromRGB(85,224,154))
-            WindUI:Notify({Title="✅ Inject Berhasil!",Content=fname.." tersimpan di GitHub.\nRaw URL sudah siap disalin.",Duration=5})
-        else
-            setStatus("❌ Upload gagal: "..tostring(ghErr), Color3.fromRGB(224,85,85))
-            WindUI:Notify({Title="❌ Inject Gagal",Content=tostring(ghErr),Duration=5})
+-- CONTENT AREA
+local Content=Instance.new("Frame",Main) Content.Size=UDim2.new(1,-20,1,-108) Content.Position=UDim2.new(0,10,0,100) Content.BackgroundTransparency=1 Content.BorderSizePixel=0
+
+local function mkPage()
+    local sc=Instance.new("ScrollingFrame",Content) sc.Size=UDim2.fromScale(1,1) sc.BackgroundTransparency=1
+    sc.BorderSizePixel=0 sc.ScrollBarThickness=3 sc.ScrollBarImageColor3=AC
+    sc.CanvasSize=UDim2.new(0,0,0,0) sc.AutomaticCanvasSize=Enum.AutomaticSize.Y sc.Visible=false
+    do local l=Instance.new("UIListLayout",sc) l.SortOrder=Enum.SortOrder.LayoutOrder l.Padding=UDim.new(0,8) end
+    mkP(sc,0,4,4,4)
+    return sc
+end
+
+local PageControls = mkPage()
+local PageInfect   = mkPage()
+local PageTest     = mkPage()
+
+local curPage = nil
+local function showPage(page, btn)
+    if curPage then curPage.Visible=false end
+    page.Visible=true curPage=page
+    for _,b in ipairs(TabBar:GetChildren()) do
+        if b:IsA("TextButton") then
+            b.BackgroundColor3 = b==btn and D4 or D3
+            b.TextColor3 = b==btn and AC or ST
         end
-
-        InjectBtn.Text="⚡ Inject"
-        InjectBtn.Active=true
-    end)
+    end
 end
 
-InjectBtn.MouseButton1Click:Connect(injectScript)
-IXBtn.MouseButton1Click:Connect(function() IF.Visible=false OV.Visible=false end)
-OV.MouseButton1Click:Connect(function() IF.Visible=false OV.Visible=false end)
+BtnControls.MouseButton1Click:Connect(function() showPage(PageControls,BtnControls) end)
+BtnInfect.MouseButton1Click:Connect(function() showPage(PageInfect,BtnInfect) end)
+BtnTest.MouseButton1Click:Connect(function() showPage(PageTest,BtnTest) end)
 
-CopyBtn.MouseButton1Click:Connect(function()
-    if lastRawURL~="" then
-        setclipboard(lastRawURL)
-        CopyBtn.Text="✓ Copied!"
-        task.wait(2)
-        CopyBtn.Text="📋 Copy"
-    end
+-- ═══════════════════════
+--  CONTROLS PAGE
+-- ═══════════════════════
+mkLabel(PageControls,"🎯 Target Player",AC,1)
+local ctrlTarget = mkInput(PageControls,"Username target...",2)
+
+mkLabel(PageControls,"── Actions",ST,3)
+local btnKick = mkBtn(PageControls,"👢  Kick",D4,4)
+btnKick.MouseButton1Click:Connect(function()
+    local t=ctrlTarget.Text:gsub("^%s*(.-)%s*$","%1")
+    if t=="" then Notify("❌ Error","Target kosong!",3) return end
+    Notify("⏳ Sending...","Mengirim kick ke "..t,2)
+    task.spawn(function() sendSignal("kick",t,{}) Notify("✅ Sent","Kick dikirim ke "..t,3) end)
 end)
 
--- ══════════════════════════════════════════
---    INJECTOR TAB
--- ══════════════════════════════════════════
-TabInject:Paragraph({
-    Title="⚡ Script Injector",
-    Desc ="Upload script ke GitHub repo. Script tersimpan di folder /scripts dan auto-generate raw URL.",
-    Color="Blue"
-})
-TabInject:Button({Title="Open Injector",Icon="shield-alert",Callback=function()
-    FNBox.Text="" SBox.Text="" StatusLbl.Text="" URLFrame.Visible=false URLFrame.Size=UDim2.new(1,-24,0,0) lastRawURL=""
-    OV.Visible=true IF.Visible=true
-    IF:TweenPosition(UDim2.new(0.5,-250,0.5,-260),Enum.EasingDirection.Out,Enum.EasingStyle.Back,0.3,true)
-end})
-
--- Daftar script yang sudah ada di folder lokal
-TabInject:Paragraph({Title="📁 Scripts Lokal",Desc="Script yang tersimpan di Delta/Workspace/Control_Hub/scripts/",Color="Blue"})
-
-local scriptFiles = {}
-pcall(function()
-    scriptFiles = listfiles(SCRIPTS_FOLDER) or {}
+local btnReset = mkBtn(PageControls,"🔄  Reset Character",D4,5)
+btnReset.MouseButton1Click:Connect(function()
+    local t=ctrlTarget.Text:gsub("^%s*(.-)%s*$","%1")
+    if t=="" then Notify("❌ Error","Target kosong!",3) return end
+    Notify("⏳ Sending...","Mengirim reset ke "..t,2)
+    task.spawn(function() sendSignal("reset",t,{}) Notify("✅ Sent","Reset dikirim ke "..t,3) end)
 end)
 
-if #scriptFiles==0 then
-    TabInject:Paragraph({Title="Kosong",Desc="Belum ada script. Inject dulu!",Color="Blue"})
-else
-    for _, fpath in ipairs(scriptFiles) do
-        local fname = fpath:match("([^/\\]+)$") or fpath
-        TabInject:Button({
-            Title=fname, Icon="file-code",
-            Callback=function()
-                WindUI:Notify({Title="⏳ Running...",Content="Menjalankan "..fname,Duration=2})
-                local code=readfile(fpath)
-                local fn,err=loadstring(code)
-                if fn then
-                    task.spawn(fn)
-                    WindUI:Notify({Title="✅ Ran!",Content=fname.." berhasil dijalankan.",Duration=3})
-                else
-                    WindUI:Notify({Title="❌ Error",Content=tostring(err),Duration=5})
+mkLabel(PageControls,"── Ban Time (max: 3d 24h 60m 60s)",ST,6)
+local banD=mkInput(PageControls,"Day (0-3)",7)
+local banH=mkInput(PageControls,"Hour (0-24)",8)
+local banM=mkInput(PageControls,"Minute (0-60)",9)
+local banS=mkInput(PageControls,"Second (0-60)",10)
+local btnBan = mkBtn(PageControls,"⏱️  Apply Ban Time",D4,11)
+btnBan.MouseButton1Click:Connect(function()
+    local t=ctrlTarget.Text:gsub("^%s*(.-)%s*$","%1")
+    if t=="" then Notify("❌ Error","Target kosong!",3) return end
+    local d,h,m,s=tonumber(banD.Text) or 0,tonumber(banH.Text) or 0,tonumber(banM.Text) or 0,tonumber(banS.Text) or 0
+    if d>3 or h>24 or m>60 or s>60 then Notify("❌ Error","Melebihi batas maksimum!",3) return end
+    if d==0 and h==0 and m==0 and s==0 then Notify("❌ Error","Durasi tidak boleh 0!",3) return end
+    local expiry=os.time()+d*86400+h*3600+m*60+s
+    Notify("⏳ Sending...","Mengirim ban ke "..t,2)
+    task.spawn(function() sendSignal("ban",t,{day=d,hour=h,min=m,sec=s,expiry=expiry}) Notify("✅ Sent","Ban dikirim ke "..t,3) end)
+end)
+
+mkLabel(PageControls,"── Message",ST,12)
+local msgInput=mkInput(PageControls,"Tulis pesan...",13)
+local btnMsg = mkBtn(PageControls,"📨  Send Message",D4,14)
+btnMsg.MouseButton1Click:Connect(function()
+    local t=ctrlTarget.Text:gsub("^%s*(.-)%s*$","%1")
+    local msg=msgInput.Text:gsub("^%s*(.-)%s*$","%1")
+    if t=="" or msg=="" then Notify("❌ Error","Target atau pesan kosong!",3) return end
+    Notify("⏳ Sending...","Mengirim pesan ke "..t,2)
+    task.spawn(function() sendSignal("message",t,{text=msg}) Notify("✅ Sent","Pesan dikirim ke "..t,3) end)
+end)
+
+-- ═══════════════════════
+--  INFECT PAGE
+-- ═══════════════════════
+mkLabel(PageInfect,"💉 Add Script to Loader",AC,1)
+mkLabel(PageInfect,"Title",ST,2) local iTitle=mkInput(PageInfect,"Nama script...",3)
+mkLabel(PageInfect,"Description",ST,4) local iDesc=mkInput(PageInfect,"Deskripsi...",5)
+mkLabel(PageInfect,"Icon (emoji)",ST,6) local iIcon=mkInput(PageInfect,"🎮",7)
+mkLabel(PageInfect,"Script URL (raw)",ST,8) local iUrl=mkInput(PageInfect,"https://raw.github...",9)
+mkLabel(PageInfect,"Game Name",ST,10) local iGame=mkInput(PageInfect,"Nama game di Loader...",11)
+
+local btnInfect=mkBtn(PageInfect,"💉  Inject to Loader",AC,12)
+btnInfect.MouseButton1Click:Connect(function()
+    local title=iTitle.Text:gsub("^%s*(.-)%s*$","%1")
+    local desc=iDesc.Text:gsub("^%s*(.-)%s*$","%1")
+    local icon=iIcon.Text:gsub("^%s*(.-)%s*$","%1")
+    local url=iUrl.Text:gsub("^%s*(.-)%s*$","%1")
+    local game_=iGame.Text:gsub("^%s*(.-)%s*$","%1")
+    if title=="" or url=="" or game_=="" then Notify("❌ Error","Title, URL, Game wajib diisi!",3) return end
+    if icon=="" then icon="🎮" end
+    Notify("⏳ Injecting...","Upload ke GitHub...",3)
+    task.spawn(function()
+        -- Baca scripts_db.json
+        local db = {}
+        pcall(function()
+            local raw=game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/AdminHub/scripts_db.json?t="..os.time())
+            if #raw>2 then db=HttpService:JSONDecode(raw) end
+        end)
+        -- Cari game entry
+        local entry=nil
+        for _,g in ipairs(db) do if g.game==game_ then entry=g break end end
+        if not entry then entry={game=game_,icon=icon,scripts={}} table.insert(db,entry) end
+        table.insert(entry.scripts,{name=title,desc=desc,icon=icon,url=url})
+        -- Upload
+        local PAT=""
+        pcall(function()
+            local roots={"","Delta/Workspace/","DeltaWorkspace/"}
+            for _,r in ipairs(roots) do
+                local cfg=r.."Control_Hub/assets/config.json"
+                if isfile(cfg) then
+                    local d=HttpService:JSONDecode(readfile(cfg))
+                    if d and d.PAT then PAT=d.PAT break end
                 end
             end
-        })
-    end
-end
-
-TabInject:Button({Title="🗑  Reset / Clear Scripts",Icon="trash-2",Callback=function()
-    WindUI:Notify({Title="⏳",Content="Menghapus semua script lokal...",Duration=2})
-    pcall(function()
-        local files=listfiles(SCRIPTS_FOLDER) or {}
-        for _,f in ipairs(files) do pcall(delfile,f) end
-    end)
-    WindUI:Notify({Title="✅ Cleared!",Content="Semua script lokal dihapus. Re-inject untuk mengisi ulang.",Duration=4})
-end})
-
--- ══════════════════════════════════════════
---    CONTROLS TAB
--- ══════════════════════════════════════════
-local ctrlTarget = ""
-
-TabControls:Paragraph({Title="🎯 Target Player",Desc="Pilih target dulu sebelum menjalankan aksi.",Color="Blue"})
-TabControls:Input({Title="Target Username",Placeholder="Username player...",Callback=function(v) ctrlTarget=v end})
-
-local function sendSignal(type_, data)
-    if ctrlTarget=="" then
-        WindUI:Notify({Title="❌",Content="Target username kosong!",Duration=3}) return
-    end
-    WindUI:Notify({Title="⏳ Sending...",Content="Mengirim sinyal "..type_.." ke "..ctrlTarget,Duration=2})
-    task.spawn(function()
-        local ok = pcall(function() sendSignalJB(type_, ctrlTarget, data) end)
-        if ok then
-            WindUI:Notify({Title="✅ Sent!",Content='Sinyal "'..type_..'" terkirim ke '..ctrlTarget,Duration=3})
-        else
-            WindUI:Notify({Title="❌ Gagal",Content="Gagal kirim sinyal!",Duration=4})
-        end
-    end)
-end
-
--- Kick
-TabControls:Button({Title="👢 Kick",Icon="user-x",Callback=function()
-    sendSignal("kick",{})
-end})
-
--- Ban Time
-local bD,bH,bM,bS=0,0,0,0
-TabControls:Paragraph({Title="⏱️ Ban Time",Desc="Maksimal: 3 hari, 24 jam, 60 menit, 60 detik.",Color="Blue"})
-TabControls:Input({Title="Day (max 3)",Placeholder="0",Callback=function(v) bD=tonumber(v) or 0 end})
-TabControls:Input({Title="Hour (max 24)",Placeholder="0",Callback=function(v) bH=tonumber(v) or 0 end})
-TabControls:Input({Title="Minute (max 60)",Placeholder="0",Callback=function(v) bM=tonumber(v) or 0 end})
-TabControls:Input({Title="Second (max 60)",Placeholder="0",Callback=function(v) bS=tonumber(v) or 0 end})
-TabControls:Button({Title="⏱️ Apply Ban Time",Icon="clock",Callback=function()
-    if (bD or 0)>3 or (bH or 0)>24 or (bM or 0)>60 or (bS or 0)>60 then
-        WindUI:Notify({Title="❌",Content="Melebihi batas maksimum!",Duration=3}) return end
-    if bD==0 and bH==0 and bM==0 and bS==0 then
-        WindUI:Notify({Title="❌",Content="Durasi tidak boleh 0!",Duration=3}) return end
-    local expiry=os.time()+(bD or 0)*86400+(bH or 0)*3600+(bM or 0)*60+(bS or 0)
-    sendSignal("ban",{day=bD,hour=bH,min=bM,sec=bS,expiry=expiry})
-end})
-
--- Reset
-TabControls:Button({Title="🔄 Reset Character",Icon="rotate-cw",Callback=function()
-    sendSignal("reset",{})
-end})
-
--- Message
-local msgInput=""
-TabControls:Input({Title="Message",Placeholder="Tulis pesan...",Callback=function(v) msgInput=v end})
-TabControls:Button({Title="📨 Send Message",Icon="message-square",Callback=function()
-    if msgInput=="" then WindUI:Notify({Title="❌",Content="Pesan kosong!",Duration=3}) return end
-    sendSignal("message",{text=msgInput})
-end})
-
--- Teleport
-TabControls:Button({Title="🚀 Teleport To Player",Icon="navigation",Callback=function()
-    if ctrlTarget=="" then WindUI:Notify({Title="❌",Content="Target kosong!",Duration=3}) return end
-    WindUI:Notify({Title="⏳",Content="Mencari game "..ctrlTarget.."...",Duration=2})
-    task.spawn(function()
-        local ok2,userId=pcall(function()
-            local d=HttpService:JSONDecode(game:HttpGet("https://users.roblox.com/v1/users/search?keyword="..HttpService:UrlEncode(ctrlTarget).."&limit=5"))
-            if d and d.data then for _,u in ipairs(d.data) do if u.name==ctrlTarget then return u.id end end end
-            return nil
         end)
-        if not ok2 or not userId then WindUI:Notify({Title="❌",Content="User tidak ditemukan!",Duration=4}) return end
-        local ok3,presence=pcall(function()
-            local res=httpRequest({Url="https://presence.roblox.com/v1/presence/users",Method="POST",Headers={["Content-Type"]="application/json"},Body=HttpService:JSONEncode({userIds={userId}})})
-            if res and res.Body then return HttpService:JSONDecode(res.Body) end
-            return nil
+        if PAT=="" then Notify("❌ Error","PAT tidak ditemukan di config.json!",5) return end
+        -- Get SHA
+        local sha=nil
+        pcall(function()
+            local res=httpRequest({Url="https://api.github.com/repos/HaZcK/ScriptHub/contents/Script/AdminHub/scripts_db.json",Method="GET",Headers={["Authorization"]="token "..PAT,["User-Agent"]="AdminHub"}})
+            if res and res.Body then local m=HttpService:JSONDecode(res.Body) sha=m and m.sha end
         end)
-        if not ok3 or not presence then WindUI:Notify({Title="❌",Content="Gagal cek presence!",Duration=4}) return end
-        local up=presence.userPresences and presence.userPresences[1]
-        if not up or not up.placeId or up.placeId==0 then
-            WindUI:Notify({Title="❌",Content=ctrlTarget.." tidak sedang bermain game!",Duration=4}) return
-        end
-        TS:Teleport(up.placeId,player)
+        -- Encode & upload
+        local jsonStr=HttpService:JSONEncode(db)
+        local b64="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+        local encoded=((jsonStr:gsub(".",function(x) local r,b2="",x:byte() for i=8,1,-1 do r=r..(b2%2^i-b2%2^(i-1)>0 and "1" or "0") end return r end).."0000"):gsub("%d%d%d?%d?%d?%d?",function(x) if #x<6 then return "" end local c=0 for i=1,6 do c=c+(x:sub(i,i)=="1" and 2^(6-i) or 0) end return b64:sub(c+1,c+1) end)..({"","==","="})[#jsonStr%3+1])
+        local body=HttpService:JSONEncode({message="Infect: add "..title,content=encoded,sha=sha,branch="main"})
+        local ok=pcall(function()
+            httpRequest({Url="https://api.github.com/repos/HaZcK/ScriptHub/contents/Script/AdminHub/scripts_db.json",Method="PUT",Headers={["Authorization"]="token "..PAT,["Content-Type"]="application/json",["User-Agent"]="AdminHub"},Body=body})
+        end)
+        if ok then Notify("✅ Injected!",title.." ditambahkan ke Loader!",5)
+        else Notify("❌ Gagal","Upload error. Cek PAT!",5) end
     end)
-end})
+end)
 
--- ══════════════════════════════════════════
---    TEST TAB
--- ══════════════════════════════════════════
-TabTest:Paragraph({Title="🧪 Test Controls",Desc="Lihat siapa yang pakai AdminHub dan test fitur ke mereka.",Color="Blue"})
-
-TabTest:Button({Title="🔍 Refresh Online Players",Icon="refresh-cw",Callback=function()
-    WindUI:Notify({Title="⏳",Content="Memuat daftar online...",Duration=2})
+-- ═══════════════════════
+--  TEST PAGE
+-- ═══════════════════════
+mkLabel(PageTest,"🧪 Online Players",AC,1)
+local btnRefresh=mkBtn(PageTest,"🔍  Refresh Online",D4,2)
+btnRefresh.MouseButton1Click:Connect(function()
+    Notify("⏳","Memuat online players...",2)
     task.spawn(function()
-        local data   = jbGet()
-        local online = data.online or {}
-        local now    = os.time()
-        local active = {}
-        for _,p in ipairs(online) do
-            if (now-(p.LastSeen or 0)) < 60 then table.insert(active,p) end
-        end
-        if #active==0 then
-            WindUI:Notify({Title="📋 Online",Content="Tidak ada player online pakai Loader saat ini.",Duration=5}) return
-        end
+        local d=jbGet() local ol=d.online or {}
+        local now=os.time() local active={}
+        for _,p in ipairs(ol) do if (now-(p.LastSeen or 0))<60 then table.insert(active,p) end end
+        if #active==0 then Notify("📋 Online","Tidak ada yang online.",5) return end
         local lines={}
-        for _,p in ipairs(active) do
-            table.insert(lines,"• "..p.Username..(p.Display and p.Display~=p.Username and " ("..p.Display..")" or ""))
-        end
-        WindUI:Notify({Title="🟢 Online ("..#active..")",Content=table.concat(lines,"
-"),Duration=8})
+        for _,p in ipairs(active) do table.insert(lines,"• "..p.Username) end
+        Notify("🟢 Online ("..#active..")",table.concat(lines,"\n"),8)
     end)
-end})
+end)
 
--- Test ke diri sendiri
-TabTest:Paragraph({Title="🎯 Test ke diri sendiri",Desc="Fitur sama persis seperti Controls tapi target = kamu sendiri.",Color="Blue"})
+mkLabel(PageTest,"── Test ke diri sendiri",ST,3)
+local btnTestReset=mkBtn(PageTest,"🔄  Test Reset",D4,4)
+btnTestReset.MouseButton1Click:Connect(function()
+    Notify("🔄 Test Reset","Resetting...",2)
+    task.wait(1.5) pcall(function() player:LoadCharacter() end)
+end)
 
-TabTest:Button({Title="Test Reset",Icon="rotate-cw",Callback=function()
-    WindUI:Notify({Title="⏳",Content="Testing reset...",Duration=1})
-    task.wait(1)
-    pcall(function() player:LoadCharacter() end)
-end})
+mkLabel(PageTest,"── Test Message",ST,5)
+local testMsg=mkInput(PageTest,"Tulis pesan tes...",6)
+local btnTestMsg=mkBtn(PageTest,"📨  Test Message",D4,7)
+btnTestMsg.MouseButton1Click:Connect(function()
+    local msg=testMsg.Text:gsub("^%s*(.-)%s*$","%1")
+    if msg=="" then Notify("❌","Pesan kosong!",3) return end
+    Notify('📨 Message By "Test"',msg,6)
+end)
 
-local testMsg=""
-TabTest:Input({Title="Test Message",Placeholder="Tulis pesan tes...",Callback=function(v) testMsg=v end})
-TabTest:Button({Title="Test Message Frame",Icon="message-square",Callback=function()
-    if testMsg=="" then WindUI:Notify({Title="❌",Content="Pesan kosong!",Duration=3}) return end
-    showMsg("Test (You)", testMsg)
-end})
+-- WATERMARK
+local WM=Instance.new("TextLabel",Gui) WM.Size=UDim2.new(0,180,0,20) WM.Position=UDim2.new(0,12,1,-28)
+WM.BackgroundTransparency=1 WM.Text="Script By AdminHub" WM.RichText=true
+WM.TextColor3=Color3.fromRGB(255,255,255) WM.TextTransparency=0.7
+WM.Font=Enum.Font.GothamMedium WM.TextSize=11 WM.TextXAlignment=Enum.TextXAlignment.Left
 
+-- OPEN BUTTON (kalau Main di-close)
+local OpenBtn=Instance.new("TextButton",Gui) OpenBtn.Size=UDim2.new(0,36,0,36) OpenBtn.Position=UDim2.new(0,12,0.5,-18)
+OpenBtn.BackgroundColor3=D3 OpenBtn.TextColor3=AC OpenBtn.Font=Enum.Font.GothamBold OpenBtn.TextSize=16
+OpenBtn.Text="⬡" OpenBtn.BorderSizePixel=0 OpenBtn.Visible=false mkC(OpenBtn,8) mkS(OpenBtn,AC,1)
+OpenBtn.MouseButton1Click:Connect(function() Main.Visible=true OpenBtn.Visible=false end)
+HClose.MouseButton1Click:Connect(function() Main.Visible=false OpenBtn.Visible=true end)
 
--- ══════════════════════════════════════════
---    INFECT TAB
--- ══════════════════════════════════════════
-TabInfect:Paragraph({
-    Title = "💉 Infect — Add Script to Loader",
-    Desc  = "Tambah script baru ke Loader. User yang execute Loader akan lihat script ini.",
-    Color = "Blue"
-})
-
--- Form state
-local iTitle,iDesc,iIcon,iScript,iPlace = "","","🎮","",""
-
-TabInfect:Input({Title="Script Title",    Placeholder="Nama script...",           Callback=function(v) iTitle=v end})
-TabInfect:Input({Title="Description",     Placeholder="Deskripsi singkat...",     Callback=function(v) iDesc=v end})
-TabInfect:Input({Title="Icon (emoji/url)",Placeholder="🎮 atau URL gambar...",    Callback=function(v) iIcon=v end})
-TabInfect:Input({Title="Script URL (raw)",Placeholder="https://raw.github...",   Callback=function(v) iScript=v end})
-TabInfect:Input({Title="Game Name",       Placeholder="Nama game di Loader...",   Callback=function(v) iPlace=v end})
-
-TabInfect:Button({Title="💉 Infect",Icon="syringe",Callback=function()
-    -- Validasi
-    if iTitle=="" then WindUI:Notify({Title="❌",Content="Title wajib diisi!",Duration=3}) return end
-    if iScript=="" then WindUI:Notify({Title="❌",Content="Script URL wajib diisi!",Duration=3}) return end
-    if iPlace=="" then WindUI:Notify({Title="❌",Content="Game Name wajib diisi!",Duration=3}) return end
-    if iIcon==""  then iIcon="🎮" end
-    if iDesc==""  then iDesc="No description." end
-
-    WindUI:Notify({Title="⏳ Infecting...",Content="Menambahkan script ke Loader...",Duration=3})
-
-    task.spawn(function()
-        -- Baca scripts_db.json dari GitHub
-        local db = ghGet("scripts_db.json")
-        if not db or type(db)~="table" then db = {} end
-
-        -- Cari apakah game sudah ada
-        local gameEntry = nil
-        for _,g in ipairs(db) do
-            if g.game == iPlace then gameEntry=g break end
-        end
-
-        -- Kalau belum ada, buat baru
-        if not gameEntry then
-            gameEntry = { game=iPlace, icon=iIcon, scripts={} }
-            table.insert(db, gameEntry)
-        end
-
-        -- Cek duplikat script
-        for _,s in ipairs(gameEntry.scripts) do
-            if s.name==iTitle then
-                WindUI:Notify({Title="⚠️",Content="Script '"..iTitle.."' sudah ada di game ini!",Duration=4})
-                return
-            end
-        end
-
-        -- Tambah script baru
-        table.insert(gameEntry.scripts, {
-            name = iTitle,
-            desc = iDesc,
-            icon = iIcon,
-            url  = iScript
-        })
-
-        -- Upload ke GitHub
-        local ok, err = ghWrite("scripts_db.json", db)
-        if ok then
-            WindUI:Notify({
-                Title   = "✅ Infected!",
-                Content = '"'..iTitle..'" berhasil ditambahkan ke Loader!
-Game: '..iPlace,
-                Duration = 5
-            })
-            -- Reset form
-            iTitle="" iDesc="" iIcon="🎮" iScript="" iPlace=""
-        else
-            WindUI:Notify({Title="❌ Gagal",Content="Gagal upload: "..tostring(err),Duration=5})
-        end
-    end)
-end})
-
-TabInfect:Button({Title="🗑️ Remove Script from Loader",Icon="trash-2",Callback=function()
-    if iTitle=="" or iPlace=="" then
-        WindUI:Notify({Title="⚠️",Content="Isi Title dan Game Name dulu!",Duration=3}) return
-    end
-    task.spawn(function()
-        local db = ghGet("scripts_db.json") or {}
-        local removed = false
-        for _,g in ipairs(db) do
-            if g.game==iPlace then
-                for i=#g.scripts,1,-1 do
-                    if g.scripts[i].name==iTitle then
-                        table.remove(g.scripts,i)
-                        removed=true break
-                    end
-                end
-            end
-        end
-        if removed then
-            ghWrite("scripts_db.json",db)
-            WindUI:Notify({Title="✅",Content='"'..iTitle..'" dihapus dari Loader!',Duration=4})
-        else
-            WindUI:Notify({Title="❌",Content="Script tidak ditemukan!",Duration=4})
-        end
-    end)
-end})
-
-TabInfect:Button({Title="📋 List Scripts in Loader",Icon="list",Callback=function()
-    task.spawn(function()
-        local db = ghGet("scripts_db.json") or {}
-        if #db==0 then
-            WindUI:Notify({Title="📋",Content="Belum ada script di Loader.",Duration=4}) return
-        end
-        local lines={}
-        for _,g in ipairs(db) do
-            table.insert(lines, g.icon.." "..g.game.." ("..#g.scripts.." scripts)")
-            for _,s in ipairs(g.scripts) do
-                table.insert(lines, "  › "..s.name)
-            end
-        end
-        WindUI:Notify({Title="📋 Loader Scripts",Content=table.concat(lines,"
-"),Duration=10})
-    end)
-end})
-
--- ══════════════════════════════════════════
---    SETTINGS TAB
--- ══════════════════════════════════════════
-TabSettings:Paragraph({Title="⚙️ Config",Desc="PAT dan repo config tersimpan di DeltaWorkspace/AdminHub/assets/config.json",Color="Blue"})
-
-local cfgPAT,cfgOwner,cfgRepo,cfgBranch,cfgPath=GH_PAT,GH_OWNER,GH_REPO,GH_BRANCH,GH_PATH
-TabSettings:Input({Title="GitHub PAT",Placeholder="ghp_...",Callback=function(v) cfgPAT=v end})
-TabSettings:Input({Title="Repo Owner",Placeholder=GH_OWNER,Callback=function(v) cfgOwner=v end})
-TabSettings:Input({Title="Repo Name",Placeholder=GH_REPO,Callback=function(v) cfgRepo=v end})
-TabSettings:Input({Title="Branch",Placeholder=GH_BRANCH,Callback=function(v) cfgBranch=v end})
-TabSettings:Input({Title="Path",Placeholder=GH_PATH,Callback=function(v) cfgPath=v end})
-TabSettings:Button({Title="💾 Save Config",Icon="save",Callback=function()
-    local cfg={PAT=cfgPAT,Owner=cfgOwner,Repo=cfgRepo,Branch=cfgBranch,Path=cfgPath}
-    writefile(CFG_JSON, HttpService:JSONEncode(cfg))
-    WindUI:Notify({Title="✅ Saved!",Content="Config tersimpan! Re-execute script untuk apply.",Duration=4})
-end})
-
--- ══════════════════════════════════════════
---    START BACKGROUND TASKS
--- ══════════════════════════════════════════
+-- START
+showPage(PageControls,BtnControls)
 task.spawn(function()
-    if GH_PAT~="" then
-        preloadSignals()
-        registerOnline()
-        task.spawn(heartbeat)
-        task.spawn(pollSignals)
-        WindUI:Notify({Title="✅ AdminHub Ready",Content="Terhubung ke GitHub. Signal polling aktif.",Duration=4})
-    else
-        WindUI:Notify({Title="⚠️ Config",Content="PAT belum diset!\nPergi ke tab Settings dan isi PAT.",Duration=6})
-    end
+    preload()
+    registerOnline()
+    task.spawn(heartbeat)
+    task.spawn(poll)
+    Notify("✅ AdminHub Ready","Signal polling aktif. JSONBin terhubung.",4)
 end)
