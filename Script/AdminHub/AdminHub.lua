@@ -19,14 +19,35 @@ local httpRequest = (syn and syn.request) or (http and http.request)
     or function(o) return {Body=game:HttpGet(o.Url), StatusCode=200} end
 
 -- ══════════════════════════════════════════
---    FOLDER SETUP
+--    FOLDER SETUP (auto-detect executor root)
 -- ══════════════════════════════════════════
-local ROOT   = "Delta/Workspace"
-local FOLDER = ROOT.."AdminHub"
-local ASSETS = ROOT.."AdminHub/assets"
-local SCRIPTS_FOLDER = ROOT.."AdminHub/Script"
-local CFG_JSON = ASSETS.."/config.json"
+local POSSIBLE_ROOTS = {
+    "",
+    "Delta/Workspace/",
+    "workspace/",
+    "scripts/",
+    "autoexec/",
+    "Synapse/",
+    "KRNL/",
+    "Delta/",
+    "Fluxus/",
+    "Arceus/",
+    "Hydrogen/",
+}
+local ROOT = ""
+for _, r in ipairs(POSSIBLE_ROOTS) do
+    pcall(function()
+        if r ~= "" and isfolder(r.."AdminHub") then ROOT = r end
+    end)
+    if ROOT ~= "" then break end
+end
 
+local FOLDER         = ROOT.."Control_Hub"
+local ASSETS         = ROOT.."Control_Hub/assets"
+local SCRIPTS_FOLDER = ROOT.."Control_Hub/scripts"
+local CFG_JSON       = ASSETS.."/config.json"
+
+-- Buat folder kalau belum ada
 for _, f in ipairs({FOLDER, ASSETS, SCRIPTS_FOLDER}) do
     if not isfolder(f) then pcall(makefolder, f) end
 end
@@ -38,7 +59,7 @@ local GH_PAT    = ""
 local GH_OWNER  = "HaZcK"
 local GH_REPO   = "ScriptHub"
 local GH_BRANCH = "main"
-local GH_PATH   = "AdminHub"
+local GH_PATH   = "Script/AdminHub"
 local GH_RAW = "https://raw.githubusercontent.com/"..GH_OWNER.."/"..GH_REPO.."/refs/heads/"..GH_BRANCH.."/"..GH_PATH.."/"
 local GH_API = "https://api.github.com/repos/"..GH_OWNER.."/"..GH_REPO.."/contents/"..GH_PATH.."/"
 
@@ -340,7 +361,7 @@ local Window = WindUI:CreateWindow({
     Title  = "AdminHub",
     Icon   = "box",
     Author = "Khafidz",
-    Folder = FOLDER,
+    Folder = "Control_Hub",
 })
 
 Window:Tag({Title="1.0", Icon="terminal", Color=Color3.fromHex("#87CEEB"), Radius=0.5})
@@ -499,7 +520,7 @@ TabInject:Button({Title="Open Injector",Icon="shield-alert",Callback=function()
 end})
 
 -- Daftar script yang sudah ada di folder lokal
-TabInject:Paragraph({Title="📁 Scripts Lokal",Desc="Script yang tersimpan di DeltaWorkspace/AdminHub/scripts/",Color="Blue"})
+TabInject:Paragraph({Title="📁 Scripts Lokal",Desc="Script yang tersimpan di Delta/Workspace/Control_Hub/scripts/",Color="Blue"})
 
 local scriptFiles = {}
 pcall(function()
