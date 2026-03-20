@@ -36,8 +36,8 @@ end
 -- ══════════════════════════════════════════
 --    JSONBIN CONFIG (sama dengan Loader.lua)
 -- ══════════════════════════════════════════
-local BIN_ID     = "YOUR_BIN_ID_HERE"
-local ACCESS_KEY = "YOUR_ACCESS_KEY_HERE"
+local BIN_ID     = "69bcf4b3c3097a1dd540e510"
+local ACCESS_KEY = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
 local JSONBIN_URL= "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
