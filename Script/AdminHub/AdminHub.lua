@@ -2,7 +2,7 @@
 -- ║           AdminHub - Maincore            ║
 -- ║         Author: Khafidz (KHAFIDZKTP)    ║
 -- ╚══════════════════════════════════════════╝
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/AdminHub/AdminHub.lua"))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/AdminHub/AdminHub.lua"))()
 
 local Players      = game:GetService("Players")
 local HttpService  = game:GetService("HttpService")
