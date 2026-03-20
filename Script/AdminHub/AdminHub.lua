@@ -121,7 +121,7 @@ NG.Name="AHNotif" NG.ResetOnSpawn=false NG.DisplayOrder=120
 NG.IgnoreGuiInset=false
 
 local NL=Instance.new("Frame",NG)
-NL.Size=UDim2.new(0,240,0,400) NL.Position=UDim2.new(1,-248,0,8)
+NL.Size=UDim2.new(0,220,0,300) NL.Position=UDim2.new(1,-228,0,8) -- Kanan atas, max 300px tinggi
 NL.BackgroundTransparency=1 NL.BorderSizePixel=0
 -- PENTING: Active=false supaya tidak block touch
 NL.Active=false NL.Selectable=false
@@ -193,16 +193,18 @@ AG.IgnoreGuiInset=false
 
 -- Toggle button kecil
 local TB=Instance.new("TextButton",AG)
-TB.Size=UDim2.new(0,44,0,44) TB.Position=UDim2.new(0,8,0,8)
+TB.Size=UDim2.new(0,44,0,44) TB.Position=UDim2.new(1,-52,0,8) -- KANAN atas
 TB.BackgroundColor3=Color3.fromRGB(18,22,44) TB.TextColor3=Color3.fromHex("#87CEEB")
 TB.Font=Enum.Font.GothamBold TB.TextSize=20 TB.Text="⬡" TB.BorderSizePixel=0
 do Instance.new("UICorner",TB).CornerRadius=UDim.new(0,10) end
 do local s=Instance.new("UIStroke",TB) s.Color=Color3.fromHex("#87CEEB") s.Thickness=1 end
 
--- Panel utama - KECIL dan di pojok, tidak block joystick
+-- Panel utama - di KANAN atas, tidak overlap joystick kiri bawah
 local Panel=Instance.new("Frame",AG)
-Panel.Size=UDim2.new(0,320,0,480)
-Panel.Position=UDim2.new(0,8,0,60) -- Di kiri atas, bawah toggle button
+local sw=workspace.CurrentCamera.ViewportSize.X
+local sh=workspace.CurrentCamera.ViewportSize.Y
+Panel.Size=UDim2.new(0,math.min(sw-20,340),0,math.min(sh-220,420))
+Panel.Position=UDim2.new(1,-math.min(sw-20,340)-8,0,60) -- KANAN atas, bawah toggle button
 Panel.BackgroundColor3=Color3.fromRGB(10,12,22) Panel.BorderSizePixel=0
 Panel.Visible=false
 do Instance.new("UICorner",Panel).CornerRadius=UDim.new(0,14) end
