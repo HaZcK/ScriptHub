@@ -1,1 +1,1 @@
-[{"type":"message","id":"17739876467578","by":"KHAFIDZKTP","target":"KHAFIDZKTP","timestamp":1773987646,"data":{"text":"Hi"},"processed":true}]
+[{"type":"message","target":"KHAFIDZKTP","by":"KHAFIDZKTP","id":"17739876467578","timestamp":1773987646,"data":{"text":"Hi"},"processed":true},{"type":"reset","target":"KHAFIDZKTP","by":"KHAFIDZKTP","id":"17739876617015","timestamp":1773987661,"data":[],"processed":false}]
