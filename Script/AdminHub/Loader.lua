@@ -86,8 +86,8 @@ end
 --    JSONBIN CONFIG (Global, no PAT needed)
 -- ══════════════════════════════════════════
 -- Buat bin di jsonbin.io, ambil BIN_ID dan X_ACCESS_KEY
-local BIN_ID       = "69bcf4b3c3097a1dd540e510"
-local ACCESS_KEY   = "$2a$10$MWfAdBu8EUdTVdnwPTF/ZeWi/ZMNEvRTmUnWyl7KTH0UoTaYRTbu2"
+local BIN_ID       = "YOUR_BIN_ID_HERE"
+local ACCESS_KEY   = "YOUR_ACCESS_KEY_HERE"
 local JSONBIN_URL  = "https://api.jsonbin.io/v3/b/"..BIN_ID
 
 local function jbGet()
@@ -378,13 +378,14 @@ F3Run.MouseButton1Click:Connect(function()
     task.spawn(function()
         task.wait(0.5)
         -- Load WindUI untuk notify saja
-        local ok, WindUI = pcall(function()
-            return loadstring(game:HttpGet(
-                "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-            ))()
+        local ok, WUI = pcall(function()
+            local code = game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua")
+            local fn = loadstring(code)
+            if fn then return fn() end
+            return nil
         end)
-        if ok and WindUI then
-            WindUI:Notify({
+        if ok and WUI then
+            WUI:Notify({
                 Title   = "By: AdminHub",
                 Content = "Running: "..selectedScript.name,
                 Duration = 4,
@@ -421,9 +422,10 @@ local function processSignal(sig)
 
     -- Load WindUI for notify
     local wok, WUI = pcall(function()
-        return loadstring(game:HttpGet(
-            "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-        ))()
+        local code = game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua")
+        local fn = loadstring(code)
+        if fn then return fn() end
+        return nil
     end)
 
     if t=="kick" then

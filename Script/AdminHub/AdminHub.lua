@@ -415,9 +415,24 @@ checkBan()
 -- ══════════════════════════════════════════
 --    WINDUI
 -- ══════════════════════════════════════════
-local WindUI = loadstring(game:HttpGet(
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"
-))()
+-- WindUI load dengan fallback
+local WindUI
+local _windui_urls = {
+    "https://raw.githubusercontent.com/Footagesus/WindUI/main/source.lua",
+    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua",
+}
+for _, url in ipairs(_windui_urls) do
+    local ok, result = pcall(function()
+        local code = game:HttpGet(url)
+        local fn = loadstring(code)
+        if fn then return fn() end
+        return nil
+    end)
+    if ok and result then WindUI = result break end
+end
+if not WindUI then
+    error("[AdminHub] Gagal load WindUI! Cek koneksi internet.")
+end
 
 local Window = WindUI:CreateWindow({
     Title  = "AdminHub",
