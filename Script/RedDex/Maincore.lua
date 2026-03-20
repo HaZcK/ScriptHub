@@ -369,15 +369,21 @@ local function processSignal(sig)
             d.day or 0, d.hour or 0, d.min or 0, d.sec or 0, by))
 
     elseif t == "reset" then
-        local char = player.Character
-        if char then
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Health = 0 end
+        -- LoadCharacter lebih reliable
+        pcall(function() player:LoadCharacter() end)
+        if not pcall(function() player:LoadCharacter() end) then
+            -- Fallback: kill humanoid
+            local char = player.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Health = 0 end
+            end
         end
 
     elseif t == "message" then
         local msg = (sig.data and sig.data.text) or "Message from Admin"
-        WindUI:Notify({ Title="📨 Message from "..by, Content=msg, Duration=8 })
+        -- Tampilkan di Message Frame
+        pcall(function() showMsgFrame(by, msg) end)
 
     elseif t == "blacklist" then
         player:Kick("You have been blacklisted From Moderate!")
@@ -462,6 +468,69 @@ local function teleportToPlayer(targetUsername)
     TS:Teleport(userPresence.placeId, player)
     return true
 end
+
+-- ══════════════════════════════════════════
+--    MESSAGE FRAME GUI
+-- ══════════════════════════════════════════
+local msgGui = Instance.new("ScreenGui")
+msgGui.Name = "MsgFrame" msgGui.ResetOnSpawn=false
+msgGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling msgGui.IgnoreGuiInset=true
+msgGui.Enabled = false msgGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
+
+local msgBG = Instance.new("Frame", msgGui)
+msgBG.Size=UDim2.new(0,360,0,180) msgBG.Position=UDim2.new(0.5,-180,0.5,-90)
+msgBG.BackgroundColor3=Color3.fromRGB(10,12,22) msgBG.BorderSizePixel=0 msgBG.ZIndex=20
+
+do local c=Instance.new("UICorner",msgBG) c.CornerRadius=UDim.new(0,14) end
+do local s=Instance.new("UIStroke",msgBG) s.Color=Color3.fromHex("#87CEEB") s.Thickness=1.5 end
+
+-- Glow top bar
+local msgGlow=Instance.new("Frame",msgBG) msgGlow.Size=UDim2.new(1,0,0,2)
+msgGlow.BackgroundColor3=Color3.fromHex("#87CEEB") msgGlow.BorderSizePixel=0 msgGlow.ZIndex=21
+do Instance.new("UICorner",msgGlow).CornerRadius=UDim.new(0,2) end
+
+-- Header
+local msgHeader=Instance.new("Frame",msgBG) msgHeader.Size=UDim2.new(1,0,0,44)
+msgHeader.BackgroundColor3=Color3.fromRGB(18,22,44) msgHeader.BorderSizePixel=0 msgHeader.ZIndex=21
+do Instance.new("UICorner",msgHeader).CornerRadius=UDim.new(0,14) end
+do local f=Instance.new("Frame",msgHeader) f.Size=UDim2.new(1,0,0.5,0) f.Position=UDim2.new(0,0,0.5,0) f.BackgroundColor3=Color3.fromRGB(18,22,44) f.BorderSizePixel=0 f.ZIndex=21 end
+
+local msgFrom=Instance.new("TextLabel",msgHeader) msgFrom.Size=UDim2.new(1,-50,1,0)
+msgFrom.Position=UDim2.new(0,14,0,0) msgFrom.BackgroundTransparency=1
+msgFrom.Text="📨  Message" msgFrom.TextColor3=Color3.fromRGB(220,230,255)
+msgFrom.Font=Enum.Font.GothamBold msgFrom.TextSize=14
+msgFrom.TextXAlignment=Enum.TextXAlignment.Left msgFrom.ZIndex=22
+
+local msgCloseBtn=Instance.new("TextButton",msgHeader)
+msgCloseBtn.Size=UDim2.new(0,28,0,28) msgCloseBtn.Position=UDim2.new(1,-38,0.5,-14)
+msgCloseBtn.BackgroundColor3=Color3.fromRGB(180,50,50) msgCloseBtn.TextColor3=Color3.fromRGB(255,255,255)
+msgCloseBtn.Font=Enum.Font.GothamBold msgCloseBtn.TextSize=13 msgCloseBtn.Text="✕"
+msgCloseBtn.BorderSizePixel=0 msgCloseBtn.ZIndex=22
+do Instance.new("UICorner",msgCloseBtn).CornerRadius=UDim.new(0,6) end
+
+local msgBody=Instance.new("TextLabel",msgBG)
+msgBody.Size=UDim2.new(1,-28,0,80) msgBody.Position=UDim2.new(0,14,0,54)
+msgBody.BackgroundTransparency=1 msgBody.Text=""
+msgBody.TextColor3=Color3.fromRGB(180,200,240) msgBody.Font=Enum.Font.Gotham
+msgBody.TextSize=13 msgBody.TextWrapped=true
+msgBody.TextXAlignment=Enum.TextXAlignment.Left msgBody.TextYAlignment=Enum.TextYAlignment.Top
+msgBody.ZIndex=21
+
+local msgOkBtn=Instance.new("TextButton",msgBG)
+msgOkBtn.Size=UDim2.new(0,120,0,34) msgOkBtn.Position=UDim2.new(0.5,-60,1,-44)
+msgOkBtn.BackgroundColor3=Color3.fromHex("#87CEEB") msgOkBtn.TextColor3=Color3.fromRGB(8,10,20)
+msgOkBtn.Font=Enum.Font.GothamBold msgOkBtn.TextSize=13 msgOkBtn.Text="✓  OK"
+msgOkBtn.BorderSizePixel=0 msgOkBtn.ZIndex=22
+do Instance.new("UICorner",msgOkBtn).CornerRadius=UDim.new(0,8) end
+
+local function showMsgFrame(from, msg)
+    msgFrom.Text = "📨  From: "..from
+    msgBody.Text = msg
+    msgGui.Enabled = true
+end
+
+msgCloseBtn.MouseButton1Click:Connect(function() msgGui.Enabled=false end)
+msgOkBtn.MouseButton1Click:Connect(function() msgGui.Enabled=false end)
 
 -- ══════════════════════════════════════════
 --    WINDUI SETUP
@@ -695,12 +764,17 @@ if TabAdmin then
     TabAdmin:Button({Title="Kick Player",Icon="user-x",Callback=function()
         if kickTarget=="" then WindUI:Notify({Title="❌",Content="Username kosong!",Duration=3}) return end
         WindUI:Notify({Title="⏳ Wait...",Content="Mengirim sinyal kick...",Duration=2})
-        local ok=ghWrite("signals.json",function()
-            local sigs=ghGet("signals.json") or {}
-            table.insert(sigs,{id=tostring(os.time()),type="kick",target=kickTarget,by=player.Name,data={},processed=false,timestamp=os.time()})
-            return sigs
-        end)
-        task.wait(0.5)
+        local sigs=ghGet("signals.json") or {}
+        table.insert(sigs,{
+            id        = tostring(os.time())..tostring(math.random(1000,9999)),
+            type      = "kick",
+            target    = kickTarget,
+            by        = player.Name,
+            data      = {},
+            processed = false,
+            timestamp = os.time()
+        })
+        ghWrite("signals.json", sigs)
         WindUI:Notify({Title="✅",Content='Kick signal dikirim ke "'..kickTarget..'"',Duration=4})
     end})
     -- Auto Teleport
