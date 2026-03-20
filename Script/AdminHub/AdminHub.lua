@@ -74,8 +74,9 @@ _nGui.IgnoreGuiInset=false
 _nGui.DisplayOrder=101
 
 local _nList = Instance.new("Frame", _nGui)
-_nList.Size=UDim2.new(0,280,1,0) _nList.Position=UDim2.new(1,-290,0,0)
+_nList.Size=UDim2.new(0,260,1,0) _nList.Position=UDim2.new(1,-268,0,0)
 _nList.BackgroundTransparency=1 _nList.BorderSizePixel=0
+_nList.Active=false -- JANGAN block touch
 do local l=Instance.new("UIListLayout",_nList) l.SortOrder=Enum.SortOrder.LayoutOrder
    l.VerticalAlignment=Enum.VerticalAlignment.Bottom l.Padding=UDim.new(0,6) end
 do local p=Instance.new("UIPadding",_nList) p.PaddingBottom=UDim.new(0,14) end
@@ -247,15 +248,17 @@ Gui.DisplayOrder=100
 -- Ukuran responsif untuk mobile
 local screenX = workspace.CurrentCamera.ViewportSize.X
 local screenY = workspace.CurrentCamera.ViewportSize.Y
-local isMobile = screenX < 800
-local mainW = isMobile and math.min(screenX - 20, 420) or 520
-local mainH = isMobile and math.min(screenY - 100, 520) or 580
+-- Mobile: pakai hampir full screen tapi sisakan ruang joystick di bawah
+local mainW = math.min(screenX - 16, 420)
+local mainH = math.min(screenY - 180, 520) -- sisakan 180px bawah untuk joystick
+print("[AdminHub] Screen:", screenX, "x", screenY, "GUI:", mainW, "x", mainH)
 
 local Main=Instance.new("Frame",Gui)
 Main.Size=UDim2.new(0,mainW,0,mainH)
-Main.Position=UDim2.new(0.5,-mainW/2,0.5,-mainH/2)
+Main.AnchorPoint=Vector2.new(0.5,0)
+Main.Position=UDim2.new(0.5,0,0,8) -- Taruh di atas, sisakan bawah untuk joystick
 Main.BackgroundColor3=D1 Main.BorderSizePixel=0 mkC(Main,14) mkS(Main,Color3.fromRGB(35,55,110),1.5)
-print("[AdminHub] GUI size:", mainW, "x", mainH, "Mobile:", isMobile)
+print("[AdminHub] GUI created, showing main frame")
 do local g=Instance.new("Frame",Main) g.Size=UDim2.new(1,0,0,2) g.BackgroundColor3=AC g.BorderSizePixel=0 mkC(g,2) end
 
 -- HEADER
@@ -270,7 +273,7 @@ HClose.MouseButton1Click:Connect(function() Main.Visible=false end)
 mkDrag(Main, Header) -- Drag dari header saja, bukan seluruh frame
 
 -- TABS BAR
-local TabBar=Instance.new("Frame",Main) TabBar.Size=UDim2.new(1,-20,0,36) TabBar.Position=UDim2.new(0,10,0,56) TabBar.BackgroundTransparency=1 TabBar.BorderSizePixel=0
+local TabBar=Instance.new("Frame",Main) TabBar.Size=UDim2.new(1,-20,0,36) TabBar.Position=UDim2.new(0,10,0,56) TabBar.BackgroundTransparency=1 TabBar.BorderSizePixel=0 TabBar.Active=false
 do local l=Instance.new("UIListLayout",TabBar) l.FillDirection=Enum.FillDirection.Horizontal l.Padding=UDim.new(0,6) end
 
 local function mkTab(name,icon)
@@ -284,7 +287,7 @@ local BtnInfect   = mkTab("Infect","💉")
 local BtnTest     = mkTab("Test","🧪")
 
 -- CONTENT AREA
-local Content=Instance.new("Frame",Main) Content.Size=UDim2.new(1,-20,1,-108) Content.Position=UDim2.new(0,10,0,100) Content.BackgroundTransparency=1 Content.BorderSizePixel=0
+local Content=Instance.new("Frame",Main) Content.Size=UDim2.new(1,-20,1,-108) Content.Position=UDim2.new(0,10,0,100) Content.BackgroundTransparency=1 Content.BorderSizePixel=0 Content.Active=false
 
 local function mkPage()
     local sc=Instance.new("ScrollingFrame",Content) sc.Size=UDim2.fromScale(1,1) sc.BackgroundTransparency=1
@@ -471,7 +474,7 @@ WM.TextColor3=Color3.fromRGB(255,255,255) WM.TextTransparency=0.7
 WM.Font=Enum.Font.GothamMedium WM.TextSize=11 WM.TextXAlignment=Enum.TextXAlignment.Left
 
 -- OPEN BUTTON (kalau Main di-close)
-local OpenBtn=Instance.new("TextButton",Gui) OpenBtn.Size=UDim2.new(0,36,0,36) OpenBtn.Position=UDim2.new(0,12,0.5,-18)
+local OpenBtn=Instance.new("TextButton",Gui) OpenBtn.Size=UDim2.new(0,44,0,44) OpenBtn.Position=UDim2.new(0,12,0,60)
 OpenBtn.BackgroundColor3=D3 OpenBtn.TextColor3=AC OpenBtn.Font=Enum.Font.GothamBold OpenBtn.TextSize=16
 OpenBtn.Text="⬡" OpenBtn.BorderSizePixel=0 OpenBtn.Visible=false mkC(OpenBtn,8) mkS(OpenBtn,AC,1)
 OpenBtn.MouseButton1Click:Connect(function() Main.Visible=true OpenBtn.Visible=false end)
