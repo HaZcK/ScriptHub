@@ -1,8 +1,8 @@
 -- ╔══════════════════════════════════════════╗
--- ║           AdminHub - Maincore            ║
+-- ║           AdminHub - Khafidz            ║
 -- ║         Author: Khafidz (KHAFIDZKTP)    ║
 -- ╚══════════════════════════════════════════╝
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/AdminHub/Maincore.lua"))()
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/AdminHub/AdminHub.lua"))()
 
 local Players      = game:GetService("Players")
 local HttpService  = game:GetService("HttpService")
@@ -21,7 +21,7 @@ local httpRequest = (syn and syn.request) or (http and http.request)
 -- ══════════════════════════════════════════
 --    FOLDER SETUP
 -- ══════════════════════════════════════════
-local ROOT   = "DeltaWorkspace/"
+local ROOT   = "Delta/Workspace"
 local FOLDER = ROOT.."AdminHub"
 local ASSETS = ROOT.."AdminHub/assets"
 local SCRIPTS_FOLDER = ROOT.."AdminHub/scripts"
