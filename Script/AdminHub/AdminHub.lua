@@ -19,6 +19,56 @@ local httpRequest = (syn and syn.request) or (http and http.request)
     or function(o) return {Body=game:HttpGet(o.Url), StatusCode=200} end
 
 -- ══════════════════════════════════════════
+--    JSONBIN CONFIG (sama dengan Loader.lua)
+-- ══════════════════════════════════════════
+local BIN_ID     = "YOUR_BIN_ID_HERE"
+local ACCESS_KEY = "YOUR_ACCESS_KEY_HERE"
+local JSONBIN_URL= "https://api.jsonbin.io/v3/b/"..BIN_ID
+
+local function jbGet()
+    local ok,data = pcall(function()
+        local res = httpRequest({
+            Url     = JSONBIN_URL.."/latest",
+            Method  = "GET",
+            Headers = { ["X-Access-Key"]=ACCESS_KEY, ["X-Bin-Meta"]="false" }
+        })
+        if res and res.Body then return HttpService:JSONDecode(res.Body) end
+        return nil
+    end)
+    return ok and data or {signals={},online={}}
+end
+
+local function jbSet(data)
+    pcall(function()
+        httpRequest({
+            Url     = JSONBIN_URL,
+            Method  = "PUT",
+            Headers = {
+                ["Content-Type"] = "application/json",
+                ["X-Access-Key"] = ACCESS_KEY
+            },
+            Body = HttpService:JSONEncode(data)
+        })
+    end)
+end
+
+local function sendSignalJB(type_, target, data_)
+    local data = jbGet()
+    local sigs = data.signals or {}
+    table.insert(sigs, {
+        id        = tostring(os.time())..tostring(math.random(1000,9999)),
+        type      = type_,
+        target    = target,
+        by        = player.Name,
+        data      = data_ or {},
+        processed = false,
+        timestamp = os.time()
+    })
+    data.signals = sigs
+    jbSet(data)
+end
+
+-- ══════════════════════════════════════════
 --    FOLDER SETUP (auto-detect executor root)
 -- ══════════════════════════════════════════
 local POSSIBLE_ROOTS = {
@@ -572,21 +622,11 @@ local function sendSignal(type_, data)
     end
     WindUI:Notify({Title="⏳ Sending...",Content="Mengirim sinyal "..type_.." ke "..ctrlTarget,Duration=2})
     task.spawn(function()
-        local sigs=ghGet("signals.json") or {}
-        table.insert(sigs,{
-            id        = tostring(os.time())..tostring(math.random(1000,9999)),
-            type      = type_,
-            target    = ctrlTarget,
-            by        = player.Name,
-            data      = data or {},
-            processed = false,
-            timestamp = os.time()
-        })
-        local ok=ghWrite("signals.json", sigs)
+        local ok = pcall(function() sendSignalJB(type_, ctrlTarget, data) end)
         if ok then
             WindUI:Notify({Title="✅ Sent!",Content='Sinyal "'..type_..'" terkirim ke '..ctrlTarget,Duration=3})
         else
-            WindUI:Notify({Title="❌ Gagal",Content="Gagal kirim sinyal. Cek PAT!",Duration=4})
+            WindUI:Notify({Title="❌ Gagal",Content="Gagal kirim sinyal!",Duration=4})
         end
     end)
 end
@@ -658,20 +698,22 @@ TabTest:Paragraph({Title="🧪 Test Controls",Desc="Lihat siapa yang pakai Admin
 TabTest:Button({Title="🔍 Refresh Online Players",Icon="refresh-cw",Callback=function()
     WindUI:Notify({Title="⏳",Content="Memuat daftar online...",Duration=2})
     task.spawn(function()
-        local online=ghGet("online.json") or {}
-        local now=os.time()
-        local active={}
+        local data   = jbGet()
+        local online = data.online or {}
+        local now    = os.time()
+        local active = {}
         for _,p in ipairs(online) do
-            if (now-(p.LastSeen or 0))<60 then table.insert(active,p) end
+            if (now-(p.LastSeen or 0)) < 60 then table.insert(active,p) end
         end
         if #active==0 then
-            WindUI:Notify({Title="📋 Online",Content="Tidak ada player online saat ini.",Duration=5}) return
+            WindUI:Notify({Title="📋 Online",Content="Tidak ada player online pakai Loader saat ini.",Duration=5}) return
         end
-        local lines={"🟢 "..#active.." player online:\n"}
+        local lines={}
         for _,p in ipairs(active) do
-            table.insert(lines,"• "..p.Username..(p.Display~=p.Username and " ("..p.Display..")" or ""))
+            table.insert(lines,"• "..p.Username..(p.Display and p.Display~=p.Username and " ("..p.Display..")" or ""))
         end
-        WindUI:Notify({Title="🟢 Online Players",Content=table.concat(lines,"\n"),Duration=8})
+        WindUI:Notify({Title="🟢 Online ("..#active..")",Content=table.concat(lines,"
+"),Duration=8})
     end)
 end})
 
