@@ -419,36 +419,145 @@ checkBan()
 --    WINDUI
 -- ══════════════════════════════════════════
 -- Load WindUI dengan versi spesifik (anti-redirect)
-local WindUI
-local _wui_urls = {
-    "https://github.com/Footagesus/WindUI/releases/download/1.6.41/main.lua",
-    "https://github.com/Footagesus/WindUI/releases/latest/download/main.lua",
-    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/main.lua",
-}
-for _, url in ipairs(_wui_urls) do
-    local ok, result = pcall(function()
-        local code = game:HttpGet(url)
-        if #code < 1000 then error("too short") end
-        local fn, err = loadstring(code)
-        if not fn then error(err or "loadstring failed") end
-        return fn()
-    end)
-    if ok and result then
-        WindUI = result
-        break
-    end
-end
-if not WindUI then
-    error("[AdminHub] Gagal load WindUI!")
-end
-local Window = WindUI:CreateWindow({
-    Title  = "AdminHub",
-    Icon   = "box",
-    Author = "Khafidz",
-    Folder = "Control_Hub",
-})
+-- ══════════════════════════════════════════
+--    NOTIFY SYSTEM (tanpa WindUI, pure Roblox GUI)
+-- ══════════════════════════════════════════
+local _notifGui = Instance.new("ScreenGui")
+_notifGui.Name = "AdminHubNotif"
+_notifGui.ResetOnSpawn = false
+_notifGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+_notifGui.IgnoreGuiInset = true
+_notifGui.Parent = game:GetService("Players").LocalPlayer.PlayerGui
 
-Window:Tag({Title="1.0", Icon="terminal", Color=Color3.fromHex("#87CEEB"), Radius=0.5})
+local _notifList = Instance.new("Frame", _notifGui)
+_notifList.Size = UDim2.new(0, 280, 1, 0)
+_notifList.Position = UDim2.new(1, -290, 0, 0)
+_notifList.BackgroundTransparency = 1
+_notifList.BorderSizePixel = 0
+do
+    local l = Instance.new("UIListLayout", _notifList)
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.VerticalAlignment = Enum.VerticalAlignment.Bottom
+    l.Padding = UDim.new(0, 6)
+    local p = Instance.new("UIPadding", _notifList)
+    p.PaddingBottom = UDim.new(0, 12)
+    p.PaddingRight = UDim.new(0, 0)
+end
+
+local _notifCount = 0
+local function Notify(opts)
+    _notifCount = _notifCount + 1
+    local title    = opts.Title   or "AdminHub"
+    local content  = opts.Content or ""
+    local duration = opts.Duration or 4
+
+    local card = Instance.new("Frame", _notifList)
+    card.Size = UDim2.new(1, 0, 0, 0)
+    card.AutomaticSize = Enum.AutomaticSize.Y
+    card.BackgroundColor3 = Color3.fromRGB(12, 14, 26)
+    card.BorderSizePixel = 0
+    card.LayoutOrder = _notifCount
+    card.BackgroundTransparency = 1
+    do Instance.new("UICorner", card).CornerRadius = UDim.new(0, 10) end
+    do
+        local s = Instance.new("UIStroke", card)
+        s.Color = Color3.fromHex("#87CEEB")
+        s.Thickness = 1
+    end
+    do
+        local p = Instance.new("UIPadding", card)
+        p.PaddingLeft = UDim.new(0, 12)
+        p.PaddingRight = UDim.new(0, 12)
+        p.PaddingTop = UDim.new(0, 10)
+        p.PaddingBottom = UDim.new(0, 10)
+    end
+    do
+        local l = Instance.new("UIListLayout", card)
+        l.SortOrder = Enum.SortOrder.LayoutOrder
+        l.Padding = UDim.new(0, 4)
+    end
+
+    local titleLbl = Instance.new("TextLabel", card)
+    titleLbl.Size = UDim2.new(1, 0, 0, 18)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Text = title
+    titleLbl.TextColor3 = Color3.fromHex("#87CEEB")
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.TextSize = 13
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.LayoutOrder = 1
+
+    local bodyLbl = Instance.new("TextLabel", card)
+    bodyLbl.Size = UDim2.new(1, 0, 0, 0)
+    bodyLbl.AutomaticSize = Enum.AutomaticSize.Y
+    bodyLbl.BackgroundTransparency = 1
+    bodyLbl.Text = content
+    bodyLbl.TextColor3 = Color3.fromRGB(180, 200, 240)
+    bodyLbl.Font = Enum.Font.Gotham
+    bodyLbl.TextSize = 11
+    bodyLbl.TextWrapped = true
+    bodyLbl.TextXAlignment = Enum.TextXAlignment.Left
+    bodyLbl.LayoutOrder = 2
+
+    -- Animate in
+    game:GetService("TweenService"):Create(card, TweenInfo.new(0.3), {BackgroundTransparency = 0}):Play()
+
+    -- Auto remove
+    task.delay(duration, function()
+        game:GetService("TweenService"):Create(card, TweenInfo.new(0.3), {BackgroundTransparency = 1}):Play()
+        task.wait(0.35)
+        card:Destroy()
+    end)
+end
+
+-- WindUI stub
+local WindUI = { Notify = Notify }
+
+-- Load WindUI yang asli
+local _wuiOk, _wuiReal = pcall(function()
+    local code = game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua")
+    if #code > 1000 then
+        local fn = loadstring(code)
+        if fn then return fn() end
+    end
+    return nil
+end)
+if _wuiOk and _wuiReal then
+    WindUI = _wuiReal
+end
+
+local Window
+if WindUI.CreateWindow then
+    Window = WindUI:CreateWindow({
+        Title  = "AdminHub",
+        Icon   = "box",
+        Author = "Khafidz",
+        Folder = "Control_Hub",
+    })
+    pcall(function()
+        Window:Tag({Title="1.0", Icon="terminal", Color=Color3.fromHex("#87CEEB"), Radius=0.5})
+    end)
+else
+    -- Fallback window stub kalau WindUI gagal load
+    local function stubTab(opts)
+        local t = {}
+        local mt = {__index = function(_, k)
+            return function(self, o, cb)
+                if type(o)=="table" and o.Callback then
+                    -- store callback tapi tidak tampilkan UI
+                end
+                return {}
+            end
+        end}
+        setmetatable(t, mt)
+        return t
+    end
+    Window = {
+        Tag = function() end,
+        Tab = stubTab,
+    }
+    Notify({Title="⚠️ AdminHub", Content="WindUI gagal load. Fitur UI terbatas.", Duration=5})
+end
 
 local TabInject   = Window:Tab({Title="Injector",  Icon="shield-alert"       })
 local TabInfect   = Window:Tab({Title="Infect",    Icon="syringe"            })
