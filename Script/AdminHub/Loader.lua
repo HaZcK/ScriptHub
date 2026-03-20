@@ -77,7 +77,7 @@ local SCRIPT_DB = {
             {
                 name = "Auto Raid",
                 desc = "Auto complete raids for max rewards",
-                url  = "https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/BloxFruits/AutoRaid.lua"
+                url  = ""
             },
         }
     },
