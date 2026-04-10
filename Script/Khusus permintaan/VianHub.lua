@@ -1,24 +1,26 @@
-local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+local WindUI = loadstring(game:HttpGet(
+    "https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/init.lua"
+))()
 
 local Window = WindUI:CreateWindow({
     Title = "VianHub - Premium Menu",
     Icon = "rbxassetid://10723343321",
     Author = "Vian",
-    Folder = "VianHubConfigs",
-}),
+    Folder = "VianHubConfigs"
+})
 
 -- // KEY SYSTEM \\ --
-Window:KeySystem({
-    Key = {"vianhub"}, -- Key yang kamu minta
+WindUI:KeySystem({
+    Key = {"vianhub"},
     Note = "Masukkan Key: vianhub",
-    URL = "https://discord.gg/vianhub", -- Ganti dengan link kamu jika ada
+    URL = "https://discord.gg/vianhub",
     OnSuccess = function()
         WindUI:Notify({
             Title = "Access Granted",
             Content = "Welcome to VianHub!",
             Duration = 5
-        }),
-    end,
+        })
+    end
 })
 
 -- // TABS \\ --
@@ -30,16 +32,17 @@ local Player = game.Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local NoclipEnabled = false
 
--- // MAIN TAB: WALKSPEED & NOCLIP \\ --
+-- // MAIN TAB \\ --
 MainTab:AddSlider({
     Title = "Walk Speed",
     Desc = "Kecepatan lari (Maksimal 100)",
-    Min = 16, 
+    Min = 16,
     Max = 100,
     Default = 16,
     Callback = function(v)
-        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
-            Player.Character.Humanoid.WalkSpeed = v
+        local char = Player.Character
+        if char and char:FindFirstChild("Humanoid") then
+            char.Humanoid.WalkSpeed = v
         end
     end
 })
@@ -50,10 +53,18 @@ MainTab:AddToggle({
     Default = false,
     Callback = function(state)
         NoclipEnabled = state
+
+        -- Restore collision saat dimatikan
+        if not state and Player.Character then
+            for _, part in pairs(Player.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
     end
 })
 
--- Loop Noclip agar tetap aktif
 RunService.Stepped:Connect(function()
     if NoclipEnabled and Player.Character then
         for _, part in pairs(Player.Character:GetDescendants()) do
@@ -65,30 +76,58 @@ RunService.Stepped:Connect(function()
 end)
 
 -- // VISUAL TAB: ESP \\ --
+local function addESP(p)
+    if p == Player or not p.Character then return end
+    if p.Character:FindFirstChild("VianESP") then return end
+    local hl = Instance.new("Highlight")
+    hl.Name = "VianESP"
+    hl.FillColor = Color3.fromRGB(0, 255, 127)
+    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
+    hl.Parent = p.Character
+end
+
+local function removeESP(p)
+    if p.Character and p.Character:FindFirstChild("VianESP") then
+        p.Character.VianESP:Destroy()
+    end
+end
+
+local espPlayerAdded
+local espCharAdded = {}
+
 VisualTab:AddToggle({
     Title = "Player ESP",
     Desc = "Melihat pemain lain melalui tembok",
     Default = false,
     Callback = function(state)
         _G.ESPVisible = state
-        
+
         if state then
-            -- Memberikan Highlight ke semua player yang sudah ada
             for _, p in pairs(game.Players:GetPlayers()) do
-                if p ~= Player and p.Character then
-                    local hl = Instance.new("Highlight")
-                    hl.Name = "VianESP"
-                    hl.FillColor = Color3.fromRGB(0, 255, 127)
-                    hl.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    hl.Parent = p.Character
+                addESP(p)
+                -- Handle respawn
+                espCharAdded[p] = p.CharacterAdded:Connect(function()
+                    task.wait(0.1)
+                    if _G.ESPVisible then addESP(p) end
+                end)
+            end
+            espPlayerAdded = game.Players.PlayerAdded:Connect(function(p)
+                p.CharacterAdded:Connect(function()
+                    task.wait(0.1)
+                    if _G.ESPVisible then addESP(p) end
+                end)
+            end)
+        else
+            for _, p in pairs(game.Players:GetPlayers()) do
+                removeESP(p)
+                if espCharAdded[p] then
+                    espCharAdded[p]:Disconnect()
+                    espCharAdded[p] = nil
                 end
             end
-        else
-            -- Menghapus Highlight
-            for _, p in pairs(game.Players:GetPlayers()) do
-                if p.Character and p.Character:FindFirstChild("VianESP") then
-                    p.Character.VianESP:Destroy()
-                end
+            if espPlayerAdded then
+                espPlayerAdded:Disconnect()
+                espPlayerAdded = nil
             end
         end
     end
