@@ -1,5 +1,5 @@
 local WindUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/dist/init.lua"))()
-p
+
 local Window = WindUI:CreateWindow({
     Title = "VianHub - Premium Menu",
     Icon = "rbxassetid://10723343321",
