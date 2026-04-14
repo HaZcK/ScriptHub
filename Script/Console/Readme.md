@@ -1,5 +1,5 @@
 ## Script Here!
 
 ``` lua
-loadstring(game:HttpGet("https://github.com/AZYsGithub/DexPlusPlus/releases/latest/download/out.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/HaZcK/ScriptHub/refs/heads/main/Script/Console/ConsoleUsed.lua"))()
 ```
