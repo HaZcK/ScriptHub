@@ -37,4 +37,6 @@ local Tab1 = Window:CreateTab("PublicBot", "app-window")
 
 local Paragraph1 = Tab1:CreateParagraph({Title = "Coming Soon!", Content = "I need more knowledge to be able to create a chatbot that can interact with other people and can also auto walk and other people can run commands from this bot but it is still in the development stage."})
 
+local Tab2 = Window:CreateTab("PrivateBot", "
+
 Rayfield:LoadConfiguration()
