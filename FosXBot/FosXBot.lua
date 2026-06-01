@@ -41,24 +41,41 @@ local Tab2 = Window:CreateTab("PrivateBot", "eye-off")
 
 local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What do you want to ask?"})
 
+-- Variabel penampung teks jawaban AI asli (Solusi biar button copy jalan!)
+local lastAIResponse = ""
+
 local CopyButton = Tab2:CreateButton({
    Name = "Copy Massage From Bot",
    Callback = function()
-         -- Ambil isi teks yang sedang tampil di paragraf ReplyBot
-      local textToCopy = ReplyBot.CurrentContent or ReplyBot.Content or "..."
-      
-      -- Validasi jika teks masih bawaan kosong, jangan di-copy
-      if textToCopy ~= "..." and textToCopy ~= "" then
-          if setclipboard then
-              setclipboard(textToCopy)
-          elseif toclipboard then
-              toclipboard(textToCopy)
-          end
+         -- Validasi jika variabel penampung tidak kosong, langsung copy!
+      if lastAIResponse ~= "" and lastAIResponse ~= "..." then
+         if setclipboard then
+            setclipboard(lastAIResponse)
+         elseif toclipboard then
+            tclipboard(lastAIResponse)
          end
+         
+         Rayfield:Notify({
+            Title = "Clipboard",
+            Content = "Jawaban berhasil disalin!",
+            Duration = 2,
+            Image = "check-circle"
+         })
+      else
+         Rayfield:Notify({
+            Title = "Clipboard Error",
+            Content = "Belum ada jawaban yang bisa disalin!",
+            Duration = 2,
+            Image = "ban"
+         })
+      end
    end,
 })
 
 local SectionTabs2 = Tab2:CreateSection("Giving Answers")
+
+-- Variabel lokal untuk menyimpan waktu terakhir kirim (Anti-Spam)
+local lastInputTime = 0
 
 local UserAnswer = Tab2:CreateInput({
    Name = "Answer",
@@ -67,27 +84,89 @@ local UserAnswer = Tab2:CreateInput({
    RemoveTextAfterFocusLost = false,
    Flag = "UserAnswerToBot",
    Callback = function(Text)
-       -- Jalankan efek prank jika user memasukkan teks (tidak kosong)
-      if Text ~= "" then
-         -- Loop animasi titik-titik biar kelihatan meyakinkan
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking."})
-         task.wait(0.5)
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking.."})
-         task.wait(0.5)
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
-         task.wait(0.5)
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking."})
-         task.wait(0.4)
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking.."})
-         task.wait(0.4)
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
-         task.wait(0.4)
-         
-         -- Setelah total ~2.7 detik, tembak teks aslinya wkwk
-         ReplyBot:Set({
-            Title = "Reply From Bot",
-            Content = "System Bot Not connected yet, still in development stage."
+       if Text == "" then return end
+      
+      -- ========================================================
+      -- [ALUR 2]: JIKA TERLALU BANYAK ANSWER / TIDAK KASIH JEDA 1-2 DETIK
+      -- ========================================================
+      local currentTime = os.time()
+      if currentTime - lastInputTime < 2 then
+         -- SYSTEM BLOKIR: Tidak dikonversi ke JSON & tidak ke server
+         Rayfield:Notify({
+            Title = "Spam Detected",
+            Content = "Tunggu jeda 1-2 detik sebelum mengirim pesan lagi!",
+            Duration = 2,
+            Image = "ban"
          })
+         return
+      end
+      
+      -- Update waktu input terakhir jika lolos sensor jeda
+      lastInputTime = currentTime
+      
+      -- ========================================================
+      -- [ALUR 1]: JIKA NORMAL (Proses Konversi JSON & Kirim ke Server)
+      -- ========================================================
+      -- 1. Efek AI Thinking
+      ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+      
+      -- 2. Ambil Api Key dari Tab Config
+      local RawKey = Rayfield.Flags.ApiKeyFosX.CurrentValue or ""
+      local CleanedKey = string.gsub(RawKey, "%s+", "")
+      
+      local HttpService = game:GetService("HttpService")
+      local success, response = pcall(function()
+         return HttpService:RequestAsync({
+            Url = "https://api.groq.com/openai/v1/chat/completions",
+            Method = "POST",
+            Headers = {
+               ["Authorization"] = "Bearer " .. CleanedKey,
+               ["Content-Type"] = "application/json"
+            },
+            Body = HttpService:JSONEncode({
+               model = "llama3-8b-8192",
+               messages = {
+                  { role = "system", content = "You are FosX AI, a helpful Roblox assistant." },
+                  { role = "user", content = Text }
+               },
+               temperature = 0.7
+            })
+         })
+      end)
+      
+      -- 3. Membaca respon balik server
+      if success and response then
+         if response.StatusCode == 200 then
+            -- BERHASIL NORMAL: Server kirim JSON -> Decode -> Tampilkan hasil
+            local data = HttpService:JSONDecode(response.Body)
+            local aiAnswer = data.choices[1].message.content
+            
+            -- Simpan ke variabel penampung biar bisa dicopy tombol sebelah
+            lastAIResponse = aiAnswer
+            
+            -- Tampilkan hasilnya di teks paragraf
+            ReplyBot:Set({Title = "FosX AI Result", Content = aiAnswer})
+            
+         -- ========================================================
+         -- [ALUR 3]: JIKA API RATE MENCAPAI LIMIT (Error 429 / dll)
+         -- ========================================================
+         elseif response.StatusCode == 429 or response.StatusCode == 400 then
+            -- Server baca rate limit -> AI tidak kasih pesan apa-apa cuma ". . ."
+            lastAIResponse = "..."
+            ReplyBot:Set({Title = "Reply From Bot", Content = ". . ."})
+            
+            -- Munculkan Notif sistem
+            Rayfield:Notify({
+               Title = "Rate Limit Reached",
+               Content = "Server sibuk atau limit kuota API habis!",
+               Duration = 3,
+               Image = "ban"
+            })
+         end
+      else
+         -- Jika pcall gagal total (Request tidak terkirim/koneksi mati)
+         lastAIResponse = "..."
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Connection Error."})
       end
    end,
 })
