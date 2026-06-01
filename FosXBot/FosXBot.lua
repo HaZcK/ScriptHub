@@ -41,13 +41,6 @@ local Tab2 = Window:CreateTab("PrivateBot", "eye-off")
 
 local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What do you want to ask?"})
 
--- Variabel penampung teks jawaban AI asli (Solusi biar button copy jalan!)
-local lastAIResponse = ""
--- 2. Pengunci sistem (Biar gak dobel request pemicu rate limit palsu)
-local isProcessing = false
--- Variabel lokal untuk menyimpan waktu terakhir kirim (Anti-Spam)
-local lastInputTime = 0
-
 local CopyButton = Tab2:CreateButton({
    Name = "Copy Massage From Bot",
    Callback = function()
@@ -185,32 +178,18 @@ local ClearMemoryButton = Tab4:CreateButton({
 
 Rayfield:LoadConfiguration()
 
--- ========================================================
--- BACKEND ENGINE: TEXT = JSON = SERVER = JSON = TEXT = AI
--- ========================================================
-local MaxCoreSlots = 10
-local CoreMemories = {}
-for i = 1, MaxCoreSlots do CoreMemories[i] = "" end
-
-local SystemPrompt = "You are FosX AI. Extract and remember only critical user core details (name, preferences). Ignore small talk."
-local ChatHistory = {{ role = "system", content = SystemPrompt }}
-
-local function UpdateMemoryUI()
-    local displayText = ""
-    for i = 1, MaxCoreSlots do
-        if CoreMemories[i] ~= "" then
-            displayText = displayText .. i .. ". " .. CoreMemories[i] .. "\n"
-        else
-            displayText = displayText .. i .. ". \n"
-        end
-    end
-    displayText = displayText .. "And others..."
-    MemoryText:Set({Title = "AI Core Brain Logs (Max 10)", Content = displayText})
-end
+-- Tambahkan variabel ini di bagian paling atas backend engine lu (di luar fungsi)
+local isProcessing = false
+local lastInputTime = 0
+local lastAIResponse = ""
 
 -- MESIN UTAMA: Memproses request dari Input UI maupun Chat Game
 function ProcessAIRequest(userRawText)
-    ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+    -- Pastikan nama variabel Paragraph lu sesuai (ganti 'ReplyBot' jika nama variabel lu berbeda di atas)
+    if ReplyBot then
+        ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+    end
+    
     table.insert(ChatHistory, { role = "user", content = userRawText })
     
     local success, requestPayload = pcall(function()
@@ -224,7 +203,9 @@ function ProcessAIRequest(userRawText)
     
     local ApiKey = string.gsub(Rayfield.Flags.ApiKeyFosX.CurrentValue or "", "%s+", "")
     if ApiKey == "" or ApiKey == "gsk_*********" then 
-        ReplyBot:Set({Title = "Reply From Bot", Content = "API Key Missing!"})
+        if ReplyBot then
+            ReplyBot:Set({Title = "Reply From Bot", Content = "API Key Missing!"})
+        end
         isProcessing = false
         return 
     end
@@ -242,7 +223,7 @@ function ProcessAIRequest(userRawText)
             })
         end)
         
-        isProcessing = false -- Buka kembali kunci anti-spam setelah server merespon
+        isProcessing = false
         
         if responseSuccess and serverResponse and serverResponse.StatusCode == 200 then
             local decodeSuccess, decodedData = pcall(function()
@@ -250,10 +231,14 @@ function ProcessAIRequest(userRawText)
             end)
             if decodeSuccess and decodedData.choices then
                 local aiResponseText = decodedData.choices[1].message.content
-                lastAIResponse = aiResponseText -- Simpan biar tombol copy jalan!
+                lastAIResponse = aiResponseText
                 
                 table.insert(ChatHistory, { role = "assistant", content = aiResponseText })
-                ReplyBot:Set({Title = "Reply From Bot", Content = aiResponseText})
+                
+                -- DI SINI PERUBAHANNYA: Mengganti isi teks Paragraph utama menjadi jawaban asli dari AI
+                if ReplyBot then
+                    ReplyBot:Set({Title = "Reply From Bot", Content = aiResponseText})
+                end
                 
                 -- Sistem Filter Memori Otomatis
                 local patterns = {"my name is ([%w%s]+)", "nama saya ([%w%s]+)", "i like ([%w%s]+)", "aku suka ([%w%s]+)"}
@@ -278,17 +263,9 @@ function ProcessAIRequest(userRawText)
                 end
             end
         else
-            ReplyBot:Set({Title = "Reply From Bot", Content = "Server Limit / Error."})
+            if ReplyBot then
+                ReplyBot:Set({Title = "Reply From Bot", Content = "Server Limit / Error."})
+            end
         end
     end)
 end
-
--- Pemicu Cadangan: Lewat Private Chat Game (Metode BloxyAI)
-game:GetService("TextChatService").MessageReceived:Connect(function(textChatMessage)
-    local sender = textChatMessage.TextSource
-    if sender and sender.UserId == game.Players.LocalPlayer.UserId then
-        if textChatMessage.Metadata and string.find(textChatMessage.Metadata, "Whisper") then
-            ProcessAIRequest(textChatMessage.Text)
-        end
-    end
-end)
