@@ -87,7 +87,7 @@ local UserAnswer = Tab2:CreateInput({
    Callback = function(Text)
          if Text == "" then return end
       if isProcessing then return end
-      
+
       -- Anti-spam jeda input lokal (Biar gak crash)
       local currentTime = os.time()
       if currentTime - lastInputTime < 2 then
@@ -99,84 +99,12 @@ local UserAnswer = Tab2:CreateInput({
          })
          return
       end
-      
+
       isProcessing = true
       lastInputTime = currentTime
       
-      ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
-      
-      local RawKey = Rayfield.Flags.ApiKeyFosX.CurrentValue or ""
-      local CleanedKey = string.gsub(RawKey, "%s+", "")
-      
-      local HttpService = game:GetService("HttpService")
-      
-      -- ========================================================
-      -- 1. PROSES CHATTING: Text = Json = ai = server -> Tampilkan Jawaban
-      -- ========================================================
-      local success, response = pcall(function()
-         return HttpService:RequestAsync({
-            Url = "https://api.groq.com/openai/v1/chat/completions",
-            Method = "POST",
-            Headers = {
-               ["Authorization"] = "Bearer " .. CleanedKey,
-               ["Content-Type"] = "application/json"
-            },
-            Body = HttpService:JSONEncode({
-               model = "llama3-8b-8192",
-               messages = {
-                  { role = "system", content = "You are FosX AI, a helpful Roblox assistant." },
-                  { role = "user", content = Text }
-               },
-               temperature = 0.7
-            })
-         })
-      end)
-      
-      if success and response and response.StatusCode == 200 then
-         local data = HttpService:JSONDecode(response.Body)
-         local aiAnswer = data.choices[1].message.content
-         
-         lastAIResponse = aiAnswer
-         -- Server = Json = text = ai (Jawaban sukses nampil!)
-         ReplyBot:Set({Title = "FosX AI Result", Content = aiAnswer})
-         
-         -- ========================================================
-         -- 2. KONSEP LU: System = server -> Cek apakah setelah ini limit?
-         -- ========================================================
-         local checkSuccess, checkResponse = pcall(function()
-            return HttpService:RequestAsync({
-               Url = "https://api.groq.com/openai/v1/models", -- Sinyal ringan buat nanya status key
-               Method = "GET",
-               Headers = {
-                  ["Authorization"] = "Bearer " .. CleanedKey,
-                  ["Content-Type"] = "application/json"
-               }
-            })
-         end)
-         
-         -- Server = system = Json = text = notif
-         if checkSuccess and checkResponse and (checkResponse.StatusCode == 429 or checkResponse.StatusCode == 400) then
-            Rayfield:Notify({
-               Title = "Rate Limit Warning",
-               Content = "Peringatan: Penggunaan baru saja mencapai limit server! Jeda berikutnya mungkin akan melambat.",
-               Duration = 8, -- Durasi agak lama sesuai req lu
-               Image = "ban"
-            })
-         end
-         
-      else
-         -- Jika dari request chat awal emang udah eror/limit
-         lastAIResponse = "..."
-         ReplyBot:Set({Title = "Reply From Bot", Content = ". . ."})
-         Rayfield:Notify({
-            Title = "Server Error / Limit",
-            Content = "Gagal memproses pesan atau API Key limit.",
-            Duration = 5,
-            Image = "ban"
-         })
-      end
-      
-      isProcessing = false
+      -- Panggil fungsi mesin AI untuk memproses teks dari Input Box UI ini!
+      ProcessAIRequest(Text)
    end,
 })
 
@@ -256,3 +184,111 @@ local ClearMemoryButton = Tab4:CreateButton({
 })
 
 Rayfield:LoadConfiguration()
+
+-- ========================================================
+-- BACKEND ENGINE: TEXT = JSON = SERVER = JSON = TEXT = AI
+-- ========================================================
+local MaxCoreSlots = 10
+local CoreMemories = {}
+for i = 1, MaxCoreSlots do CoreMemories[i] = "" end
+
+local SystemPrompt = "You are FosX AI. Extract and remember only critical user core details (name, preferences). Ignore small talk."
+local ChatHistory = {{ role = "system", content = SystemPrompt }}
+
+local function UpdateMemoryUI()
+    local displayText = ""
+    for i = 1, MaxCoreSlots do
+        if CoreMemories[i] ~= "" then
+            displayText = displayText .. i .. ". " .. CoreMemories[i] .. "\n"
+        else
+            displayText = displayText .. i .. ". \n"
+        end
+    end
+    displayText = displayText .. "And others..."
+    MemoryText:Set({Title = "AI Core Brain Logs (Max 10)", Content = displayText})
+end
+
+-- MESIN UTAMA: Memproses request dari Input UI maupun Chat Game
+function ProcessAIRequest(userRawText)
+    ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+    table.insert(ChatHistory, { role = "user", content = userRawText })
+    
+    local success, requestPayload = pcall(function()
+        return game:GetService("HttpService"):JSONEncode({
+            model = "llama3-8b-8192",
+            messages = ChatHistory,
+            temperature = 0.5
+        })
+    end)
+    if not success then isProcessing = false return end
+    
+    local ApiKey = string.gsub(Rayfield.Flags.ApiKeyFosX.CurrentValue or "", "%s+", "")
+    if ApiKey == "" or ApiKey == "gsk_*********" then 
+        ReplyBot:Set({Title = "Reply From Bot", Content = "API Key Missing!"})
+        isProcessing = false
+        return 
+    end
+
+    task.spawn(function()
+        local responseSuccess, serverResponse = pcall(function()
+            return game:GetService("HttpService"):RequestAsync({
+                Url = "https://api.groq.com/openai/v1/chat/completions",
+                Method = "POST",
+                Headers = {
+                    ["Authorization"] = "Bearer " .. ApiKey,
+                    ["Content-Type"] = "application/json"
+                },
+                Body = requestPayload
+            })
+        end)
+        
+        isProcessing = false -- Buka kembali kunci anti-spam setelah server merespon
+        
+        if responseSuccess and serverResponse and serverResponse.StatusCode == 200 then
+            local decodeSuccess, decodedData = pcall(function()
+                return game:GetService("HttpService"):JSONDecode(serverResponse.Body)
+            end)
+            if decodeSuccess and decodedData.choices then
+                local aiResponseText = decodedData.choices[1].message.content
+                lastAIResponse = aiResponseText -- Simpan biar tombol copy jalan!
+                
+                table.insert(ChatHistory, { role = "assistant", content = aiResponseText })
+                ReplyBot:Set({Title = "Reply From Bot", Content = aiResponseText})
+                
+                -- Sistem Filter Memori Otomatis
+                local patterns = {"my name is ([%w%s]+)", "nama saya ([%w%s]+)", "i like ([%w%s]+)", "aku suka ([%w%s]+)"}
+                for _, pattern in ipairs(patterns) do
+                    local matchedInfo = string.match(userRawText:lower(), pattern)
+                    if matchedInfo then
+                        local alreadySaved = false
+                        for i = 1, MaxCoreSlots do
+                            if CoreMemories[i]:lower() == userRawText:lower() then alreadySaved = true break end
+                        end
+                        if not alreadySaved then
+                            for i = 1, MaxCoreSlots do
+                                if CoreMemories[i] == "" then
+                                    CoreMemories[i] = userRawText
+                                    UpdateMemoryUI()
+                                    break
+                                end
+                            end
+                        end
+                        break
+                    end
+                end
+            end
+        else
+            ReplyBot:Set({Title = "Reply From Bot", Content = "Server Limit / Error."})
+        end
+    end)
+end
+
+-- Pemicu Cadangan: Lewat Private Chat Game (Metode BloxyAI)
+game:GetService("TextChatService").MessageReceived:Connect(function(textChatMessage)
+    local sender = textChatMessage.TextSource
+    if sender and sender.UserId == game.Players.LocalPlayer.UserId then
+        if textChatMessage.Metadata and string.find(textChatMessage.Metadata, "Whisper") then
+            ProcessAIRequest(textChatMessage.Text)
+        end
+    end
+end)
