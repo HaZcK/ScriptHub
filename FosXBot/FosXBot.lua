@@ -1,3 +1,8 @@
+-- TARUH INI DI BARIS PALING ATAS SCRIPT LU (GLOBAL SEQUENCE)
+_G.isProcessing = false
+_G.lastInputTime = 0
+_G.lastAIResponse = ""
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -178,14 +183,8 @@ local ClearMemoryButton = Tab4:CreateButton({
 
 Rayfield:LoadConfiguration()
 
--- Tambahkan variabel ini di bagian paling atas backend engine lu (di luar fungsi)
-local isProcessing = false
-local lastInputTime = 0
-local lastAIResponse = ""
-
 -- MESIN UTAMA: Memproses request dari Input UI maupun Chat Game
 function ProcessAIRequest(userRawText)
-    -- Pastikan nama variabel Paragraph lu sesuai (ganti 'ReplyBot' jika nama variabel lu berbeda di atas)
     if ReplyBot then
         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
     end
@@ -199,14 +198,14 @@ function ProcessAIRequest(userRawText)
             temperature = 0.5
         })
     end)
-    if not success then isProcessing = false return end
+    if not success then _G.isProcessing = false return end
     
     local ApiKey = string.gsub(Rayfield.Flags.ApiKeyFosX.CurrentValue or "", "%s+", "")
     if ApiKey == "" or ApiKey == "gsk_*********" then 
         if ReplyBot then
             ReplyBot:Set({Title = "Reply From Bot", Content = "API Key Missing!"})
         end
-        isProcessing = false
+        _G.isProcessing = false
         return 
     end
 
@@ -223,7 +222,7 @@ function ProcessAIRequest(userRawText)
             })
         end)
         
-        isProcessing = false
+        _G.isProcessing = false
         
         if responseSuccess and serverResponse and serverResponse.StatusCode == 200 then
             local decodeSuccess, decodedData = pcall(function()
@@ -231,11 +230,10 @@ function ProcessAIRequest(userRawText)
             end)
             if decodeSuccess and decodedData.choices then
                 local aiResponseText = decodedData.choices[1].message.content
-                lastAIResponse = aiResponseText
+                _G.lastAIResponse = aiResponseText
                 
                 table.insert(ChatHistory, { role = "assistant", content = aiResponseText })
                 
-                -- DI SINI PERUBAHANNYA: Mengganti isi teks Paragraph utama menjadi jawaban asli dari AI
                 if ReplyBot then
                     ReplyBot:Set({Title = "Reply From Bot", Content = aiResponseText})
                 end
