@@ -98,7 +98,7 @@ local Info = Tab3:CreateParagraph({Title = "How get Api", Content = "1. Go to co
 
 local SectionApikey = Tab3:CreateSection("Api Configuration⚙️")
 
-local ServerSignal = Tab3:CreateLabel("Disconnected", "radio-off")
+local ServerSignal = Tab3:CreateLabel("Disconnected", "globe-off")
 
 local ApiKeyInput = Tab3:CreateInput({
    Name = "Api key",
@@ -138,7 +138,7 @@ local ApiKeyInput = Tab3:CreateInput({
       -- 3. Cek hasil komunikasi dari perintah server system
       if success and response and response.StatusCode == 200 then
          -- Perintah mengubah label & ikon jika SELESAI & BERHASIL
-         ServerSignal:Set("Connected", "radio")
+         ServerSignal:Set("Connected", "globe")
          
          Rayfield:Notify({
             Title = "System Connection",
@@ -148,7 +148,7 @@ local ApiKeyInput = Tab3:CreateInput({
          })
       else
          -- Jika gagal atau API Key salah, kembalikan ke disconnected
-         ServerSignal:Set("Disconnected", "radio-off")
+         ServerSignal:Set("Disconnected", "globe-off")
          
          Rayfield:Notify({
             Title = "Connection Failed",
