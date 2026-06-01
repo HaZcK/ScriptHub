@@ -37,7 +37,7 @@ local Tab1 = Window:CreateTab("PublicBot", "bot")
 
 local Paragraph1 = Tab1:CreateParagraph({Title = "Coming Soon!", Content = "I need more knowledge to be able to create a chatbot that can interact with other people and can also auto walk and other people can run commands from this bot but it is still in the development stage."})
 
-local Tab2 = Window:CreateTab("PrivateBot", "bot-message-square")
+local Tab2 = Window:CreateTab("PrivateBot", "hat-glasses")
 
 local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What do you want to ask?"})
 
@@ -89,6 +89,75 @@ local UserAnswer = Tab2:CreateInput({
             Content = "System Bot Not connected yet, still in development stage."
          })
       end
+   end,
+})
+
+local Tab3 = Window:CreateTab("Config", "cog")
+
+local Info = Tab3:CreateParagraph({Title = "How get Api", Content = "1. Go to console.groq.com\n2. Login with Google/GitHub\n3. Click 'API Keys' on left sidebar\n4. Click 'Create API Key'\n5. Name it and copy the gsk_... key\n6. Paste it below!"})
+
+local SectionApikey = Tab3:CreateSection("Api Configuration⚙️")
+
+local ServerSignal = Tab3:CreateLabel("Disconnected", "radio-off")
+
+local ApiKeyInput = Tab3:CreateInput({
+   Name = "Api key",
+   CurrentValue = "",
+   PlaceholderText = "gsk_*********",
+   RemoveTextAfterFocusLost = false,
+   Flag = "ApiKeyFosX",
+   Callback = function(Text)
+   -- Jangan jalanin sistem kalau teks kosong
+      if Text == "" then return end
+      
+      -- 1. Notifikasi awal: Memulai Real Loading ke Server
+      Rayfield:Notify({
+         Title = "System Connection",
+         Content = "Connecting to Groq Server... Please wait.",
+         Duration = 3,
+         Image = "refresh-cw",
+      })
+      
+      -- 2. Proses Real Loading: Kirim request tes singkat ke Groq
+      local HttpService = game:GetService("HttpService")
+      local success, response = pcall(function()
+         return request({
+            Url = "https://api.groq.com/openai/v1/chat/completions",
+            Method = "POST",
+            Headers = {
+               ["Content-Type"] = "application/json",
+               ["Authorization"] = "Bearer " .. Text
+            },
+            Body = HttpService:JSONEncode({
+               model = "llama3-8b-8192",
+               messages = {{role = "user", content = "ping"}}
+            })
+         })
+      end)
+      
+      -- 3. Cek hasil komunikasi dari perintah server system
+      if success and response and response.StatusCode == 200 then
+         -- Perintah mengubah label & ikon jika SELESAI & BERHASIL
+         ServerSignal:Set("Connected", "radio")
+         
+         Rayfield:Notify({
+            Title = "System Connection",
+            Content = "Success! Server connected and authenticated.",
+            Duration = 4,
+            Image = "check-circle",
+         })
+      else
+         -- Jika gagal atau API Key salah, kembalikan ke disconnected
+         ServerSignal:Set("Disconnected", "radio-off")
+         
+         Rayfield:Notify({
+            Title = "Connection Failed",
+            Content = "Invalid API Key or Server Error. Check your key!",
+            Duration = 4,
+            Image = "x-circle",
+         })
+      end
+   end,
    end,
 })
 
