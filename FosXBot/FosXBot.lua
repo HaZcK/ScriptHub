@@ -107,54 +107,46 @@ local ApiKeyInput = Tab3:CreateInput({
    RemoveTextAfterFocusLost = false,
    Flag = "ApiKeyFosX",
    Callback = function(Text)
-   -- Jangan jalanin sistem kalau teks kosong
-      if Text == "" then return end
+    -- Trik sakti: Bersihkan spasi gaib di depan/belakang otomatis
+      local CleanedKey = string.gsub(Text, "%s+", "")
       
-      -- 1. Notifikasi awal: Memulai Real Loading ke Server
-      Rayfield:Notify({
-         Title = "System Connection",
-         Content = "Connecting to Groq Server... Please wait.",
-         Duration = 3,
-         Image = "refresh-cw",
-      })
+      if CleanedKey == "" then 
+         ServerSignal:Set("Disconnected", "ban")
+         return 
+      end
       
-      -- 2. Proses Real Loading: Kirim request tes singkat ke Groq
+      -- Menjalankan Real Loading / Pengecekan ke Server Groq
       local HttpService = game:GetService("HttpService")
       local success, response = pcall(function()
-         return request({
-            Url = "https://api.groq.com/openai/v1/chat/completions",
-            Method = "POST",
+         return HttpService:RequestAsync({
+            Url = "https://api.groq.com/openai/v1/models", -- Cek model untuk tes validitas key
+            Method = "GET",
             Headers = {
-               ["Content-Type"] = "application/json",
-               ["Authorization"] = "Bearer " .. Text
-            },
-            Body = HttpService:JSONEncode({
-               model = "llama3-8b-8192",
-               messages = {{role = "user", content = "ping"}}
-            })
+               ["Authorization"] = "Bearer " .. CleanedKey,
+               ["Content-Type"] = "application/json"
+            }
          })
       end)
       
-      -- 3. Cek hasil komunikasi dari perintah server system
       if success and response and response.StatusCode == 200 then
-         -- Perintah mengubah label & ikon jika SELESAI & BERHASIL
+         -- SUCCESS: Berhasil terhubung, ganti jadi icon "globe"!
          ServerSignal:Set("Connected", "globe")
          
          Rayfield:Notify({
             Title = "System Connection",
             Content = "Success! Server connected and authenticated.",
             Duration = 4,
-            Image = "check-circle",
+            Image = "globe",
          })
       else
-         -- Jika gagal atau API Key salah, kembalikan ke disconnected
-         ServerSignal:Set("Disconnected", "ban")
+         -- FAILED: Key invalid atau server error, balikin ke icon "ban"!
+         ServerSignal:Set("Invalid API Key", "ban")
          
          Rayfield:Notify({
             Title = "Connection Failed",
-            Content = "Invalid API Key or Server Error. Check your key!",
+            Content = "Invalid API Key or Server Error.",
             Duration = 4,
-            Image = "x-circle",
+            Image = "ban",
          })
       end
    end,
