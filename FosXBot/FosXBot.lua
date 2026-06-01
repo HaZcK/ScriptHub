@@ -240,6 +240,19 @@ local ApiKeyInput = Tab3:CreateInput({
    end,
 })
 
-local Tab4 = Window:CreateTab("Memory", "database-search")
+local Tab4 = Window:CreateTab("Memory", "history")
+
+local InfoMemory = Tab4:CreateParagraph({Title = "Memory Management System", Content = "This section serves as the dedicated long-term memory configuration for FosX AI. It automatically syncs, tracks, and stores your local private chat history to maintain conversational context and deliver personalized responses. If you wish to wipe out all stored data, identity logs, and previous chat records, simply use the 'Clear all memory' function below to completely reset the AI's memory matrix back to factory defaults."})
+
+local Divider = Tab4:CreateDivider()
+
+local MemoryText = Tab4:CreateParagraph({Title = "Conversation History", Content = "1. No core memory stored.\n2. \n3. \n4. \n5. \n6. \n7. \n8. \n9. \n10. \nAnd others..."})
+
+local ClearMemoryButton = Tab4:CreateButton({
+   Name = "Clear All Memory",
+   Callback = function()
+   -- The function that takes place when the button is pressed
+   end,
+})
 
 Rayfield:LoadConfiguration()
