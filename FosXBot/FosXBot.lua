@@ -33,10 +33,63 @@ local Window = Rayfield:CreateWindow({
    }
 })
 
-local Tab1 = Window:CreateTab("PublicBot", "app-window")
+local Tab1 = Window:CreateTab("PublicBot", "bot-off")
 
 local Paragraph1 = Tab1:CreateParagraph({Title = "Coming Soon!", Content = "I need more knowledge to be able to create a chatbot that can interact with other people and can also auto walk and other people can run commands from this bot but it is still in the development stage."})
 
-local Tab2 = Window:CreateTab("PrivateBot", "
+local Tab2 = Window:CreateTab("PrivateBot", "bot-message-square")
+
+local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What do you want to ask?"})
+
+local CopyButton = Tab2:CreateButton({
+   Name = "Copy Massage From Bot",
+   Callback = function()
+         -- Ambil isi teks yang sedang tampil di paragraf ReplyBot
+      local textToCopy = ReplyBot.CurrentContent or ReplyBot.Content or "..."
+      
+      -- Validasi jika teks masih bawaan kosong, jangan di-copy
+      if textToCopy ~= "..." and textToCopy ~= "" then
+          if setclipboard then
+              setclipboard(textToCopy)
+          elseif toclipboard then
+              toclipboard(textToCopy)
+          end
+         end
+   end,
+})
+
+local SectionTabs2 = Tab2:CreateSection("Giving Answers")
+
+local UserAnswer = Tab2:CreateInput({
+   Name = "Answer",
+   CurrentValue = "",
+   PlaceholderText = "Give You answer..",
+   RemoveTextAfterFocusLost = false,
+   Flag = "UserAnswerToBot",
+   Callback = function(Text)
+       -- Jalankan efek prank jika user memasukkan teks (tidak kosong)
+      if Text ~= "" then
+         -- Loop animasi titik-titik biar kelihatan meyakinkan
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking."})
+         task.wait(0.5)
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking.."})
+         task.wait(0.5)
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+         task.wait(0.5)
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking."})
+         task.wait(0.4)
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking.."})
+         task.wait(0.4)
+         ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
+         task.wait(0.4)
+         
+         -- Setelah total ~2.7 detik, tembak teks aslinya wkwk
+         ReplyBot:Set({
+            Title = "Reply From Bot",
+            Content = "System Bot Not connected yet, still in development stage."
+         })
+      end
+   end,
+})
 
 Rayfield:LoadConfiguration()
