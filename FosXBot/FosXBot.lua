@@ -98,7 +98,7 @@ local Info = Tab3:CreateParagraph({Title = "How get Api", Content = "1. Go to co
 
 local SectionApikey = Tab3:CreateSection("Api Configuration⚙️")
 
-local ServerSignal = Tab3:CreateLabel("Disconnected", "globe-off")
+local ServerSignal = Tab3:CreateLabel("Disconnected", "ban")
 
 local ApiKeyInput = Tab3:CreateInput({
    Name = "Api key",
