@@ -43,6 +43,8 @@ local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What
 
 -- Variabel penampung teks jawaban AI asli (Solusi biar button copy jalan!)
 local lastAIResponse = ""
+-- 2. Pengunci sistem (Biar gak dobel request pemicu rate limit palsu)
+local isProcessing = false
 
 local CopyButton = Tab2:CreateButton({
    Name = "Copy Massage From Bot",
@@ -81,17 +83,19 @@ local UserAnswer = Tab2:CreateInput({
    Name = "Answer",
    CurrentValue = "",
    PlaceholderText = "Give You answer..",
-   RemoveTextAfterFocusLost = false,
+   RemoveTextAfterFocusLost = true,
    Flag = "UserAnswerToBot",
    Callback = function(Text)
-       if Text == "" then return end
+   if Text == "" then return end
+      
+      -- Jika sedang memproses request sebelumnya, langsung blokir!
+      if isProcessing then return end
       
       -- ========================================================
       -- [ALUR 2]: JIKA TERLALU BANYAK ANSWER / TIDAK KASIH JEDA 1-2 DETIK
       -- ========================================================
       local currentTime = os.time()
       if currentTime - lastInputTime < 2 then
-         -- SYSTEM BLOKIR: Tidak dikonversi ke JSON & tidak ke server
          Rayfield:Notify({
             Title = "Spam Detected",
             Content = "Tunggu jeda 1-2 detik sebelum mengirim pesan lagi!",
@@ -101,16 +105,15 @@ local UserAnswer = Tab2:CreateInput({
          return
       end
       
-      -- Update waktu input terakhir jika lolos sensor jeda
+      -- Aktifkan pengunci sistem & update waktu input terakhir
+      isProcessing = true
       lastInputTime = currentTime
       
       -- ========================================================
-      -- [ALUR 1]: JIKA NORMAL (Proses Konversi JSON & Kirim ke Server)
+      -- [ALUR 1]: JIKA NORMAL (Proses Kirim ke Server)
       -- ========================================================
-      -- 1. Efek AI Thinking
       ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
       
-      -- 2. Ambil Api Key dari Tab Config
       local RawKey = Rayfield.Flags.ApiKeyFosX.CurrentValue or ""
       local CleanedKey = string.gsub(RawKey, "%s+", "")
       
@@ -134,28 +137,22 @@ local UserAnswer = Tab2:CreateInput({
          })
       end)
       
-      -- 3. Membaca respon balik server
+      -- Membaca respon balik server
       if success and response then
          if response.StatusCode == 200 then
-            -- BERHASIL NORMAL: Server kirim JSON -> Decode -> Tampilkan hasil
             local data = HttpService:JSONDecode(response.Body)
             local aiAnswer = data.choices[1].message.content
             
-            -- Simpan ke variabel penampung biar bisa dicopy tombol sebelah
             lastAIResponse = aiAnswer
-            
-            -- Tampilkan hasilnya di teks paragraf
             ReplyBot:Set({Title = "FosX AI Result", Content = aiAnswer})
             
          -- ========================================================
          -- [ALUR 3]: JIKA API RATE MENCAPAI LIMIT (Error 429 / dll)
          -- ========================================================
          elseif response.StatusCode == 429 or response.StatusCode == 400 then
-            -- Server baca rate limit -> AI tidak kasih pesan apa-apa cuma ". . ."
             lastAIResponse = "..."
             ReplyBot:Set({Title = "Reply From Bot", Content = ". . ."})
             
-            -- Munculkan Notif sistem
             Rayfield:Notify({
                Title = "Rate Limit Reached",
                Content = "Server sibuk atau limit kuota API habis!",
@@ -164,10 +161,12 @@ local UserAnswer = Tab2:CreateInput({
             })
          end
       else
-         -- Jika pcall gagal total (Request tidak terkirim/koneksi mati)
          lastAIResponse = "..."
          ReplyBot:Set({Title = "Reply From Bot", Content = "Connection Error."})
       end
+      
+      -- Buka kembali pengunci setelah semua proses selesai
+      isProcessing = false
    end,
 })
 
