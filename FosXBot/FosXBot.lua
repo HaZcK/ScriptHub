@@ -158,7 +158,6 @@ local ApiKeyInput = Tab3:CreateInput({
          })
       end
    end,
-   end,
 })
 
 Rayfield:LoadConfiguration()
