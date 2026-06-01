@@ -148,7 +148,7 @@ local ApiKeyInput = Tab3:CreateInput({
          })
       else
          -- Jika gagal atau API Key salah, kembalikan ke disconnected
-         ServerSignal:Set("Disconnected", "globe-off")
+         ServerSignal:Set("Disconnected", "ban")
          
          Rayfield:Notify({
             Title = "Connection Failed",
