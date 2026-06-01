@@ -240,4 +240,6 @@ local ApiKeyInput = Tab3:CreateInput({
    end,
 })
 
+local Tab4 = Window:CreateTab("Memory", "database-search")
+
 Rayfield:LoadConfiguration()
