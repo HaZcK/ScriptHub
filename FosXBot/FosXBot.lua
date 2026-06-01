@@ -29,7 +29,7 @@ local Window = Rayfield:CreateWindow({
       FileName = "FosXKey_Only", -- It is recommended to use something unique, as other scripts using Rayfield may overwrite your key file
       SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
       GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"I Femboy", "Me Femboy", "You Femboy", "EZ"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
+      Key = {"I Femboy", "Me Femboy", "You Femboy", "EZZ"} -- List of keys that the system will accept, can be RAW file links (pastebin, github, etc.) or simple strings ("hello", "key22")
    }
 })
 
@@ -45,6 +45,8 @@ local ReplyBot = Tab2:CreateParagraph({Title = "Reply From Bot", Content = "What
 local lastAIResponse = ""
 -- 2. Pengunci sistem (Biar gak dobel request pemicu rate limit palsu)
 local isProcessing = false
+-- Variabel lokal untuk menyimpan waktu terakhir kirim (Anti-Spam)
+local lastInputTime = 0
 
 local CopyButton = Tab2:CreateButton({
    Name = "Copy Massage From Bot",
@@ -76,9 +78,6 @@ local CopyButton = Tab2:CreateButton({
 
 local SectionTabs2 = Tab2:CreateSection("Giving Answers")
 
--- Variabel lokal untuk menyimpan waktu terakhir kirim (Anti-Spam)
-local lastInputTime = 0
-
 local UserAnswer = Tab2:CreateInput({
    Name = "Answer",
    CurrentValue = "",
@@ -86,14 +85,10 @@ local UserAnswer = Tab2:CreateInput({
    RemoveTextAfterFocusLost = true,
    Flag = "UserAnswerToBot",
    Callback = function(Text)
-   if Text == "" then return end
-      
-      -- Jika sedang memproses request sebelumnya, langsung blokir!
+         if Text == "" then return end
       if isProcessing then return end
       
-      -- ========================================================
-      -- [ALUR 2]: JIKA TERLALU BANYAK ANSWER / TIDAK KASIH JEDA 1-2 DETIK
-      -- ========================================================
+      -- Anti-spam jeda input lokal (Biar gak crash)
       local currentTime = os.time()
       if currentTime - lastInputTime < 2 then
          Rayfield:Notify({
@@ -105,19 +100,19 @@ local UserAnswer = Tab2:CreateInput({
          return
       end
       
-      -- Aktifkan pengunci sistem & update waktu input terakhir
       isProcessing = true
       lastInputTime = currentTime
       
-      -- ========================================================
-      -- [ALUR 1]: JIKA NORMAL (Proses Kirim ke Server)
-      -- ========================================================
       ReplyBot:Set({Title = "Reply From Bot", Content = "Thinking..."})
       
       local RawKey = Rayfield.Flags.ApiKeyFosX.CurrentValue or ""
       local CleanedKey = string.gsub(RawKey, "%s+", "")
       
       local HttpService = game:GetService("HttpService")
+      
+      -- ========================================================
+      -- 1. PROSES CHATTING: Text = Json = ai = server -> Tampilkan Jawaban
+      -- ========================================================
       local success, response = pcall(function()
          return HttpService:RequestAsync({
             Url = "https://api.groq.com/openai/v1/chat/completions",
@@ -137,35 +132,50 @@ local UserAnswer = Tab2:CreateInput({
          })
       end)
       
-      -- Membaca respon balik server
-      if success and response then
-         if response.StatusCode == 200 then
-            local data = HttpService:JSONDecode(response.Body)
-            local aiAnswer = data.choices[1].message.content
-            
-            lastAIResponse = aiAnswer
-            ReplyBot:Set({Title = "FosX AI Result", Content = aiAnswer})
-            
+      if success and response and response.StatusCode == 200 then
+         local data = HttpService:JSONDecode(response.Body)
+         local aiAnswer = data.choices[1].message.content
+         
+         lastAIResponse = aiAnswer
+         -- Server = Json = text = ai (Jawaban sukses nampil!)
+         ReplyBot:Set({Title = "FosX AI Result", Content = aiAnswer})
+         
          -- ========================================================
-         -- [ALUR 3]: JIKA API RATE MENCAPAI LIMIT (Error 429 / dll)
+         -- 2. KONSEP LU: System = server -> Cek apakah setelah ini limit?
          -- ========================================================
-         elseif response.StatusCode == 429 or response.StatusCode == 400 then
-            lastAIResponse = "..."
-            ReplyBot:Set({Title = "Reply From Bot", Content = ". . ."})
-            
+         local checkSuccess, checkResponse = pcall(function()
+            return HttpService:RequestAsync({
+               Url = "https://api.groq.com/openai/v1/models", -- Sinyal ringan buat nanya status key
+               Method = "GET",
+               Headers = {
+                  ["Authorization"] = "Bearer " .. CleanedKey,
+                  ["Content-Type"] = "application/json"
+               }
+            })
+         end)
+         
+         -- Server = system = Json = text = notif
+         if checkSuccess and checkResponse and (checkResponse.StatusCode == 429 or checkResponse.StatusCode == 400) then
             Rayfield:Notify({
-               Title = "Rate Limit Reached",
-               Content = "Server sibuk atau limit kuota API habis!",
-               Duration = 3,
+               Title = "Rate Limit Warning",
+               Content = "Peringatan: Penggunaan baru saja mencapai limit server! Jeda berikutnya mungkin akan melambat.",
+               Duration = 8, -- Durasi agak lama sesuai req lu
                Image = "ban"
             })
          end
+         
       else
+         -- Jika dari request chat awal emang udah eror/limit
          lastAIResponse = "..."
-         ReplyBot:Set({Title = "Reply From Bot", Content = "Connection Error."})
+         ReplyBot:Set({Title = "Reply From Bot", Content = ". . ."})
+         Rayfield:Notify({
+            Title = "Server Error / Limit",
+            Content = "Gagal memproses pesan atau API Key limit.",
+            Duration = 5,
+            Image = "ban"
+         })
       end
       
-      -- Buka kembali pengunci setelah semua proses selesai
       isProcessing = false
    end,
 })
